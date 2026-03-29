@@ -152,11 +152,21 @@
 - [x] 入力バリデーション: GT範囲, 建造年, IMO7桁, 航行区域必須 ✅ (6fa8726)
 - [x] 週次サマリー (`weekly_summary.py` + `weekly-summary.yml`) ✅ (6fa8726)
 
+#### 追加機能 + インフラ（2026-03-29）
+
+- [x] ニュース詳細改善: OGメタタグ, 色付き信頼度, 原文/PDFリンク ✅ (eda97cb)
+- [x] ダッシュボード該当フィルタ (`?filter=applicable`) ✅ (eda97cb)
+- [x] LINE 通知 (`notify_matches.py` + run-matching.yml 連携) ✅ (eda97cb)
+- [x] Playwright E2E テスト (9テスト) ✅ (eda97cb)
+- [x] ニュースページネーション (10件ずつ) + フォント軽量化 ✅ (a521b8c)
+- [x] カスタムドメイン: https://miharikun.vercel.app ✅
+- [x] Vercel 自動デプロイ (Git push → 自動ビルド) ✅
+
 #### 残タスク
 
-- [ ] **過去データ一括取り込み** — NK 30件実行中、完了後に自動マッチング
-- [ ] 初期ロード < 50KB 確認、Service Worker キャッシュ
-- [ ] カスタムドメイン設定（任意）
+- [ ] NK 過去データ一括取り込み（Gemini 枠回復後に再実行。8件成功済み、残りは pending_queue）
+- [ ] Service Worker キャッシュ（オフライン対応）
+- [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定（LINE 通知を有効化）
 
 ## Phase 3: Fleet 管理 + 拡張 📋 未着手
 
@@ -207,3 +217,10 @@
 - 2026-03-29 22:50 — [Lead/Opus] ニュースページ: ソースフィルタ + 件数表示
 - 2026-03-29 22:50 — [Agent A/Sonnet] 入力バリデーション: GT範囲, 建造年, IMO7桁, 航行区域必須
 - 2026-03-29 22:50 — [Agent B/Sonnet] 週次サマリー (weekly_summary.py + weekly-summary.yml)
+- 2026-03-29 23:00 — [Lead/Opus] ニュースページネーション (10件) + Mono フォント削除 + OG メタタグ
+- 2026-03-29 23:05 — [Lead/Opus] カスタムドメイン: miharikun.vercel.app 設定
+- 2026-03-29 23:10 — [Agent/Sonnet] ニュース詳細: OGメタ, 色付き信頼度, リンク改善
+- 2026-03-29 23:10 — [Agent/Sonnet] ダッシュボード: 該当のみフィルタ + 件数表示
+- 2026-03-29 23:10 — [Agent/Sonnet] LINE 通知: notify_matches.py + ワークフロー連携
+- 2026-03-29 23:10 — [Agent/Sonnet] Playwright E2E テスト: 9テスト (landing/news/auth)
+- 2026-03-29 23:20 — [Lead/Opus] Vercel 自動デプロイ設定完了 (Git push → 自動ビルド)
