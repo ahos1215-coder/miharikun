@@ -221,10 +221,20 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
                 locale="ja-JP",
             )
             page.goto(NK_LIST_URL, timeout=30000, wait_until="networkidle")
-            # ASP.NET のテーブルが描画されるまで待機
-            page.wait_for_selector("table tr td", timeout=10000)
             html = page.content()
             logger.info(f"Page HTML length: {len(html)}")
+
+            # デバッグ: HTML の先頭をログ出力（テーブルが見つからない場合の診断用）
+            if "table" not in html.lower()[:5000]:
+                logger.warning(f"No <table> in first 5000 chars. HTML head: {html[:2000]}")
+
+            # テーブルがある場合は描画待ち（ない場合はスキップしてパース側で0件判定）
+            try:
+                page.wait_for_selector("table tr td", timeout=5000)
+                html = page.content()
+            except Exception:
+                logger.warning("table tr td selector not found, proceeding with current HTML")
+
             browser.close()
     except Exception as e:
         logger.error(f"Failed to fetch NK list page: {e}")
