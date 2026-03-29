@@ -415,12 +415,22 @@ def process_entries(
                                 classification.get("category"),
                                 classification.get("confidence"),
                             )
+                            # classify_pdf は失敗時に例外ではなく status=pending を返す
+                            if classification.get("status") == "pending":
+                                logger.warning("Gemini 分類失敗（pending）: %s — %s", source_id, classification.get("error"))
+                                client.queue_pending(
+                                    source="MLIT",
+                                    source_id=source_id,
+                                    pdf_url=primary_pdf_url or "",
+                                    reason="gemini_pending",
+                                    error_detail=classification.get("error", ""),
+                                )
                         except Exception as e:
                             logger.error("Gemini 分類エラー: %s — %s", primary_pdf_url, e)
                             client.queue_pending(
                                 source="MLIT",
                                 source_id=source_id,
-                                pdf_url=primary_pdf_url,
+                                pdf_url=primary_pdf_url or "",
                                 reason="gemini_error",
                                 error_detail=str(e),
                             )

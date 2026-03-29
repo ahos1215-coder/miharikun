@@ -605,6 +605,8 @@ def process_entry(
         )
         if classification is None:
             raise ValueError("classify_pdf returned None")
+        if classification.get("status") == "pending":
+            raise ValueError(f"classify_pdf returned pending: {classification.get('error', '')}")
     except Exception as e:
         logger.error(f"Gemini classification failed for TEC-{entry.tec_number}: {e}")
         # Gemini 失敗 → pending_queue に登録（翌日のバッチで自動リトライ）
