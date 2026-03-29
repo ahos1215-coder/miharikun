@@ -31,7 +31,13 @@ function applicabilityLabel(isApplicable: boolean | null) {
   return <span className="text-amber-600">判定中</span>;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const params = await searchParams;
+  const filterApplicable = params.filter === "applicable";
   const supabase = await createClient();
 
   const {
@@ -106,13 +112,40 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <>
+          <div className="flex gap-2 mb-4">
+            <Link
+              href="/dashboard"
+              className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                !filterApplicable
+                  ? "bg-blue-600 text-white"
+                  : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              }`}
+            >
+              [ALL] 全て表示
+            </Link>
+            <Link
+              href="/dashboard?filter=applicable"
+              className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                filterApplicable
+                  ? "bg-blue-600 text-white"
+                  : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              }`}
+            >
+              [CHECK] 該当のみ
+            </Link>
+          </div>
+
           <div className="flex flex-col gap-6">
             {shipList.map((ship) => {
-              const matches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
+              const allMatches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
                 // 該当 > 判定中 > 非該当 の順で表示
                 const order = (v: boolean | null) => v === true ? 0 : v === null ? 1 : 2;
                 return order(a.is_applicable) - order(b.is_applicable);
               });
+              const applicableCount = allMatches.filter((m) => m.is_applicable === true).length;
+              const matches = filterApplicable
+                ? allMatches.filter((m) => m.is_applicable === true)
+                : allMatches;
               return (
                 <div
                   key={ship.id}
@@ -136,6 +169,12 @@ export default async function DashboardPage() {
                       [EDIT] 編集
                     </Link>
                   </div>
+
+                  {allMatches.length > 0 && (
+                    <p className="text-xs text-zinc-500 mb-2">
+                      該当: {applicableCount}件 / 全: {allMatches.length}件
+                    </p>
+                  )}
 
                   {matches.length === 0 ? (
                     <p className="text-sm text-zinc-400">

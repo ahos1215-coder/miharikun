@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
 import type { Regulation, Severity, Citation } from "@/lib/types";
 
 function severityBadge(severity: Severity) {
@@ -25,11 +26,27 @@ function sourceBadge(source: string) {
 }
 
 function confidenceDisplay(confidence: number | null) {
-  if (confidence === null) return "不明";
+  if (confidence === null) {
+    return <span className="text-zinc-400">不明</span>;
+  }
   const pct = Math.round(confidence * 100);
-  if (confidence >= 0.8) return `${pct}%`;
-  if (confidence >= 0.5) return `${pct}% [!] 要確認`;
-  return `${pct}% [?] AI不確実`;
+  if (confidence >= 0.8) {
+    return (
+      <span className="text-green-600 font-semibold">{pct}%</span>
+    );
+  }
+  if (confidence >= 0.5) {
+    return (
+      <span className="text-amber-600 font-semibold">
+        {pct}% [!] 要確認
+      </span>
+    );
+  }
+  return (
+    <span className="text-red-600 font-semibold">
+      {pct}% [?] AI不確実
+    </span>
+  );
 }
 
 function formatDate(dateStr: string | null) {
@@ -41,25 +58,55 @@ function formatDate(dateStr: string | null) {
   });
 }
 
+async function fetchRegulation(id: string): Promise<Regulation | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("regulations")
+    .select("*")
+    .eq("id", id)
+    .single();
+  return data as Regulation | null;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const reg = await fetchRegulation(id);
+
+  if (!reg) {
+    return { title: "規制情報が見つかりません | MIHARIKUN" };
+  }
+
+  const description =
+    reg.summary_ja ?? `${reg.source} の規制情報: ${reg.title}`;
+
+  return {
+    title: `${reg.title} | MIHARIKUN`,
+    description,
+    openGraph: {
+      title: `[${reg.source}] ${reg.title}`,
+      description,
+      type: "article",
+      publishedTime: reg.published_at ?? undefined,
+    },
+  };
+}
+
 export default async function RegulationDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const reg = await fetchRegulation(id);
 
-  const { data } = await supabase
-    .from("regulations")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (!data) {
+  if (!reg) {
     notFound();
   }
 
-  const reg = data as Regulation;
   const citations = (reg.citations ?? []) as Citation[];
 
   return (
@@ -68,7 +115,7 @@ export default async function RegulationDetailPage({
         href="/news"
         className="text-sm text-blue-600 hover:underline"
       >
-        &larr; ニュース一覧へ戻る
+        &larr; ニュース一覧に戻る
       </Link>
 
       <div className="mt-4 rounded border border-zinc-200 p-6 dark:border-zinc-800">
@@ -145,7 +192,7 @@ export default async function RegulationDetailPage({
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline"
             >
-              原文リンク &rarr;
+              [LINK] 原文を見る
             </a>
           )}
           {reg.pdf_url && (
@@ -155,7 +202,7 @@ export default async function RegulationDetailPage({
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline"
             >
-              PDF &rarr;
+              [PDF] PDF を開く
             </a>
           )}
         </div>
