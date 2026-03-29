@@ -96,7 +96,6 @@ jobs:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
-          SCRAPE_USER_AGENT: 'MaritimeRegsMonitor/1.0 (+https://github.com/${{ github.repository }}; contact@example.com)'
 
       - name: Upload scrape artifacts
         if: always()
