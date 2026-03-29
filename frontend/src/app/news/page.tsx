@@ -14,7 +14,7 @@ function severityBadge(severity: Severity) {
 }
 
 function sourceBadge(source: string) {
-  if (source === "NK") {
+  if (source === "nk" || source === "NK") {
     return <span className="text-emerald-700 font-semibold">[NK]</span>;
   }
   if (source === "MLIT") {
@@ -45,19 +45,67 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-export default async function NewsPage() {
+export default async function NewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>;
+}) {
+  const params = await searchParams;
+  const sourceFilter = params.source?.toUpperCase();
+
   const supabase = await createClient();
 
-  const { data: regulations } = await supabase
+  let query = supabase
     .from("regulations")
     .select("*")
     .order("published_at", { ascending: false });
 
+  if (sourceFilter) {
+    query = query.ilike("source", sourceFilter);
+  }
+
+  const { data: regulations } = await query;
   const items = (regulations ?? []) as Regulation[];
+
+  // ソース別件数（フィルタ前の全数）
+  const { count: totalCount } = await supabase
+    .from("regulations")
+    .select("*", { count: "exact", head: true });
+
+  const { count: nkCount } = await supabase
+    .from("regulations")
+    .select("*", { count: "exact", head: true })
+    .ilike("source", "nk");
+
+  const { count: mlitCount } = await supabase
+    .from("regulations")
+    .select("*", { count: "exact", head: true })
+    .ilike("source", "MLIT");
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">最新規制ニュース</h1>
+      <h1 className="text-2xl font-bold mb-4">最新規制ニュース</h1>
+
+      <div className="flex gap-2 mb-6 text-sm">
+        <Link
+          href="/news"
+          className={`rounded px-3 py-1 ${!sourceFilter ? "bg-blue-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
+        >
+          全て ({totalCount ?? 0})
+        </Link>
+        <Link
+          href="/news?source=nk"
+          className={`rounded px-3 py-1 ${sourceFilter === "NK" ? "bg-emerald-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
+        >
+          NK ({nkCount ?? 0})
+        </Link>
+        <Link
+          href="/news?source=mlit"
+          className={`rounded px-3 py-1 ${sourceFilter === "MLIT" ? "bg-indigo-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
+        >
+          国交省 ({mlitCount ?? 0})
+        </Link>
+      </div>
 
       {items.length === 0 ? (
         <p className="text-zinc-500">規制情報はまだありません</p>
@@ -78,6 +126,11 @@ export default async function NewsPage() {
                   {confidenceLabel(reg.confidence)}
                 </div>
                 <p className="font-medium">{reg.title}</p>
+                {reg.summary_ja && (
+                  <p className="text-xs text-zinc-500 mt-1 line-clamp-2">
+                    {reg.summary_ja}
+                  </p>
+                )}
                 <p className="text-xs text-zinc-400 mt-1">
                   {formatDate(reg.published_at)}
                 </p>

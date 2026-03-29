@@ -45,6 +45,12 @@ export default function ShipNewPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (navigationArea.length === 0) {
+      setError("航行区域を1つ以上選択してください");
+      return;
+    }
+
     setLoading(true);
 
     const supabase = createClient();
@@ -100,6 +106,7 @@ export default function ShipNewPage() {
             id="ship_name"
             type="text"
             required
+            maxLength={100}
             value={shipName}
             onChange={(e) => setShipName(e.target.value)}
             className={inputClass}
@@ -135,6 +142,8 @@ export default function ShipNewPage() {
             type="number"
             required
             min={1}
+            max={500000}
+            step={1}
             value={grossTonnage}
             onChange={(e) => setGrossTonnage(e.target.value)}
             className={inputClass}
@@ -149,7 +158,9 @@ export default function ShipNewPage() {
           <input
             id="dwt"
             type="number"
-            min={0}
+            min={1}
+            max={1000000}
+            step={1}
             value={dwt}
             onChange={(e) => setDwt(e.target.value)}
             className={inputClass}
@@ -166,7 +177,7 @@ export default function ShipNewPage() {
             type="number"
             required
             min={1900}
-            max={2030}
+            max={2026}
             value={buildYear}
             onChange={(e) => setBuildYear(e.target.value)}
             className={inputClass}
@@ -215,7 +226,9 @@ export default function ShipNewPage() {
 
         {/* 航行区域 */}
         <div>
-          <span className="block text-sm font-medium">航行区域</span>
+          <span className="block text-sm font-medium">
+            航行区域 <span className="text-red-500">*</span>
+          </span>
           <div className="mt-1 space-y-1">
             {navAreas.map((area) => (
               <label key={area} className="flex items-center gap-2 text-sm">
@@ -255,6 +268,9 @@ export default function ShipNewPage() {
           <input
             id="imo_number"
             type="text"
+            pattern="\d{7}"
+            maxLength={7}
+            title="IMO番号は7桁の数字です"
             value={imoNumber}
             onChange={(e) => setImoNumber(e.target.value)}
             className={inputClass}
