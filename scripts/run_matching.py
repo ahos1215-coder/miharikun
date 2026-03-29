@@ -117,16 +117,23 @@ def fetch_regulations(limit: Optional[int] = None) -> list[dict]:
 
 def fetch_existing_matches() -> set[tuple[str, str]]:
     """
-    user_matches テーブルから既存の (regulation_id, ship_profile_id) ペアを取得。
-    既にマッチ済みのペアをスキップするために使用。
+    user_matches テーブルから、正常に完了した (regulation_id, ship_profile_id) ペアを取得。
+    confidence=0 のレコード（429 等で失敗した判定）は再処理対象とするためスキップしない。
     """
     logger.info("既存の user_matches を取得中...")
     rows = fetch_all_paginated(
         "user_matches",
-        select="regulation_id,ship_profile_id",
+        select="regulation_id,ship_profile_id,confidence",
     )
-    existing = {(row["regulation_id"], row["ship_profile_id"]) for row in rows}
-    logger.info(f"既存 user_matches: {len(existing)} ペア")
+    # confidence > 0 のもののみ「完了済み」として扱う
+    existing = {
+        (row["regulation_id"], row["ship_profile_id"])
+        for row in rows
+        if row.get("confidence") is not None and row["confidence"] > 0
+    }
+    total = len(rows)
+    retry = total - len(existing)
+    logger.info(f"既存 user_matches: {total} ペア（完了={len(existing)}, 再処理対象={retry}）")
     return existing
 
 
