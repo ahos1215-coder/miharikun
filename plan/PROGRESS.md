@@ -13,9 +13,9 @@
 |-------|---------|-----------|---------|
 | Phase 0: 基盤構築 | — | ✅ 完了 | 2026-03-29 |
 | Phase 1 R1: スクレイパー構築 | R1 | ✅ 完了 | 2026-03-29 |
-| Phase 1 R2: DB + 検証 | R2 | ⏳ 作業中 | 2026-03-29 |
-| Phase 2: UI + 認証 | — | 📋 未着手 | — |
-| Phase 3: 通知 + 船舶管理 | — | 📋 未着手 | — |
+| Phase 1 R2: DB + 検証 + マッチング基盤 | R2 | ⏳ 作業中 | 2026-03-29 |
+| Phase 2: Ship Specs + マッチング + 超軽量 UI | — | 📋 未着手 | — |
+| Phase 3: Fleet 管理 + 拡張 | — | 📋 未着手 | — |
 
 ---
 
@@ -70,35 +70,54 @@
 
 ---
 
-### ラウンド 2: DB マイグレーション + 検証 ⏳ 作業中
+### ラウンド 2: DB + 検証 + マッチング基盤 ⏳ 作業中
 
-**次のアクション（優先順）:**
+> **v5 戦略方針転換**: 資格管理フック廃止、Ship Specs + マッチングエンジンに全力集中。
+> 詳細: `plan/STRATEGIC_PIVOT_v5.md`
+
+#### 完了済み
 
 - [x] Supabase マイグレーション SQL 作成（`supabase/migrations/`）✅
-  - `regulations` テーブル（Blueprint §7.1 + コード実装のフィールド統合）
-  - `pending_queue` テーブル
-  - `mlit_crawl_state` テーブル
-  - RLS ポリシー（anon=読取専用, service_role=全操作）
-  - インデックス 10個
+  - `regulations`, `pending_queue`, `mlit_crawl_state` + RLS + インデックス
   - **Supabase ダッシュボードで適用済み**
-- [x] `process-queue.yml` — pending_queue 自動リトライ（毎日 JST 12:00）✅
-- [x] `health-check.yml` — ソース鮮度・DB 容量モニタリング（毎週月曜 JST 09:00）✅
-- [x] NK サイトへの実アクセス dry-run テスト — 🚫 GHA IP ブロック（ローカルは OK）
-  - ClassNK は GHA IP レンジをブロック。Playwright でも空 HTML。
-  - **対策**: ローカル実行 or self-hosted runner。GHA cron は無効化済み。
-- [x] 国交省 RSS フィードの実取得テスト ✅
-  - 旧 URL (maritime.xml) は 404 → pressrelease.rdf に修正
-  - GHA dry-run: 50エントリ中8件海事関連を検出、3件処理成功
-- [ ] Gemini API 分類精度検証・プロンプトチューニング
-- [ ] e-Gov スクレイパー第 3 層（法令パブリックコメント）
+- [x] `process-queue.yml` + `health-check.yml` ✅
+- [x] MLIT RSS 実データテスト ✅（GHA dry-run 成功、8件海事関連検出）
+- [x] NK IP ブロック調査 ✅（GHA IP 完全ブロック確認）
+
+#### 次のアクション（優先順）
+
+- [ ] **Self-hosted Runner 設定** — 開発 PC を GHA ランナーに登録、NK ワークフローを `runs-on: self-hosted` に変更
+- [ ] **ship_profiles テーブル作成** — `supabase/migrations/00005_ship_profiles.sql`
+  - ship_name, ship_type, gross_tonnage, dwt, build_year, classification_society, flag_state, navigation_area[], routes[], imo_number
+  - RLS: 自分の船のみ CRUD、service_role は全操作
+- [ ] **マッチングエンジン v1** — `scripts/utils/matching.py`
+  - ルールベース: GT 範囲、船種、建造年の単純比較で明確な非該当を除外
+  - AI マッチング: 残った候補を Gemini に送り、自船スペックとの精密照合
+  - confidence + reason + citations を返す
+- [ ] **MLIT RSS 本番実行**（dry-run なし）→ Gemini 分類精度検証
+- [ ] NK 本番実行（Self-hosted Runner 設定後）
 
 ---
 
-## Phase 2: UI + 認証 📋 未着手
-設計書: `plan/MARITIME_PROJECT_BLUEPRINT_v4.md` §5-§8
+## Phase 2: Ship Specs + マッチング + 超軽量 UI 📋 未着手
 
-## Phase 3: 通知 + 船舶管理 📋 未着手
-設計書: `plan/MARITIME_PROJECT_BLUEPRINT_v4.md` §9-§10
+> 設計書: `plan/STRATEGIC_PIVOT_v5.md` §4
+
+- [ ] Supabase Auth（ログイン / サインアップ）
+- [ ] Ship Specs 登録画面 (`/ships/new`, `/ships/[id]`)
+- [ ] パーソナライズダッシュボード (`/dashboard`) — 自船に関係ある規制のみ
+- [ ] ニュースタブ (`/news`) — 全規制一覧（Free）
+- [ ] 規制詳細 (`/news/[id]`) — AI 要約 + 根拠引用
+- [ ] 超軽量通知設定 (`/settings`) — メール / LINE
+- [ ] 週次サマリーメール — GHA 自動生成
+- [ ] 初期ロード < 50KB、Service Worker キャッシュ
+
+## Phase 3: Fleet 管理 + 拡張 📋 未着手
+
+- [ ] Fleet 管理（複数船一括）
+- [ ] e-Gov パブコメ監視
+- [ ] LINE リアルタイム通知
+- [ ] ユーザーフィードバック（AI 精度改善ループ）
 
 ---
 
@@ -113,3 +132,5 @@
 - 2026-03-29 — [Opus] Phase 1 R2: process_queue.py + health_check.py + GHA ワークフロー 2つ作成
 - 2026-03-29 — [Opus] MLIT RSS URL 修正 (maritime.xml→pressrelease.rdf)、GHA dry-run 成功
 - 2026-03-29 — [Opus] NK: GHA IP ブロック判明。requests/curl_cffi/Playwright 全滅。cron 無効化、ローカル実行用に維持
+- 2026-03-29 — [Opus] **戦略方針転換 v5**: 資格管理フック廃止、Ship Specs + マッチングエンジン最優先、Self-hosted Runner 採用
+- 2026-03-29 — [Opus] plan/STRATEGIC_PIVOT_v5.md 作成、CLAUDE.md・PROGRESS.md を v5 方針に更新

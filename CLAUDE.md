@@ -2,9 +2,12 @@
 
 ## プロジェクト概要
 海事規制の自動収集・AI分類・パーソナライズ通知サービス。
+**唯一最大の強み**: 膨大な規制情報の中から、自船にのみ関係ある情報を自動抽出・通知すること。
+
 設計書: `plan/MARITIME_PROJECT_BLUEPRINT_v4.md`
+**戦略方針**: `plan/STRATEGIC_PIVOT_v5.md`（v4 との矛盾時はこちらが優先）
 進捗: `plan/PROGRESS.md`（**新規セッション開始時に必ず最初に読むこと**）
-引継ぎ: `plan/HANDOFF.md`（前セッションからの引継ぎ事項・API 一覧・既知の罠）
+引継ぎ: `plan/HANDOFF.md`
 
 ## テックスタック
 - **Frontend**: Next.js 16+ (App Router) / TypeScript / Tailwind CSS
@@ -62,8 +65,16 @@
 - コミットメッセージ: `feat:`, `fix:`, `chore:`, `docs:` プレフィックス
 - 日本語コメント OK
 
+## 戦略方針（v5 で確定）
+- **資格管理フックは廃止** — `/crew/certificates` は作らない、crew_profiles テーブルも不要
+- **Ship Specs 登録がコア機能** — マッチング精度に直結する船舶プロファイルを最優先
+- **マッチングエンジンに全力** — ルールベース（高速除外）→ Gemini AI（精密判定）の2段階
+- **超軽量 UI** — 船上低帯域対応、1ページ完結、初期ロード < 50KB
+- **NK は Self-hosted Runner** — GHA IP ブロック回避のため開発 PC をランナーに設定
+
 ## やらないこと
 - Flask / Render は使わない
 - Vercel API Routes で PDF 解析や Gemini 呼び出しをしない
 - secrets をコード・コミット・ログに含めない
 - node_modules/ をコミットしない
+- 資格管理・証明書期限リマインダーは作らない（v5 で廃止決定）
