@@ -1,0 +1,66 @@
+name: Health Check
+
+on:
+  schedule:
+    # 毎週月曜 JST 09:00 = UTC 00:00
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      stale_days:
+        description: 'データが古いと判定する日数'
+        type: string
+        default: '7'
+      pending_threshold:
+        description: 'pending_queue 警告の閾値'
+        type: string
+        default: '10'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run health check
+        run: |
+          ARGS="--json-output"
+
+          if [ -n "${{ inputs.stale_days }}" ]; then
+            ARGS="$ARGS --stale-days ${{ inputs.stale_days }}"
+          fi
+
+          if [ -n "${{ inputs.pending_threshold }}" ]; then
+            ARGS="$ARGS --pending-threshold ${{ inputs.pending_threshold }}"
+          fi
+
+          cd scripts
+          python health_check.py $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+
+      - name: Send LINE notification on failure
+        if: failure()
+        run: |
+          MESSAGE="%0A[MIHARIKUN] Health Check が失敗しました%0ARun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ -n "$LINE_NOTIFY_TOKEN" ]; then
+            curl -s -X POST https://notify-api.line.me/api/notify \
+              -H "Authorization: Bearer $LINE_NOTIFY_TOKEN" \
+              -d "message=${MESSAGE}" || true
+          fi
+        env:
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
