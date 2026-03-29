@@ -13,8 +13,8 @@
 |-------|---------|-----------|---------|
 | Phase 0: 基盤構築 | — | ✅ 完了 | 2026-03-29 |
 | Phase 1 R1: スクレイパー構築 | R1 | ✅ 完了 | 2026-03-29 |
-| Phase 1 R2: DB + 検証 + マッチング基盤 | R2 | ⏳ 作業中 | 2026-03-29 |
-| Phase 2: Ship Specs + マッチング + 超軽量 UI | — | 📋 未着手 | — |
+| Phase 1 R2: DB + 検証 + マッチング基盤 | R2 | ✅ 完了 | 2026-03-29 |
+| Phase 2: Ship Specs + マッチング + 超軽量 UI | — | 📋 未着手 ← 次 | — |
 | Phase 3: Fleet 管理 + 拡張 | — | 📋 未着手 | — |
 
 ---
@@ -70,7 +70,9 @@
 
 ---
 
-### ラウンド 2: DB + 検証 + マッチング基盤 ⏳ 作業中
+### ラウンド 2: DB + 検証 + マッチング基盤 ✅ 完了
+
+**完了日:** 2026-03-29
 
 > **v5 戦略方針転換**: 資格管理フック廃止、Ship Specs + マッチングエンジンに全力集中。
 > 詳細: `plan/STRATEGIC_PIVOT_v5.md`
@@ -102,13 +104,16 @@
   - pending_queue 未登録バグ修正済み
   - 精度レポート: `plan/GEMINI_ACCURACY_REPORT.md`
 
-#### 残タスク
+#### 本番検証（2026-03-29）
 
-- [ ] **ユーザー作業**: Self-hosted Runner をローカル PC にセットアップ
-- [ ] **ユーザー作業**: `00005_ship_profiles.sql` を Supabase で実行
-- [ ] **ユーザー作業**: GEMINI_MODEL / GEMINI_FALLBACK_MODEL Secret を削除
-- [ ] MLIT RSS 再実行（Gemini Secret 修正後）→ 分類精度の再検証
-- [ ] NK 本番実行（Self-hosted Runner セットアップ後）
+- [x] **ユーザー作業**: Self-hosted Runner をローカル PC にセットアップ ✅
+- [x] **ユーザー作業**: `00005_ship_profiles.sql` を Supabase で実行 ✅
+- [x] **ユーザー作業**: GEMINI_MODEL / GEMINI_FALLBACK_MODEL Secret を削除 ✅
+- [x] MLIT ワークフロー GEMINI_MODEL を `vars || デフォルト値` に修正 ✅ (a9ee0c7)
+- [x] MLIT スクレイパー `confidence_score` → `confidence` カラム名修正 ✅ (eb314ff)
+- [x] Supabase upsert に `on_conflict=source,source_id` 追加 ✅ (55d276e)
+- [x] NK 本番実行 ✅ — 3件 upsert 成功 (recycling×2, environment×1, confidence=0.95)
+- [x] MLIT RSS 本番実行 ✅ — 3件 upsert 成功 (1件 Gemini 分類済み, 2件 429 レート制限で pending)
 
 ---
 
@@ -154,3 +159,8 @@
 - 2026-03-29 — [Lead/Opus] Self-hosted Runner 稼働確認（online）、NK dry-run 成功（50件パース、3件処理）
 - 2026-03-29 — [Lead/Opus] NK bot UA 環境変数 (SCRAPE_USER_AGENT) 削除 → 403 解消
 - 2026-03-29 — [Lead/Opus] HANDOFF.md 更新（Phase 1 R2 継続用）
+- 2026-03-29 20:57 — [Lead/Opus] MLIT ワークフロー GEMINI_MODEL を vars+デフォルト値に修正 (a9ee0c7)
+- 2026-03-29 21:00 — [Lead/Opus] MLIT confidence_score→confidence カラム名修正 (eb314ff)
+- 2026-03-29 21:03 — [Lead/Opus] Supabase upsert on_conflict 追加 (55d276e)
+- 2026-03-29 21:06 — [Lead/Opus] NK 本番成功 (3件), MLIT RSS 本番成功 (3件) — Phase 1 R2 完了
+- 2026-03-29 21:10 — [Lead/Opus] CLAUDE.md にリソース適応型 Agent Teams ルール追加
