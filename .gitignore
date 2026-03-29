@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# env files
+.env*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Next.js (also in frontend/.gitignore)
+.next/
+.vercel
