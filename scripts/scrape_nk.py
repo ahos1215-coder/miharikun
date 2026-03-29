@@ -220,8 +220,11 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
                 user_agent=HEADERS["User-Agent"],
                 locale="ja-JP",
             )
-            page.goto(NK_LIST_URL, timeout=30000, wait_until="domcontentloaded")
+            page.goto(NK_LIST_URL, timeout=30000, wait_until="networkidle")
+            # ASP.NET のテーブルが描画されるまで待機
+            page.wait_for_selector("table tr td", timeout=10000)
             html = page.content()
+            logger.info(f"Page HTML length: {len(html)}")
             browser.close()
     except Exception as e:
         logger.error(f"Failed to fetch NK list page: {e}")
