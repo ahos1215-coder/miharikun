@@ -107,3 +107,22 @@ export const NAV_AREA_LABELS: Record<NavigationArea, string> = {
   near_sea: "近海",
   smooth_water: "平水",
 };
+
+export type NotifySeverity = "all" | "critical" | "action_required";
+
+export interface UserPreferences {
+  id: string;
+  user_id: string;
+  email_notify: boolean;
+  line_notify: boolean;
+  notify_severity: NotifySeverity;
+  weekly_summary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const NOTIFY_SEVERITY_LABELS: Record<NotifySeverity, string> = {
+  all: "全て",
+  critical: "重要のみ",
+  action_required: "緊急のみ",
+};

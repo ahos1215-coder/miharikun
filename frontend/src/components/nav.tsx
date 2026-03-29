@@ -10,6 +10,7 @@ import type { User } from "@supabase/supabase-js";
 export function Nav() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -39,7 +40,8 @@ export function Nav() {
           <span>MIHARIKUN</span>
         </Link>
 
-        <div className="flex items-center gap-4 text-sm">
+        {/* Desktop nav */}
+        <div className="hidden sm:flex items-center gap-4 text-sm">
           <Link href="/news" className="hover:text-blue-600">
             [NEWS] ニュース
           </Link>
@@ -71,7 +73,55 @@ export function Nav() {
             </Link>
           )}
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          className="sm:hidden text-sm font-bold"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          {menuOpen ? "[X]" : "[MENU]"}
+        </button>
       </nav>
+
+      {/* Mobile menu */}
+      {menuOpen && (
+        <div className="sm:hidden border-t border-zinc-200 dark:border-zinc-800 px-4 py-3 flex flex-col gap-3 text-sm">
+          <Link href="/news" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
+            [NEWS] ニュース
+          </Link>
+
+          {user ? (
+            <>
+              <Link href="/dashboard" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
+                [DASH] ダッシュボード
+              </Link>
+              <Link href="/ships/new" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
+                [SHIP] 船舶登録
+              </Link>
+              <Link href="/settings" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
+                [SET] 設定
+              </Link>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleLogout();
+                }}
+                className="text-left text-zinc-500 hover:text-red-600"
+              >
+                ログアウト
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 text-center"
+              onClick={() => setMenuOpen(false)}
+            >
+              ログイン
+            </Link>
+          )}
+        </div>
+      )}
     </header>
   );
 }

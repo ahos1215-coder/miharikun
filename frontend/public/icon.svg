@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- MIHARIKUN アプリアイコン — 船のアンカーモチーフ -->
+  <rect width="512" height="512" rx="64" fill="#ffffff"/>
+  <g transform="translate(256,256)">
+    <!-- アンカー本体 -->
+    <circle cx="0" cy="-120" r="32" stroke="#2563eb" stroke-width="28" fill="none"/>
+    <line x1="0" y1="-88" x2="0" y2="140" stroke="#2563eb" stroke-width="28" stroke-linecap="round"/>
+    <line x1="-80" y1="60" x2="80" y2="60" stroke="#2563eb" stroke-width="28" stroke-linecap="round"/>
+    <!-- アンカーの腕（曲線） -->
+    <path d="M0 140 Q0 180 -70 160" stroke="#2563eb" stroke-width="28" stroke-linecap="round" fill="none"/>
+    <path d="M0 140 Q0 180 70 160" stroke="#2563eb" stroke-width="28" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

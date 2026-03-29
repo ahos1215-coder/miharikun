@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { UserPreferences } from "@/lib/types";
+import SettingsForm from "./SettingsForm";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -12,35 +14,42 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
+  // Fetch existing preferences
+  const { data: existing } = await supabase
+    .from("user_preferences")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+
+  let preferences: UserPreferences;
+
+  if (existing) {
+    preferences = existing as UserPreferences;
+  } else {
+    // Create default row on first visit
+    const { data: created, error } = await supabase
+      .from("user_preferences")
+      .insert({ user_id: user.id })
+      .select()
+      .single();
+
+    if (error || !created) {
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <p className="text-red-600">
+            設定の初期化に失敗しました: {error?.message}
+          </p>
+        </div>
+      );
+    }
+
+    preferences = created as UserPreferences;
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">通知設定</h1>
-
-      <div className="rounded border border-zinc-200 p-6 dark:border-zinc-800">
-        <div className="flex flex-col gap-4">
-          <label className="flex items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              disabled
-              className="h-4 w-4"
-            />
-            <span className="text-zinc-400">メール通知 (coming soon)</span>
-          </label>
-
-          <label className="flex items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              disabled
-              className="h-4 w-4"
-            />
-            <span className="text-zinc-400">LINE通知 (coming soon)</span>
-          </label>
-        </div>
-
-        <p className="mt-6 text-sm text-zinc-500">
-          通知機能は現在開発中です。
-        </p>
-      </div>
+      <SettingsForm preferences={preferences} />
     </div>
   );
 }
