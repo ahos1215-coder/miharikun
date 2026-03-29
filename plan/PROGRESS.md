@@ -84,18 +84,31 @@
 - [x] MLIT RSS 実データテスト ✅（GHA dry-run 成功、8件海事関連検出）
 - [x] NK IP ブロック調査 ✅（GHA IP 完全ブロック確認）
 
-#### 次のアクション（優先順）
+#### Agent Teams 並列実装（2026-03-29）
 
-- [ ] **Self-hosted Runner 設定** — 開発 PC を GHA ランナーに登録、NK ワークフローを `runs-on: self-hosted` に変更
-- [ ] **ship_profiles テーブル作成** — `supabase/migrations/00005_ship_profiles.sql`
-  - ship_name, ship_type, gross_tonnage, dwt, build_year, classification_society, flag_state, navigation_area[], routes[], imo_number
-  - RLS: 自分の船のみ CRUD、service_role は全操作
-- [ ] **マッチングエンジン v1** — `scripts/utils/matching.py`
-  - ルールベース: GT 範囲、船種、建造年の単純比較で明確な非該当を除外
-  - AI マッチング: 残った候補を Gemini に送り、自船スペックとの精密照合
+- [x] **Self-hosted Runner** ✅ — 手順書 + NK ワークフロー修正済み
+  - `plan/SELF_HOSTED_RUNNER_SETUP.md` 作成
+  - `scrape-nk.yml`: `runs-on: self-hosted`、cron 再有効化、Python フォールバック
+  - **ユーザー手動作業待ち**: Runner ダウンロード・設定・サービス化
+- [x] **ship_profiles テーブル** ✅ — `00005_ship_profiles.sql` 作成
+  - ship_profiles + user_matches テーブル + RLS + インデックス
+  - **ユーザー手動作業待ち**: Supabase ダッシュボードで SQL 実行
+- [x] **マッチングエンジン v1** ✅ — `scripts/utils/matching.py`
+  - ルールベース（6条件で高速除外）→ Gemini AI（精密判定）の2段階
   - confidence + reason + citations を返す
-- [ ] **MLIT RSS 本番実行**（dry-run なし）→ Gemini 分類精度検証
-- [ ] NK 本番実行（Self-hosted Runner 設定後）
+- [x] **MLIT RSS 本番実行** ✅ — Gemini 分類精度検証
+  - 結果: Gemini 全件失敗（GEMINI_MODEL Secret が空文字で 404）
+  - **対策**: GEMINI_MODEL / GEMINI_FALLBACK_MODEL Secret を削除 → デフォルト値が効く
+  - pending_queue 未登録バグ修正済み
+  - 精度レポート: `plan/GEMINI_ACCURACY_REPORT.md`
+
+#### 残タスク
+
+- [ ] **ユーザー作業**: Self-hosted Runner をローカル PC にセットアップ
+- [ ] **ユーザー作業**: `00005_ship_profiles.sql` を Supabase で実行
+- [ ] **ユーザー作業**: GEMINI_MODEL / GEMINI_FALLBACK_MODEL Secret を削除
+- [ ] MLIT RSS 再実行（Gemini Secret 修正後）→ 分類精度の再検証
+- [ ] NK 本番実行（Self-hosted Runner セットアップ後）
 
 ---
 
@@ -134,3 +147,7 @@
 - 2026-03-29 — [Opus] NK: GHA IP ブロック判明。requests/curl_cffi/Playwright 全滅。cron 無効化、ローカル実行用に維持
 - 2026-03-29 — [Opus] **戦略方針転換 v5**: 資格管理フック廃止、Ship Specs + マッチングエンジン最優先、Self-hosted Runner 採用
 - 2026-03-29 — [Opus] plan/STRATEGIC_PIVOT_v5.md 作成、CLAUDE.md・PROGRESS.md を v5 方針に更新
+- 2026-03-29 — [Agent A/Sonnet] Self-hosted Runner 手順書 + NK ワークフロー修正
+- 2026-03-29 — [Agent B/Sonnet] ship_profiles SQL + matching.py（ルールベース + AI 2段階）
+- 2026-03-29 — [Agent C/Sonnet] MLIT RSS 本番実行、Gemini 全件失敗の原因特定（GEMINI_MODEL Secret 空文字）
+- 2026-03-29 — [Lead/Opus] 統合チェック、classify_pdf pending ハンドリングバグ修正（NK + MLIT 両方）
