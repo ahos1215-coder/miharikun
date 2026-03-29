@@ -83,8 +83,12 @@
   - **Supabase ダッシュボードで適用済み**
 - [x] `process-queue.yml` — pending_queue 自動リトライ（毎日 JST 12:00）✅
 - [x] `health-check.yml` — ソース鮮度・DB 容量モニタリング（毎週月曜 JST 09:00）✅
-- [ ] NK サイトへの実アクセス dry-run テスト
-- [ ] 国交省 RSS フィードの実取得テスト
+- [x] NK サイトへの実アクセス dry-run テスト — 🚫 GHA IP ブロック（ローカルは OK）
+  - ClassNK は GHA IP レンジをブロック。Playwright でも空 HTML。
+  - **対策**: ローカル実行 or self-hosted runner。GHA cron は無効化済み。
+- [x] 国交省 RSS フィードの実取得テスト ✅
+  - 旧 URL (maritime.xml) は 404 → pressrelease.rdf に修正
+  - GHA dry-run: 50エントリ中8件海事関連を検出、3件処理成功
 - [ ] Gemini API 分類精度検証・プロンプトチューニング
 - [ ] e-Gov スクレイパー第 3 層（法令パブリックコメント）
 
@@ -107,3 +111,5 @@
 - 2026-03-29 16:00 — [Lead/Opus] CLAUDE.md にエージェント運用ルール追加、PROGRESS.md リデザイン
 - 2026-03-29 — [Opus] Phase 1 R2: マイグレーション SQL 4ファイル作成、Supabase 適用済み
 - 2026-03-29 — [Opus] Phase 1 R2: process_queue.py + health_check.py + GHA ワークフロー 2つ作成
+- 2026-03-29 — [Opus] MLIT RSS URL 修正 (maritime.xml→pressrelease.rdf)、GHA dry-run 成功
+- 2026-03-29 — [Opus] NK: GHA IP ブロック判明。requests/curl_cffi/Playwright 全滅。cron 無効化、ローカル実行用に維持
