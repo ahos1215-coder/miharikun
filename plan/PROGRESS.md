@@ -117,18 +117,27 @@
 
 ---
 
-## Phase 2: Ship Specs + マッチング + 超軽量 UI 📋 未着手
+## Phase 2: Ship Specs + マッチング + 超軽量 UI ⏳ 作業中
 
 > 設計書: `plan/STRATEGIC_PIVOT_v5.md` §4
 
-- [ ] Supabase Auth（ログイン / サインアップ）
-- [ ] Ship Specs 登録画面 (`/ships/new`, `/ships/[id]`)
-- [ ] パーソナライズダッシュボード (`/dashboard`) — 自船に関係ある規制のみ
-- [ ] ニュースタブ (`/news`) — 全規制一覧（Free）
-- [ ] 規制詳細 (`/news/[id]`) — AI 要約 + 根拠引用
-- [ ] 超軽量通知設定 (`/settings`) — メール / LINE
+#### フロントエンド MVP（2026-03-29）
+
+- [x] Supabase Auth（ログイン / サインアップ / ミドルウェア） ✅ (3fa5105)
+- [x] Ship Specs 登録画面 (`/ships/new`, `/ships/[id]`) ✅ (3fa5105)
+- [x] パーソナライズダッシュボード (`/dashboard`) ✅ (3fa5105)
+- [x] ニュースタブ (`/news`) + 規制詳細 (`/news/[id]`) ✅ (3fa5105)
+- [x] 通知設定 (`/settings`) プレースホルダー ✅ (3fa5105)
+- [x] Nav + Footer + ランディングページ ✅ (3fa5105)
+- [x] TypeScript 型定義 + コンパイルエラーゼロ ✅
+
+#### 残タスク
+
+- [ ] Vercel デプロイ + 環境変数設定 (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
+- [ ] Supabase Auth メール設定（確認メール送信テスト）
+- [ ] 実データでの動作確認（ログイン → 船舶登録 → ダッシュボード）
 - [ ] 週次サマリーメール — GHA 自動生成
-- [ ] 初期ロード < 50KB、Service Worker キャッシュ
+- [ ] 初期ロード < 50KB 確認、Service Worker キャッシュ
 
 ## Phase 3: Fleet 管理 + 拡張 📋 未着手
 
@@ -164,3 +173,7 @@
 - 2026-03-29 21:03 — [Lead/Opus] Supabase upsert on_conflict 追加 (55d276e)
 - 2026-03-29 21:06 — [Lead/Opus] NK 本番成功 (3件), MLIT RSS 本番成功 (3件) — Phase 1 R2 完了
 - 2026-03-29 21:10 — [Lead/Opus] CLAUDE.md にリソース適応型 Agent Teams ルール追加
+- 2026-03-29 21:30 — [Lead/Opus] Phase 2 基盤: Supabase クライアント, Auth ミドルウェア, Nav/Footer, 型定義
+- 2026-03-29 21:30 — [Agent A/Sonnet] Ship Specs 登録・編集画面 (/ships/new, /ships/[id])
+- 2026-03-29 21:30 — [Agent B/Sonnet] News + Dashboard + Settings ページ
+- 2026-03-29 21:35 — [Lead/Opus] 統合チェック: TSC エラーゼロ, コミット (3fa5105)

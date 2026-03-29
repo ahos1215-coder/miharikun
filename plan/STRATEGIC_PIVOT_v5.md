@@ -113,24 +113,24 @@ Gemini を活用し、PDF の内容と自船スペックを照合して「適用
 
 ## 5. フェーズ再定義
 
-### Phase 1 R2（現在 → 次の作業）
+### Phase 1 R2 ✅ 完了（2026-03-29）
 
 1. ~~Supabase マイグレーション~~ ✅
 2. ~~追加ワークフロー~~ ✅
 3. ~~MLIT RSS 検証~~ ✅
-4. **Self-hosted Runner 設定** → NK 自動化
-5. **ship_profiles テーブル作成** → Supabase マイグレーション追加
-6. **マッチングエンジン v1**（ルールベース）→ `scripts/utils/matching.py`
+4. ~~Self-hosted Runner 設定~~ ✅ NK 自動化
+5. ~~ship_profiles テーブル作成~~ ✅ Supabase 適用済み
+6. ~~マッチングエンジン v1~~ ✅ `scripts/utils/matching.py` (452行)
 
-### Phase 2（フロントエンド MVP）
+### Phase 2 ⏳ MVP 実装済み・デプロイ待ち
 
-1. ログイン（Supabase Auth）
-2. **Ship Specs 登録画面** (`/ships/new`, `/ships/[id]`)
-3. **パーソナライズダッシュボード** (`/dashboard`) — 自船に関係ある規制のみ表示
-4. ニュースタブ (`/news`) — 全規制の一覧（Free）
-5. 規制詳細 (`/news/[id]`) — AI 要約 + 根拠引用
-6. **超軽量通知設定** (`/settings`) — メール/LINE
-7. **週次サマリーメール** — GHA 自動生成
+1. ~~ログイン（Supabase Auth）~~ ✅
+2. ~~Ship Specs 登録画面~~ ✅ (`/ships/new`, `/ships/[id]`)
+3. ~~パーソナライズダッシュボード~~ ✅ (`/dashboard`)
+4. ~~ニュースタブ~~ ✅ (`/news`) + 規制詳細 (`/news/[id]`)
+5. ~~超軽量通知設定~~ ✅ (`/settings` プレースホルダー)
+6. **Vercel デプロイ** — 環境変数設定待ち
+7. **週次サマリーメール** — 未着手
 
 ### Phase 3（拡張）
 

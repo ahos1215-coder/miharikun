@@ -1,6 +1,9 @@
 # Maritime Regulations Monitor — プロジェクト設計書 v4
 Last updated: 2026-03-29
 
+> **⚠️ 注意**: 本文書は技術詳細の参照用です。戦略方針は `STRATEGIC_PIVOT_v5.md` が上位文書として優先します。
+> 特に「資格管理フック」「crew_profiles テーブル」「/crew ルート」は v5 で **廃止** されました。
+>
 > **本設計書は Claude（設計担当）と Gemini（レビュー担当）の2ラウンドの議論を経て確定した最終版です。**
 >
 > **v3 → v4 の主な変更**:
