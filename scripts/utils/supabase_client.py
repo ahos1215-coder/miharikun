@@ -149,7 +149,7 @@ class SupabaseClient:
 
         def _do_upsert():
             resp = requests.post(
-                f"{self.url}/rest/v1/regulations",
+                f"{self.url}/rest/v1/regulations?on_conflict=source,source_id",
                 json=regulation,
                 headers={
                     **self._headers,
