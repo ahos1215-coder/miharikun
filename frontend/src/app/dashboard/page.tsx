@@ -53,24 +53,40 @@ export default async function DashboardPage() {
   // Fetch matches for all user's ships
   const shipIds = shipList.map((s) => s.id);
 
-  let matchesByShip: Record<string, (UserMatch & { regulation: Regulation })[]> = {};
+  let matchesByShip: Record<string, (UserMatch & { regulation?: Regulation })[]> = {};
 
   if (shipIds.length > 0) {
+    // user_matches を取得
     const { data: matches } = await supabase
       .from("user_matches")
-      .select("*, regulation:regulations(*)")
+      .select("*")
       .in("ship_profile_id", shipIds)
       .order("created_at", { ascending: false });
 
-    const allMatches = (matches ?? []) as (UserMatch & {
-      regulation: Regulation;
-    })[];
+    const allMatches = (matches ?? []) as UserMatch[];
 
+    // regulation_id を収集して regulations を別クエリで取得
+    const regIds = [...new Set(allMatches.map((m) => m.regulation_id))];
+    let regsMap: Record<string, Regulation> = {};
+
+    if (regIds.length > 0) {
+      const { data: regs } = await supabase
+        .from("regulations")
+        .select("*")
+        .in("id", regIds);
+
+      for (const r of (regs ?? []) as Regulation[]) {
+        regsMap[r.id] = r;
+      }
+    }
+
+    // matches に regulation を結合してグルーピング
     for (const m of allMatches) {
+      const entry = { ...m, regulation: regsMap[m.regulation_id] };
       if (!matchesByShip[m.ship_profile_id]) {
         matchesByShip[m.ship_profile_id] = [];
       }
-      matchesByShip[m.ship_profile_id].push(m);
+      matchesByShip[m.ship_profile_id].push(entry);
     }
   }
 
@@ -92,7 +108,11 @@ export default async function DashboardPage() {
         <>
           <div className="flex flex-col gap-6">
             {shipList.map((ship) => {
-              const matches = matchesByShip[ship.id] ?? [];
+              const matches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
+                // 該当 > 判定中 > 非該当 の順で表示
+                const order = (v: boolean | null) => v === true ? 0 : v === null ? 1 : 2;
+                return order(a.is_applicable) - order(b.is_applicable);
+              });
               return (
                 <div
                   key={ship.id}
