@@ -151,3 +151,6 @@
 - 2026-03-29 — [Agent B/Sonnet] ship_profiles SQL + matching.py（ルールベース + AI 2段階）
 - 2026-03-29 — [Agent C/Sonnet] MLIT RSS 本番実行、Gemini 全件失敗の原因特定（GEMINI_MODEL Secret 空文字）
 - 2026-03-29 — [Lead/Opus] 統合チェック、classify_pdf pending ハンドリングバグ修正（NK + MLIT 両方）
+- 2026-03-29 — [Lead/Opus] Self-hosted Runner 稼働確認（online）、NK dry-run 成功（50件パース、3件処理）
+- 2026-03-29 — [Lead/Opus] NK bot UA 環境変数 (SCRAPE_USER_AGENT) 削除 → 403 解消
+- 2026-03-29 — [Lead/Opus] HANDOFF.md 更新（Phase 1 R2 継続用）

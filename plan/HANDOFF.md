@@ -1,156 +1,188 @@
-# 引継ぎ書 — MIHARIKUN Phase 1 R1 → R2
+# 引継ぎ書 — MIHARIKUN Phase 1 R2 継続
 
 > **次のセッションはこのファイルから読み始めてください。**
-> 最終更新: 2026-03-29
+> 最終更新: 2026-03-29 19:40 JST
 
 ---
 
 ## 1. 今どこにいるか
 
-**Phase 1 ラウンド 1（スクレイパー構築）が完了し、コミット待ちの状態。**
+**Phase 1 R2（DB + マッチング基盤）の終盤。ユーザー手動作業2つ待ち。**
 
 ```
-Phase 0: 基盤構築         ✅ コミット済み (99b7246)
-Phase 1 R1: スクレイパー  ✅ 実装完了・テスト通過・未コミット ← 今ここ
-Phase 1 R2: DB + 検証     📋 未着手
-Phase 2: UI + 認証        📋 未着手
-Phase 3: 通知 + 船舶管理  📋 未着手
+Phase 0: 基盤構築              ✅ コミット済み
+Phase 1 R1: スクレイパー       ✅ コミット済み
+Phase 1 R2: DB + マッチング    ⏳ ほぼ完了、ユーザー作業待ち ← 今ここ
+Phase 2: Ship Specs + UI       📋 未着手
+Phase 3: Fleet 管理 + 拡張     📋 未着手
 ```
+
+### v5 戦略方針転換（本セッションで確定）
+- **資格管理フック完全廃止** — `/crew/certificates` は作らない
+- **Ship Specs + マッチングエンジンに 100% 集中**
+- **Self-hosted Runner 採用**（NK の GHA IP ブロック対策）
+- 詳細: `plan/STRATEGIC_PIVOT_v5.md`
 
 ---
 
 ## 2. 最初にやること
 
 ```
-1. git status で未コミット状態を確認
-2. ユーザーにコミット実行の許可を取る
-3. コミットメッセージ: "feat: Phase 1 R1 データ収集パイプライン（スクレイパー + 共通ユーティリティ）"
-4. plan/PROGRESS.md を読んで詳細を把握
+1. plan/PROGRESS.md を読んで詳細を把握
+2. ユーザーに以下2つの手動作業が完了したか確認:
+   a) Supabase で 00005 SQL の残り部分を実行（下記参照）
+   b) GitHub Secrets の GEMINI_MODEL / GEMINI_FALLBACK_MODEL を削除
+3. 完了していれば → MLIT RSS 本番再実行 + NK 本番実行
+4. 未完了であれば → ユーザーに作業を促す
 ```
 
 ---
 
-## 3. 未コミットファイル一覧（18ファイル）
+## 3. ユーザー待ちの手動作業（2つ）
 
-### 変更（既存ファイル）
-| ファイル | 変更内容 |
-|---------|---------|
-| `scripts/scrape_nk.py` | プロトタイプ(658行)→本番版(849行)。共通ユーティリティ使用、v4 フィールド追加 |
-| `CLAUDE.md` | エージェント運用ルール・進捗記録ルール追加 |
+### A. Supabase SQL 実行（途中で止まっている）
 
-### 新規
-| ファイル | 概要 |
-|---------|------|
-| `scripts/utils/__init__.py` | パッケージ化 |
-| `scripts/utils/gemini_client.py` | Gemini API（2モデル切替 + 指数バックオフ） |
-| `scripts/utils/supabase_client.py` | Supabase REST クライアント（7メソッド） |
-| `scripts/utils/line_notify.py` | LINE Notify（スロットリング付き） |
-| `scripts/utils/gdrive_client.py` | Google Drive API v3（ローカルフォールバック付き） |
-| `scripts/utils/pdf_preprocess.py` | PDF 品質チェック（4段階判定） |
-| `scripts/scrape_mlit_rss.py` | 国交省 RSS 第1層スクレイパー |
-| `scripts/scrape_mlit_crawl.py` | 国交省クロール第2層スクレイパー |
-| `scripts/requirements.txt` | Python 依存パッケージ |
-| `.github/workflows/scrape-nk.yml` | NK 日次（JST 07:00） |
-| `.github/workflows/scrape-mlit-rss.yml` | MLIT RSS 日次（JST 08:00） |
-| `.github/workflows/scrape-mlit-crawl.yml` | MLIT クロール週次（日曜 JST 06:00） |
-| `.github/workflows/notify-on-failure.yml` | 再利用可能失敗通知 |
-| `tests/python/conftest.py` | pytest fixtures |
-| `tests/python/test_scrape_nk.py` | 41テスト全通過 |
-| `plan/PROGRESS.md` | 進捗ソース・オブ・トゥルース |
-| `plan/HANDOFF.md` | この引継ぎ書 |
+`00005_ship_profiles.sql` を Supabase で実行中にトリガー重複エラーが発生。
+`ship_profiles` テーブルとトリガーは作成済みだが、以下がまだ：
+
+```sql
+-- user_matches テーブル
+CREATE TABLE IF NOT EXISTS user_matches (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    regulation_id           UUID NOT NULL REFERENCES regulations(id) ON DELETE CASCADE,
+    ship_profile_id         UUID NOT NULL REFERENCES ship_profiles(id) ON DELETE CASCADE,
+    is_applicable           BOOLEAN,
+    match_method            TEXT NOT NULL DEFAULT 'rule_based',
+    confidence              FLOAT,
+    reason                  TEXT,
+    citations               JSONB,
+    notified                BOOLEAN DEFAULT false,
+    created_at              TIMESTAMPTZ DEFAULT now(),
+    updated_at              TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(regulation_id, ship_profile_id)
+);
+
+CREATE TRIGGER user_matches_updated_at
+    BEFORE UPDATE ON user_matches
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX IF NOT EXISTS idx_user_matches_ship_profile ON user_matches(ship_profile_id);
+CREATE INDEX IF NOT EXISTS idx_user_matches_regulation   ON user_matches(regulation_id);
+CREATE INDEX IF NOT EXISTS idx_user_matches_unnotified   ON user_matches(notified) WHERE notified = false;
+
+-- RLS: ship_profiles
+ALTER TABLE ship_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "ship_profiles_owner_select" ON ship_profiles
+    FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "ship_profiles_owner_insert" ON ship_profiles
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "ship_profiles_owner_update" ON ship_profiles
+    FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "ship_profiles_owner_delete" ON ship_profiles
+    FOR DELETE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "ship_profiles_service_all" ON ship_profiles
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- RLS: user_matches
+ALTER TABLE user_matches ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "user_matches_owner_select" ON user_matches
+    FOR SELECT TO authenticated
+    USING (ship_profile_id IN (SELECT id FROM ship_profiles WHERE user_id = auth.uid()));
+CREATE POLICY "user_matches_service_all" ON user_matches
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+```
+
+### B. GitHub Secrets の削除
+
+`GEMINI_MODEL` と `GEMINI_FALLBACK_MODEL` を Secrets から**削除**する。
+空文字の Secret が環境変数を上書きして Gemini API が 404 になる原因。
+削除すれば `gemini_client.py` のデフォルト値（`gemini-2.5-flash` / `gemini-2.0-flash`）が使われる。
 
 ---
 
-## 4. 品質状態
+## 4. 完了済みタスク一覧
 
-| チェック | 結果 |
-|---------|------|
-| `python -m py_compile` 全8 .pyファイル | ✅ 全通過 |
-| YAML バリデーション 全4ワークフロー | ✅ 全通過 |
-| `pytest tests/python/test_scrape_nk.py` | ✅ 41 passed in 6.71s |
-| secrets ハードコード | ✅ なし |
-| cross-module import 整合性 | ✅ 全一致（修正済み） |
+| タスク | 状態 | コミット |
+|--------|------|---------|
+| Supabase マイグレーション (00001-00004) | ✅ 適用済み | f852231 |
+| process-queue + health-check ワークフロー | ✅ | 6380a7c |
+| MLIT RSS URL 修正 (pressrelease.rdf) | ✅ | 6888519 |
+| 戦略方針転換 v5 文書 | ✅ | cd0fe81 |
+| Self-hosted Runner 手順書 + NK ワークフロー修正 | ✅ | 9a33fc7 |
+| ship_profiles SQL + matching.py | ✅ | 2b40a09 |
+| Gemini 精度レポート | ✅ | 2b40a09 |
+| classify_pdf pending バグ修正 | ✅ | 2b40a09 |
+| NK bot UA 環境変数削除 | ✅ | ca4e0f1 |
+| **Self-hosted Runner 稼働** | ✅ | — |
+| **NK dry-run (Self-hosted 経由)** | ✅ **50件パース成功** | — |
+| **MLIT RSS dry-run (GHA)** | ✅ **8件海事関連検出** | — |
 
 ---
 
-## 5. コミット後の次のアクション（Phase 1 R2）
+## 5. ユーザー作業完了後の次のアクション
 
-優先順に:
+### 1. MLIT RSS 本番実行（Gemini Secret 修正後）
+```bash
+gh workflow run scrape-mlit-rss.yml --field dry_run=false --field limit=5
+```
+- Gemini 分類が成功するか確認
+- confidence 値、category の妥当性を検証
 
-1. **Supabase マイグレーション SQL** — `supabase/migrations/` に作成
-   - `regulations` テーブル（Blueprint §7.1）
-   - `pending_queue` テーブル
-   - `mlit_crawl_state` テーブル
-   - RLS ポリシー
+### 2. NK 本番実行（Self-hosted Runner で）
+```bash
+gh workflow run scrape-nk.yml --field dry_run=false --field limit=3
+```
+- Self-hosted Runner 経由で ClassNK にアクセス
+- PDF ダウンロード → Gemini 分類 → Supabase upsert の全パイプラインを検証
 
-2. **追加ワークフロー**
-   - `process-queue.yml`（pending_queue リトライ、毎日 JST 12:00）
-   - `health-check.yml`（ソース鮮度・DB 容量）
-
-3. **実データ動作検証**
-   - NK dry-run テスト
-   - MLIT RSS 実取得テスト
-   - Gemini 分類精度検証
+### 3. Phase 1 R2 完了判定
+上記2つが成功すれば Phase 1 R2 完了。Phase 2（フロントエンド MVP）に進む。
 
 ---
 
 ## 6. 知っておくべきこと
 
-### アーキテクチャ
-- 重い処理（スクレイピング・Gemini・DB書込）→ **GHA Python バッチ**
-- 軽い処理（UI表示・DB読取）→ **Vercel Next.js**
-- Vercel API Routes で Gemini を呼んではいけない（10秒タイムアウト）
+### Self-hosted Runner の状態
+- ランナー名: `B-A59000-089`
+- ラベル: `self-hosted, Windows, X64, nk-runner`
+- 稼働方法: `C:\actions-runner\run.cmd` をバックグラウンド実行（サービス化は未完了、管理者権限不足）
+- **PC 再起動後は `C:\actions-runner\run.cmd` を再実行する必要あり**
 
-### 共通ユーティリティの API
+### NK スクレイパーの注意点
+- `SCRAPE_USER_AGENT` 環境変数を設定してはいけない（Chrome UA のデフォルト値を使う）
+- ワークフローの `environment: production` が設定されている — GitHub で Environment `production` を作成していない場合、ジョブが保留になる可能性あり（現在は未作成でも動いている）
 
-```python
-# scripts/ 内のスクリプトでは必ずこの1行を入れてから import
-sys.path.insert(0, os.path.dirname(__file__))
+### Gemini の注意点
+- `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` は Secret ではなく Variables (vars) で設定するか、未設定でデフォルト値を使う
+- `classify_pdf` は失敗時に例外を投げず `{"status": "pending"}` を返す → 呼び出し側でチェック必須（修正済み）
 
-from utils.gemini_client import classify_pdf
-# classify_pdf(pdf_bytes: bytes, prompt: str, source_id: str = "") -> dict
-
-from utils.supabase_client import SupabaseClient
-# client = SupabaseClient()
-# client.upsert_regulation(dict) -> bool
-# client.get_max_source_id(source: str) -> Optional[str]
-# client.queue_pending(source, source_id, pdf_url, reason, error_detail) -> bool
-# client.get_pending_queue(source=None) -> list[dict]
-# client.check_source_health(source, days=30) -> dict
-
-from utils.line_notify import send_alert, send_scraper_error, send_health_check_report
-# send_alert(title: str, message: str, severity: str = "info") -> bool
-
-from utils.gdrive_client import upload_text, upload_json, create_subfolder
-# upload_json(data: dict, filename: str, folder_id=None) -> Optional[str]
-
-from utils.pdf_preprocess import preprocess_pdf, check_pdf_url, extract_text
-# preprocess_pdf(url: str, pdf_bytes: bytes) -> dict  # status: ok/skipped/scan_image/suspicious
-```
+### 設計文書の優先順位
+1. `plan/STRATEGIC_PIVOT_v5.md` — 最上位の意思決定文書
+2. `plan/MARITIME_PROJECT_BLUEPRINT_v4.md` — 技術詳細（v5 と矛盾する場合は v5 優先）
+3. `CLAUDE.md` — コーディング規約・運用ルール
 
 ### 過去の罠（再発防止）
 1. `send_line_notify` は存在しない → 正しくは `send_alert`
 2. `scripts/` から `utils/` を import するには `sys.path.insert` 必須
-3. プロンプト内の `` ```json `` を regex で検出する際、説明文に誤マッチするので `\n` を含めること
-4. ワークツリーで並列エージェント実行した際、エージェントがコミットしないことがある → 統合時に `git status` で確認
-
-### 運用ルール
-- 作業中は `plan/PROGRESS.md` の変更ログに追記すること（CLAUDE.md 参照）
-- 設計書: `plan/MARITIME_PROJECT_BLUEPRINT_v4.md`（特に §3, §7, §11, §12 が重要）
+3. ClassNK は GHA IP + bot UA の両方をブロック → Self-hosted Runner + Chrome UA で解決
+4. Supabase の空文字 Secret が環境変数のデフォルト値を上書きする
+5. `classify_pdf` は例外ではなく `status=pending` を返す → `except` だけでは捕捉できない
+6. `00005_ship_profiles.sql` は途中で止まった → user_matches + RLS が未適用
 
 ---
 
 ## 7. 必要な環境変数（GitHub Secrets）
 
-> R2 で実データ検証を始める際に設定が必要
-
-| 変数名 | 用途 | 必須タイミング |
-|--------|------|--------------|
-| `SUPABASE_URL` | Supabase プロジェクト URL | DB 操作時 |
-| `SUPABASE_SERVICE_ROLE_KEY` | RLS バイパス用キー | DB 操作時 |
-| `GEMINI_API_KEY` | Gemini API キー | 分類実行時 |
-| `GEMINI_MODEL` | プライマリモデル名（default: gemini-2.5-flash） | 任意 |
-| `GEMINI_FALLBACK_MODEL` | フォールバックモデル名（default: gemini-2.0-flash） | 任意 |
-| `LINE_NOTIFY_TOKEN` | LINE 通知トークン | 通知時 |
-| `GDRIVE_FOLDER_ID` | Google Drive 保存先フォルダ ID | テキスト保存時 |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | GCP Service Account JSON | Drive API 時 |
+| 変数名 | 状態 | 備考 |
+|--------|------|------|
+| `SUPABASE_URL` | ✅ 設定済み | |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ 設定済み | |
+| `GEMINI_API_KEY` | ✅ 設定済み | |
+| `GEMINI_MODEL` | ❌ **削除必要** | 空文字 Secret が 404 の原因 |
+| `GEMINI_FALLBACK_MODEL` | ❌ **削除必要** | 同上 |
+| `LINE_NOTIFY_TOKEN` | 未設定 | 通知不要なら後回し |
+| `GDRIVE_FOLDER_ID` | 未設定 | テキスト保存不要なら後回し |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | 未設定 | Drive API 不要なら後回し |
