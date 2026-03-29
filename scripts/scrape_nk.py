@@ -42,6 +42,7 @@ from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
+from curl_cffi import requests as cffi_requests
 
 # パス設定（scripts/ から utils を import できるようにする）
 sys.path.insert(0, os.path.dirname(__file__))
@@ -212,10 +213,13 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
 
     logger.info(f"Fetching NK list page: {NK_LIST_URL}")
     try:
-        resp = requests.get(NK_LIST_URL, headers=HEADERS, timeout=30)
+        # curl_cffi で TLS フィンガープリントを Chrome に偽装（WAF 対策）
+        resp = cffi_requests.get(
+            NK_LIST_URL, headers=HEADERS, timeout=30, impersonate="chrome"
+        )
         resp.raise_for_status()
         resp.encoding = resp.apparent_encoding
-    except requests.RequestException as e:
+    except Exception as e:
         logger.error(f"Failed to fetch NK list page: {e}")
         raise
 
@@ -364,7 +368,7 @@ def get_known_max_tec(db: SupabaseClient) -> int:
 def download_pdf(url: str) -> bytes:
     """PDF をダウンロードしてバイト列を返す"""
     logger.info(f"Downloading PDF: {url}")
-    resp = requests.get(url, headers=HEADERS, timeout=60)
+    resp = cffi_requests.get(url, headers=HEADERS, timeout=60, impersonate="chrome")
     resp.raise_for_status()
     return resp.content
 
