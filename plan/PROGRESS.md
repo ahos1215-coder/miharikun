@@ -13,7 +13,7 @@
 |-------|---------|-----------|---------|
 | Phase 0: 基盤構築 | — | ✅ 完了 | 2026-03-29 |
 | Phase 1 R1: スクレイパー構築 | R1 | ✅ 完了 | 2026-03-29 |
-| Phase 1 R2: DB + 検証 | R2 | 📋 未着手 | — |
+| Phase 1 R2: DB + 検証 | R2 | ⏳ 作業中 | 2026-03-29 |
 | Phase 2: UI + 認証 | — | 📋 未着手 | — |
 | Phase 3: 通知 + 船舶管理 | — | 📋 未着手 | — |
 
@@ -70,17 +70,19 @@
 
 ---
 
-### ラウンド 2: DB マイグレーション + 検証 📋 未着手
+### ラウンド 2: DB マイグレーション + 検証 ⏳ 作業中
 
 **次のアクション（優先順）:**
 
-- [ ] Supabase マイグレーション SQL 作成（`supabase/migrations/`）
-  - `regulations` テーブル（Blueprint §7.1 の定義に準拠）
+- [x] Supabase マイグレーション SQL 作成（`supabase/migrations/`）✅
+  - `regulations` テーブル（Blueprint §7.1 + コード実装のフィールド統合）
   - `pending_queue` テーブル
   - `mlit_crawl_state` テーブル
-  - RLS ポリシー（anon key = 読み取り専用、service_role = 全操作）
-- [ ] `process-queue.yml` — pending_queue 自動リトライ（毎日 JST 12:00）
-- [ ] `health-check.yml` — ソース鮮度・DB 容量モニタリング
+  - RLS ポリシー（anon=読取専用, service_role=全操作）
+  - インデックス 10個
+  - **Supabase ダッシュボードで適用済み**
+- [x] `process-queue.yml` — pending_queue 自動リトライ（毎日 JST 12:00）✅
+- [x] `health-check.yml` — ソース鮮度・DB 容量モニタリング（毎週月曜 JST 09:00）✅
 - [ ] NK サイトへの実アクセス dry-run テスト
 - [ ] 国交省 RSS フィードの実取得テスト
 - [ ] Gemini API 分類精度検証・プロンプトチューニング
@@ -103,3 +105,5 @@
 
 - 2026-03-29 15:00 — [Lead/Opus] Phase 1 R1 完了。Agent A/B/C の成果物を統合、import 不整合 3 件修正、41 テスト全通過
 - 2026-03-29 16:00 — [Lead/Opus] CLAUDE.md にエージェント運用ルール追加、PROGRESS.md リデザイン
+- 2026-03-29 — [Opus] Phase 1 R2: マイグレーション SQL 4ファイル作成、Supabase 適用済み
+- 2026-03-29 — [Opus] Phase 1 R2: process_queue.py + health_check.py + GHA ワークフロー 2つ作成
