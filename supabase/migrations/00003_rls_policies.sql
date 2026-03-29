@@ -7,11 +7,18 @@
 -- ========================================
 ALTER TABLE regulations ENABLE ROW LEVEL SECURITY;
 
--- anon: SELECT のみ
+-- anon: SELECT のみ（未ログインでもニュース閲覧可能）
 CREATE POLICY "regulations_anon_select"
     ON regulations
     FOR SELECT
     TO anon
+    USING (true);
+
+-- authenticated: SELECT のみ（ログイン済みユーザーのダッシュボード表示用）
+CREATE POLICY "regulations_authenticated_select"
+    ON regulations
+    FOR SELECT
+    TO authenticated
     USING (true);
 
 -- service_role: 全操作（GHA バッチ用）
