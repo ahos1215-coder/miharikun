@@ -131,13 +131,22 @@
 - [x] Nav + Footer + ランディングページ ✅ (3fa5105)
 - [x] TypeScript 型定義 + コンパイルエラーゼロ ✅
 
+#### デプロイ + E2E テスト（2026-03-29）
+
+- [x] login ページ Suspense boundary 追加（Vercel ビルドエラー修正） ✅ (5796a1f)
+- [x] Vercel デプロイ ✅ — https://frontend-nine-chi-56.vercel.app
+- [x] 環境変数設定 (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY) ✅
+- [x] Supabase Auth Site URL + Redirect URL 設定 ✅
+- [x] E2E テスト: サインアップ → 確認メール → ログイン → 船舶登録 → ダッシュボード ✅
+- [x] /news ページで実データ 6件の表示確認 ✅
+
 #### 残タスク
 
-- [ ] Vercel デプロイ + 環境変数設定 (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
-- [ ] Supabase Auth メール設定（確認メール送信テスト）
-- [ ] 実データでの動作確認（ログイン → 船舶登録 → ダッシュボード）
+- [ ] **マッチングワークフロー** — 新規規制 × 全船の自動マッチング → user_matches に書き込み
+- [ ] **過去データ一括取り込み** — NK/MLIT の limit を上げて DB にデータ蓄積
 - [ ] 週次サマリーメール — GHA 自動生成
 - [ ] 初期ロード < 50KB 確認、Service Worker キャッシュ
+- [ ] カスタムドメイン設定（任意）
 
 ## Phase 3: Fleet 管理 + 拡張 📋 未着手
 
@@ -177,3 +186,7 @@
 - 2026-03-29 21:30 — [Agent A/Sonnet] Ship Specs 登録・編集画面 (/ships/new, /ships/[id])
 - 2026-03-29 21:30 — [Agent B/Sonnet] News + Dashboard + Settings ページ
 - 2026-03-29 21:35 — [Lead/Opus] 統合チェック: TSC エラーゼロ, コミット (3fa5105)
+- 2026-03-29 22:00 — [Lead/Opus] 全ドキュメント整合性更新 (HANDOFF/STRATEGIC_PIVOT/BLUEPRINT)
+- 2026-03-29 22:10 — [Lead/Opus] login Suspense boundary 修正、Vercel デプロイ成功
+- 2026-03-29 22:15 — [Lead/Opus] Vercel 環境変数設定、Supabase Auth リダイレクト URL 修正
+- 2026-03-29 22:20 — [User] E2E テスト完了: サインアップ→ログイン→船舶登録→ダッシュボード確認
