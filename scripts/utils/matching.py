@@ -151,6 +151,47 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
         )
         return "not_applicable"
 
+    # --- カテゴリ/キーワードによる非船舶規制フィルタ ---
+    title: str = (regulation.get("title") or "").lower()
+    summary: str = (regulation.get("summary_ja") or "").lower()
+    category: str = (regulation.get("category") or "").lower()
+    combined_text: str = f"{title} {summary} {category}"
+
+    # 港湾・陸上施設・インフラ系キーワード（船舶運航に直接関係しない）
+    _INFRASTRUCTURE_KEYWORDS: list[str] = [
+        "港湾施設", "陸上施設", "荷役施設", "ターミナル",
+        "岸壁", "防波堤", "埠頭", "桟橋整備",
+        "港湾計画", "港湾整備", "港湾局",
+        "水素ステーション", "燃料供給施設", "バンカリング施設",
+        "陸上電力供給", "陸電",
+    ]
+    # 会議・委員会・行政手続き系キーワード
+    _ADMIN_KEYWORDS: list[str] = [
+        "審議会", "委員会議事", "パブリックコメント募集",
+        "意見募集", "会議開催", "議事録", "検討会",
+        "人事異動", "組織改編", "予算案",
+    ]
+
+    for kw in _INFRASTRUCTURE_KEYWORDS:
+        if kw in combined_text:
+            # ただし船舶向けの記述も含む場合は AI に委譲
+            _SHIP_OVERRIDE_KEYWORDS: list[str] = [
+                "船舶", "船上", "搭載", "乗組員", "航行",
+                "solas", "marpol", "stcw", "ism",
+            ]
+            if not any(sk in combined_text for sk in _SHIP_OVERRIDE_KEYWORDS):
+                logger.debug(
+                    f"[rule] not_applicable: インフラ/施設キーワード {kw!r} がヒット"
+                )
+                return "not_applicable"
+
+    for kw in _ADMIN_KEYWORDS:
+        if kw in combined_text:
+            logger.debug(
+                f"[rule] not_applicable: 行政/会議キーワード {kw!r} がヒット"
+            )
+            return "not_applicable"
+
     # いずれのフィルタにも引っかからなかった → AI に委譲
     logger.debug("[rule] needs_ai: ルールベースで除外できず")
     return "needs_ai"
@@ -182,17 +223,17 @@ def _build_matching_prompt(regulation: dict, ship: dict) -> str:
         f"カテゴリ: {regulation.get('category', '不明')}\n"
         f"ソース: {regulation.get('source', '不明')} / ID: {regulation.get('source_id', '不明')}\n"
         f"AI 要約 (日本語): {regulation.get('summary_ja', '（なし）')}\n"
-        f"適用船種: {', '.join(regulation.get('applicable_ship_types') or []) or '制限なし'}\n"
-        f"GT 下限: {regulation.get('applicable_gt_min', '制限なし')}\n"
-        f"GT 上限: {regulation.get('applicable_gt_max', '制限なし')}\n"
-        f"建造年以降適用: {regulation.get('applicable_built_after', '制限なし')}\n"
-        f"適用航路: {', '.join(regulation.get('applicable_routes') or []) or '制限なし'}\n"
-        f"適用旗国: {', '.join(regulation.get('applicable_flags') or []) or '制限なし'}\n"
+        f"適用船種: {', '.join(regulation.get('applicable_ship_types') or []) or '未指定（※未指定＝全船適用ではない。規制内容から判断すること）'}\n"
+        f"GT 下限: {regulation.get('applicable_gt_min') or '未指定'}\n"
+        f"GT 上限: {regulation.get('applicable_gt_max') or '未指定'}\n"
+        f"建造年以降適用: {regulation.get('applicable_built_after') or '未指定'}\n"
+        f"適用航路: {', '.join(regulation.get('applicable_routes') or []) or '未指定'}\n"
+        f"適用旗国: {', '.join(regulation.get('applicable_flags') or []) or '未指定'}\n"
         f"根拠引用: {json.dumps(regulation.get('citations') or [], ensure_ascii=False)}"
     )
 
     prompt = f"""あなたは海事規制の専門家です。以下の「自船スペック」と「規制情報」を照合し、
-この規制が当該船舶に適用されるかどうかを判定してください。
+この規制が **当該船舶の運航・設備・乗組員に直接影響するか** を判定してください。
 
 ## 自船スペック
 {ship_summary}
@@ -200,10 +241,48 @@ def _build_matching_prompt(regulation: dict, ship: dict) -> str:
 ## 規制情報
 {regulation_summary}
 
-## 判定基準
-- 規制の適用範囲（船種・GT・建造年・航行区域・旗国）と自船スペックを照合する
-- 情報が不足している場合は confidence を低くする（0.5 以下）
-- 適用可能性が否定できない場合は is_applicable: true とし、confidence で確度を表す
+## 判定の核心原則（最重要 — 必ず守ること）
+
+### 原則1: 「制限なし」≠「適用」
+規制の適用船種・GT・建造年・航路・旗国が「制限なし」であっても、それだけで適用とは判断しない。
+規制の **内容** が船舶の運航・設備・乗組員・航行安全に **積極的に関係している** 場合のみ is_applicable: true とする。
+
+### 原則2: 規制の「対象者」を見極める
+以下は **船舶オペレーターには非適用**（is_applicable: false）とする:
+- **港湾施設・陸上インフラ** に関するガイドライン（水素/アンモニア供給施設、ターミナル設計、岸壁設備など）
+- **港湾管理者・行政機関** が対象の通達（港湾計画、施設基準、行政手続き）
+- **造船所・メーカー** 向けの技術基準（新造船設計基準であっても、既存船への改修義務がない場合）
+- **会議・審議会・検討会** の開催案内、議事録、パブリックコメント募集
+- **一般的な情報提供・啓発資料**（業界動向レポート、統計情報）
+
+### 原則3: 船舶に適用される規制の特徴
+以下のいずれかに該当する場合のみ is_applicable: true を検討する:
+- SOLAS, MARPOL, STCW, ISM コード等の **国際条約改正** で、船舶に義務が生じるもの
+- **船級規則** の改正（NK, LR, BV 等）で、検査・証書に影響するもの
+- **旗国（船籍国）法令** の改正で、船舶の設備・運航に要件が変わるもの
+- **寄港国検査（PSC）** に関する新基準・重点検査項目
+- 特定海域での **航行制限・報告義務**（ECA, ECDIS 要件, 通航規制など）
+- **乗組員** の資格・訓練・安全に関する要件変更
+
+## 適用/非適用の具体例
+
+### 適用される例 (is_applicable: true)
+- 「MARPOL Annex VI 改正: 2025年以降、GT 400以上の国際航行船舶にCII格付け義務」→ バルクキャリア GT 5000 → **適用**
+- 「SOLAS II-2 改正: 全旅客船に新型火災検知器の搭載を義務化」→ 旅客船 → **適用**
+- 「東京湾における大型船舶の航行ルール変更」→ 東京湾を航行する船 → **適用**
+
+### 非適用の例 (is_applicable: false)
+- 「港湾における水素・アンモニア燃料供給施設の安全ガイドライン」→ バルクキャリア → **非適用**（施設管理者向け）
+- 「港湾施設の耐震基準改定」→ 全船舶 → **非適用**（港湾管理者向け）
+- 「第XX回海上安全委員会（MSC）開催案内」→ 全船舶 → **非適用**（会議案内）
+- 「LNG燃料船の設計ガイドライン」→ 通常燃料のバルクキャリア → **非適用**（対象船種外）
+- 「海事産業の脱炭素ロードマップ」→ 全船舶 → **非適用**（啓発資料、義務なし）
+
+## confidence の付け方
+- 0.85〜1.0: 規制文に船種/GT/旗国等の明示的な適用範囲があり、自船が該当
+- 0.65〜0.84: 船舶運航に関係するが、適用範囲の記述があいまい
+- 0.40〜0.64: 関係する可能性はあるが情報不足（needs_review になる）
+- 0.0〜0.39: ほぼ無関係または対象外
 
 ## 出力フォーマット（必須）
 以下の JSON 形式で出力してください。コードブロック (```json ... ```) に包んでください。
