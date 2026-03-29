@@ -426,7 +426,7 @@ def process_pdf(
             "category": classification.get("category"),
             "severity": classification.get("severity"),
             "summary_ja": classification.get("summary"),
-            "confidence_score": classification.get("confidence"),
+            "confidence": classification.get("confidence"),
             "citations": classification.get("citations"),
             "applicable_ship_types": classification.get("applicable_vessel_types"),
             "effective_date": classification.get("effective_date"),
