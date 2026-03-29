@@ -1,0 +1,47 @@
+name: Notify on Failure
+
+# 他のワークフローから呼び出せる再利用可能ワークフロー
+on:
+  workflow_call:
+    inputs:
+      job_name:
+        description: "失敗したジョブ名"
+        required: true
+        type: string
+      error_context:
+        description: "追加エラーコンテキスト（任意）"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      LINE_NOTIFY_TOKEN:
+        description: "LINE Notify トークン"
+        required: true
+
+jobs:
+  notify:
+    name: Send LINE Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: LINE Notify でエラー通知を送信
+        env:
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+          JOB_NAME: ${{ inputs.job_name }}
+          ERROR_CONTEXT: ${{ inputs.error_context }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          MESSAGE="
+          [CRITICAL] GHA ジョブ失敗
+          ジョブ名: ${JOB_NAME}
+          リポジトリ: ${REPO}
+          実行URL: ${RUN_URL}"
+
+          if [ -n "${ERROR_CONTEXT}" ]; then
+            MESSAGE="${MESSAGE}
+          詳細: ${ERROR_CONTEXT}"
+          fi
+
+          curl -s -X POST https://notify-api.line.me/api/notify \
+            -H "Authorization: Bearer ${LINE_NOTIFY_TOKEN}" \
+            --data-urlencode "message=${MESSAGE}"
