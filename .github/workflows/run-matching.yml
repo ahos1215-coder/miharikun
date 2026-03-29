@@ -1,0 +1,72 @@
+name: Run Matching Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry-run（DB 書き込みなし、ログ出力のみ）'
+        type: boolean
+        default: false
+      limit:
+        description: '処理する regulations の最大件数'
+        type: number
+        default: 50
+
+  # スクレイピング完了後に自動実行
+  workflow_run:
+    workflows:
+      - "NK Daily Scraper"
+      - "MLIT RSS Daily"
+    types:
+      - completed
+
+jobs:
+  matching:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
+    # workflow_run トリガーの場合、元ワークフローが成功した場合のみ実行
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r scripts/requirements.txt
+
+      - name: Run matching engine
+        run: |
+          ARGS=""
+
+          # workflow_dispatch の場合は入力パラメータを使用
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              ARGS="$ARGS --dry-run"
+            fi
+            if [ -n "${{ inputs.limit }}" ] && [ "${{ inputs.limit }}" != "0" ]; then
+              ARGS="$ARGS --limit ${{ inputs.limit }}"
+            fi
+          else
+            # workflow_run トリガーの場合はデフォルト limit 50
+            ARGS="$ARGS --limit 50"
+          fi
+
+          cd scripts
+          python run_matching.py $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          GEMINI_FALLBACK_MODEL: ${{ vars.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash' }}
