@@ -1,9 +1,10 @@
 name: NK Daily Scraper
 
 on:
-  schedule:
-    # JST 07:00 = UTC 22:00（前日）
-    - cron: '0 22 * * *'
+  # NOTE: ClassNK は GHA IP をブロックするため cron を無効化。
+  # self-hosted runner 追加時に再有効化する。
+  # schedule:
+  #   - cron: '0 22 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -40,9 +41,7 @@ jobs:
           cache-dependency-path: scripts/requirements.txt
 
       - name: Install dependencies
-        run: |
-          pip install -r scripts/requirements.txt
-          playwright install chromium --with-deps
+        run: pip install -r scripts/requirements.txt
 
       - name: Run NK scraper
         id: scrape

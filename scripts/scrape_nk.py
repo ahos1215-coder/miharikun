@@ -42,7 +42,6 @@ from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 
 # パス設定（scripts/ から utils を import できるようにする）
 sys.path.insert(0, os.path.dirname(__file__))
@@ -213,34 +212,14 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
 
     logger.info(f"Fetching NK list page: {NK_LIST_URL}")
     try:
-        # Playwright（ヘッドレス Chrome）で取得 — ClassNK WAF 対策
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page(
-                user_agent=HEADERS["User-Agent"],
-                locale="ja-JP",
-            )
-            page.goto(NK_LIST_URL, timeout=30000, wait_until="networkidle")
-            html = page.content()
-            logger.info(f"Page HTML length: {len(html)}")
-
-            # デバッグ: HTML の先頭をログ出力（テーブルが見つからない場合の診断用）
-            if "table" not in html.lower()[:5000]:
-                logger.warning(f"No <table> in first 5000 chars. HTML head: {html[:2000]}")
-
-            # テーブルがある場合は描画待ち（ない場合はスキップしてパース側で0件判定）
-            try:
-                page.wait_for_selector("table tr td", timeout=5000)
-                html = page.content()
-            except Exception:
-                logger.warning("table tr td selector not found, proceeding with current HTML")
-
-            browser.close()
-    except Exception as e:
+        resp = requests.get(NK_LIST_URL, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        resp.encoding = resp.apparent_encoding
+    except requests.RequestException as e:
         logger.error(f"Failed to fetch NK list page: {e}")
         raise
 
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(resp.text, "html.parser")
     entries.extend(_parse_list_page(soup))
 
     logger.info(f"Parsed {len(entries)} entries from page 1")
@@ -383,18 +362,11 @@ def get_known_max_tec(db: SupabaseClient) -> int:
 # ---------------------------------------------------------------------------
 
 def download_pdf(url: str) -> bytes:
-    """PDF をダウンロードしてバイト列を返す（Playwright 経由）"""
+    """PDF をダウンロードしてバイト列を返す"""
     logger.info(f"Downloading PDF: {url}")
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page(user_agent=HEADERS["User-Agent"])
-        resp = page.request.get(url, timeout=60000)
-        if resp.status != 200:
-            browser.close()
-            raise RuntimeError(f"PDF download failed: HTTP {resp.status} for {url}")
-        content = resp.body()
-        browser.close()
-        return content
+    resp = requests.get(url, headers=HEADERS, timeout=60)
+    resp.raise_for_status()
+    return resp.content
 
 
 def _build_regulation_from_classification(
