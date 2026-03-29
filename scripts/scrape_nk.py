@@ -72,12 +72,17 @@ NK_LIST_URL = "https://www.classnk.or.jp/hp/ja/tech_info/tech_ichiran.aspx"
 NK_PDF_BASE = "https://www.classnk.or.jp/hp/pdf/tech_info/tech_img"
 NK_DETAIL_URL_BASE = "https://www.classnk.or.jp/hp/ja/tech_info/tech_ichiran.aspx"
 
-# HTTP
+# HTTP — ClassNK はシンプルな bot UA を 403 で拒否するため、ブラウザライクなヘッダーを送る
 HEADERS = {
     "User-Agent": os.getenv(
         "SCRAPE_USER_AGENT",
-        "MaritimeRegsMonitor/1.0 (+https://github.com/ahos1215-coder; contact@example.com)",
-    )
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ja,en-US;q=0.7,en;q=0.3",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
 }
 REQUEST_INTERVAL = 2  # リクエスト間隔（秒）: 礼儀正しいボット
 
