@@ -118,15 +118,23 @@ export default async function DashboardPage() {
                   key={ship.id}
                   className="rounded border border-zinc-200 p-4 dark:border-zinc-800"
                 >
-                  <div className="mb-3">
-                    <h2 className="text-lg font-semibold">
-                      {ship.ship_name}
-                    </h2>
-                    <p className="text-sm text-zinc-500">
-                      {SHIP_TYPE_LABELS[ship.ship_type as ShipType] ??
-                        ship.ship_type}{" "}
-                      / {ship.gross_tonnage.toLocaleString()} GT
-                    </p>
+                  <div className="mb-3 flex items-start justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold">
+                        {ship.ship_name}
+                      </h2>
+                      <p className="text-sm text-zinc-500">
+                        {SHIP_TYPE_LABELS[ship.ship_type as ShipType] ??
+                          ship.ship_type}{" "}
+                        / {ship.gross_tonnage.toLocaleString()} GT
+                      </p>
+                    </div>
+                    <Link
+                      href={`/ships/${ship.id}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      [EDIT] 編集
+                    </Link>
                   </div>
 
                   {matches.length === 0 ? (
@@ -164,7 +172,9 @@ export default async function DashboardPage() {
                           )}
                           {m.reason && (
                             <p className="text-xs text-zinc-500 mt-1">
-                              {m.reason}
+                              {m.reason.startsWith("AI 判定失敗")
+                                ? "AI による判定を再試行中です。しばらくお待ちください。"
+                                : m.reason}
                             </p>
                           )}
                         </li>
