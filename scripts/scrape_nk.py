@@ -42,7 +42,7 @@ from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
-from curl_cffi import requests as cffi_requests
+from playwright.sync_api import sync_playwright
 
 # パス設定（scripts/ から utils を import できるようにする）
 sys.path.insert(0, os.path.dirname(__file__))
@@ -213,17 +213,21 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
 
     logger.info(f"Fetching NK list page: {NK_LIST_URL}")
     try:
-        # curl_cffi で TLS フィンガープリントを Chrome に偽装（WAF 対策）
-        resp = cffi_requests.get(
-            NK_LIST_URL, headers=HEADERS, timeout=30, impersonate="chrome"
-        )
-        resp.raise_for_status()
-        resp.encoding = resp.apparent_encoding
+        # Playwright（ヘッドレス Chrome）で取得 — ClassNK WAF 対策
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(
+                user_agent=HEADERS["User-Agent"],
+                locale="ja-JP",
+            )
+            page.goto(NK_LIST_URL, timeout=30000, wait_until="domcontentloaded")
+            html = page.content()
+            browser.close()
     except Exception as e:
         logger.error(f"Failed to fetch NK list page: {e}")
         raise
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     entries.extend(_parse_list_page(soup))
 
     logger.info(f"Parsed {len(entries)} entries from page 1")
@@ -366,11 +370,18 @@ def get_known_max_tec(db: SupabaseClient) -> int:
 # ---------------------------------------------------------------------------
 
 def download_pdf(url: str) -> bytes:
-    """PDF をダウンロードしてバイト列を返す"""
+    """PDF をダウンロードしてバイト列を返す（Playwright 経由）"""
     logger.info(f"Downloading PDF: {url}")
-    resp = cffi_requests.get(url, headers=HEADERS, timeout=60, impersonate="chrome")
-    resp.raise_for_status()
-    return resp.content
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(user_agent=HEADERS["User-Agent"])
+        resp = page.request.get(url, timeout=60000)
+        if resp.status != 200:
+            browser.close()
+            raise RuntimeError(f"PDF download failed: HTTP {resp.status} for {url}")
+        content = resp.body()
+        browser.close()
+        return content
 
 
 def _build_regulation_from_classification(

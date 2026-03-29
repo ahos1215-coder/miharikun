@@ -40,7 +40,9 @@ jobs:
           cache-dependency-path: scripts/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r scripts/requirements.txt
+        run: |
+          pip install -r scripts/requirements.txt
+          playwright install chromium --with-deps
 
       - name: Run NK scraper
         id: scrape
