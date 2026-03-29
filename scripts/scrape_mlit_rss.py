@@ -61,7 +61,8 @@ logger = logging.getLogger("scrape_mlit_rss")
 
 # デフォルト RSS URL（環境変数 MLIT_RSS_URLS でカンマ区切り指定可能）
 DEFAULT_RSS_URLS = [
-    "https://www.mlit.go.jp/rss/transportation/maritime.xml",
+    # 国交省プレスリリース RDF（海事局記事を kaiji キーワードでフィルタ）
+    "https://www.mlit.go.jp/pressrelease.rdf",
 ]
 
 # 海事関連キーワード（フィルタリング用・20語以上）
@@ -102,8 +103,11 @@ def get_rss_urls() -> list[str]:
     return DEFAULT_RSS_URLS.copy()
 
 
-def is_maritime_related(title: str, summary: str) -> bool:
-    """タイトルまたは要約が海事関連キーワードを含むか判定する。"""
+def is_maritime_related(title: str, summary: str, link: str = "") -> bool:
+    """タイトル・要約・URL が海事関連キーワードを含むか判定する。"""
+    # 海事局 URL パスを含む場合は即マッチ
+    if link and "/kaiji" in link.lower():
+        return True
     text = f"{title} {summary}".lower()
     for keyword in MARITIME_KEYWORDS:
         if keyword.lower() in text:
@@ -302,8 +306,8 @@ def fetch_rss_entries(
                     if pub_date and pub_date < since:
                         continue
 
-                # 海事キーワードフィルタ
-                if is_maritime_related(title, summary):
+                # 海事キーワードフィルタ（URL パスの kaiji も判定）
+                if is_maritime_related(title, summary, link):
                     all_entries.append(entry)
                     logger.debug("海事エントリ検出: %s", title[:60])
 
