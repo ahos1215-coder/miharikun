@@ -77,29 +77,21 @@ def generate_headline(title: str, summary: str, category: str) -> str | None:
     if elapsed < MIN_INTERVAL:
         time.sleep(MIN_INTERVAL - elapsed)
 
-    prompt = f"""あなたはニュース編集者です。以下の海事規制の情報から、Yahoo!ニュースのような20〜30文字の見出しを作成してください。
+    prompt = f"""タスク: 以下の海事規制についてニュース見出しを生成せよ。
 
-ルール:
-- 必ず20文字以上30文字以下にすること
-- 具体的な内容がわかる見出しにすること（「海事条約」のような曖昧な表現は禁止）
-- 見出しのテキストのみを1行で返すこと
-
-良い例:
-- 「閉囲区画の安全基準が大幅改正へ」(16文字)
-- 「NOx排出規制がTier IIIに強化、対象船拡大」(20文字)
-- 「シップリサイクル条約、キプロス批准で発効要件に近づく」(25文字)
-- 「MARPOL附属書VI改正、2026年から新燃料基準適用」(24文字)
-
-悪い例:
-- 「海事条約」（曖昧すぎる）
-- 「油」（短すぎる）
-- 「造船業」（内容がわからない）
-
+入力:
 タイトル: {title}
 要約: {summary or 'なし'}
 カテゴリ: {category or 'なし'}
 
-見出し（20-30文字）:"""
+出力形式: JSON
+{{"headline": "ここに20〜30文字の見出し"}}
+
+条件:
+- headlineは必ず20文字以上にすること
+- 規制の具体的内容がわかる文にすること
+- 例: {{"headline": "閉囲区画の安全基準が大幅改正、全船舶でSMS見直し必要に"}}
+- 例: {{"headline": "MARPOL附属書VI改正で2026年から新燃料基準が適用開始"}}"""
 
     try:
         url = f"{GEMINI_API_BASE}/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -116,10 +108,27 @@ def generate_headline(title: str, summary: str, category: str) -> str | None:
 
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        # 改行や余分な文字を除去
-        text = text.split("\n")[0].strip().strip('"').strip("「」")
+
+        # JSON パース試行
+        try:
+            # ```json ... ``` を除去
+            import re
+            json_match = re.search(r'\{[^}]+\}', text)
+            if json_match:
+                parsed = json.loads(json_match.group())
+                headline = parsed.get("headline", "")
+                if headline and len(headline) >= 10:
+                    return headline
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+        # フォールバック: テキストからそのまま取得
+        text = text.split("\n")[0].strip().strip('"').strip("「」").strip("`")
         if len(text) > 50:
             text = text[:47] + "..."
+        if len(text) < 10:
+            # 短すぎる場合はタイトルの先頭30文字を使用
+            return title[:30] if len(title) > 30 else title
         return text
 
     except Exception as e:
