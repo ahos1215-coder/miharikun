@@ -1,0 +1,87 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets-detection:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog Scan
+        uses: trufflesecurity/trufflehog@v3.82.13
+        with:
+          extra_args: --only-verified
+
+  npm-audit:
+    name: npm Dependency Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check frontend exists
+        id: check
+        run: test -f package.json && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Run npm audit
+        if: steps.check.outputs.exists == 'true'
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  pip-audit:
+    name: pip Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Check requirements exists
+        id: check
+        run: |
+          if [ -f requirements.txt ]; then
+            echo "file=requirements.txt" >> "$GITHUB_OUTPUT"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif [ -f scripts/requirements.txt ]; then
+            echo "file=scripts/requirements.txt" >> "$GITHUB_OUTPUT"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run pip-audit
+        if: steps.check.outputs.exists == 'true'
+        run: pip-audit -r ${{ steps.check.outputs.file }}
+        continue-on-error: true

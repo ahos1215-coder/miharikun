@@ -50,6 +50,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from utils.gemini_client import classify_pdf
 from utils.gdrive_client import upload_json
 from utils.line_notify import send_alert
+from utils.stealth_fetcher import stealth_get, stealth_download_bytes
 from utils.supabase_client import SupabaseClient
 
 # ---------------------------------------------------------------------------
@@ -212,11 +213,13 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
 
     logger.info(f"Fetching NK list page: {NK_LIST_URL}")
     try:
-        resp = requests.get(NK_LIST_URL, headers=HEADERS, timeout=30)
+        resp = stealth_get(NK_LIST_URL, headers=HEADERS, timeout=30)
         resp.raise_for_status()
-        resp.encoding = resp.apparent_encoding
     except requests.RequestException as e:
         logger.error(f"Failed to fetch NK list page: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch NK list page (stealth): {e}")
         raise
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -362,11 +365,9 @@ def get_known_max_tec(db: SupabaseClient) -> int:
 # ---------------------------------------------------------------------------
 
 def download_pdf(url: str) -> bytes:
-    """PDF をダウンロードしてバイト列を返す"""
+    """PDF をダウンロードしてバイト列を返す（Stealth フェッチャー経由）"""
     logger.info(f"Downloading PDF: {url}")
-    resp = requests.get(url, headers=HEADERS, timeout=60)
-    resp.raise_for_status()
-    return resp.content
+    return stealth_download_bytes(url, headers=HEADERS, timeout=60)
 
 
 def _build_regulation_from_classification(

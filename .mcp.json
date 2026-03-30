@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gdrive": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-google-drive"],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_SERVICE_ACCOUNT_JSON_PATH}"
+      }
+    }
+  }
+}
