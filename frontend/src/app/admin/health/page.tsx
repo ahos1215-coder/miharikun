@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 export const revalidate = 60;
 
@@ -10,34 +11,43 @@ interface HealthCard {
   status: Status;
 }
 
+const STATUS_STYLES: Record<Status, { badge: string; card: string }> = {
+  ok: {
+    badge: "text-green-600 dark:text-green-400 font-bold",
+    card: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800",
+  },
+  warn: {
+    badge: "text-amber-600 dark:text-amber-400 font-bold",
+    card: "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800",
+  },
+  err: {
+    badge: "text-red-600 dark:text-red-400 font-bold",
+    card: "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800",
+  },
+};
+
 function StatusBadge({ status }: { status: Status }) {
-  switch (status) {
-    case "ok":
-      return <span className="text-green-600 font-bold">[OK]</span>;
-    case "warn":
-      return <span className="text-amber-600 font-bold">[WARN]</span>;
-    case "err":
-      return <span className="text-red-600 font-bold">[ERR]</span>;
-  }
+  const label = status === "ok" ? "[OK]" : status === "warn" ? "[WARN]" : "[ERR]";
+  return <span className={STATUS_STYLES[status].badge}>{label}</span>;
 }
 
 function Card({ card }: { card: HealthCard }) {
-  const borderColor =
-    card.status === "ok"
-      ? "border-green-400"
-      : card.status === "warn"
-        ? "border-amber-400"
-        : "border-red-400";
-
   return (
     <div
-      className={`rounded-lg border-2 ${borderColor} bg-white p-4 shadow-sm`}
+      className={cn(
+        "rounded-xl border p-4 shadow-sm",
+        STATUS_STYLES[card.status].card,
+      )}
     >
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-zinc-600">{card.label}</h3>
+        <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">
+          {card.label}
+        </h3>
         <StatusBadge status={card.status} />
       </div>
-      <p className="text-2xl font-bold text-zinc-900">{card.value}</p>
+      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+        {card.value}
+      </p>
     </div>
   );
 }
@@ -49,32 +59,27 @@ function getWorstStatus(cards: HealthCard[]): Status {
 }
 
 function OverallBanner({ worst }: { worst: Status }) {
-  switch (worst) {
-    case "ok":
-      return (
-        <div className="rounded-lg border-2 border-green-400 bg-green-50 p-4 mb-6 text-center">
-          <span className="text-green-700 font-bold text-lg">
-            [OK] システム正常
-          </span>
-        </div>
-      );
-    case "warn":
-      return (
-        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-4 mb-6 text-center">
-          <span className="text-amber-700 font-bold text-lg">
-            [WARN] 注意が必要です
-          </span>
-        </div>
-      );
-    case "err":
-      return (
-        <div className="rounded-lg border-2 border-red-400 bg-red-50 p-4 mb-6 text-center">
-          <span className="text-red-700 font-bold text-lg">
-            [ERR] エラーがあります
-          </span>
-        </div>
-      );
-  }
+  const config: Record<Status, { className: string; text: string }> = {
+    ok: {
+      className: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300",
+      text: "システム正常",
+    },
+    warn: {
+      className: "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300",
+      text: "注意が必要です",
+    },
+    err: {
+      className: "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300",
+      text: "エラーがあります",
+    },
+  };
+
+  const c = config[worst];
+  return (
+    <div className={cn("rounded-xl border p-4 mb-6 text-center", c.className)}>
+      <span className="font-bold text-lg">{c.text}</span>
+    </div>
+  );
 }
 
 export default async function AdminHealthPage() {
@@ -313,21 +318,21 @@ export default async function AdminHealthPage() {
   const worst = getWorstStatus(cards);
 
   return (
-    <main className="min-h-screen bg-zinc-50 p-4 sm:p-8">
+    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 sm:p-8">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-zinc-900">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             システムヘルスチェック
           </h1>
           <a
             href="/admin/health"
-            className="rounded bg-zinc-200 px-3 py-1 text-sm font-semibold text-zinc-700 hover:bg-zinc-300 transition-colors"
+            className="rounded-lg bg-zinc-200 dark:bg-zinc-800 px-3 py-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
           >
-            [REFRESH] 再確認
+            再確認
           </a>
         </div>
 
-        <p className="text-xs text-zinc-500 mb-4">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
           最終確認: {now}
         </p>
 
@@ -338,7 +343,7 @@ export default async function AdminHealthPage() {
             <Card key={card.label} card={card} />
           ))}
         </div>
-        <p className="mt-6 text-xs text-zinc-400 text-center">
+        <p className="mt-6 text-xs text-zinc-400 dark:text-zinc-500 text-center">
           自動更新間隔: 60秒 | {now} 時点
         </p>
       </div>

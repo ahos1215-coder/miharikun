@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import type { Regulation, Severity } from "@/lib/types";
 
 const PAGE_SIZE = 10;
@@ -52,6 +53,19 @@ function formatDate(dateStr: string | null) {
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+/** Staggered animation class for first 5 items */
+function itemAnimationClass(index: number): string {
+  if (index >= 5) return "";
+  const delays = [
+    "motion-preset-fade",
+    "motion-preset-fade motion-delay-100",
+    "motion-preset-fade motion-delay-200",
+    "motion-preset-fade motion-delay-300",
+    "motion-preset-fade motion-delay-400",
+  ] as const;
+  return delays[index];
 }
 
 export default async function NewsPage({
@@ -142,11 +156,11 @@ export default async function NewsPage({
           name="q"
           defaultValue={searchQuery}
           placeholder="規制を検索..."
-          className="flex-1 rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="flex-1 rounded-lg border border-zinc-300 px-4 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         />
         <button
           type="submit"
-          className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
         >
           検索
         </button>
@@ -166,19 +180,34 @@ export default async function NewsPage({
       <div className="flex gap-2 mb-6 text-sm">
         <Link
           href={sourceUrl()}
-          className={`rounded px-3 py-1 ${!sourceFilter ? "bg-blue-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
+          className={cn(
+            "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+            !sourceFilter
+              ? "bg-blue-600 text-white shadow-sm scale-105"
+              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          )}
         >
           全て ({totalCount ?? 0})
         </Link>
         <Link
           href={sourceUrl("nk")}
-          className={`rounded px-3 py-1 ${sourceFilter === "NK" ? "bg-emerald-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
+          className={cn(
+            "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+            sourceFilter === "NK"
+              ? "bg-emerald-600 text-white shadow-sm scale-105"
+              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          )}
         >
           NK ({nkCount ?? 0})
         </Link>
         <Link
           href={sourceUrl("mlit")}
-          className={`rounded px-3 py-1 ${sourceFilter === "MLIT" ? "bg-indigo-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
+          className={cn(
+            "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+            sourceFilter === "MLIT"
+              ? "bg-indigo-600 text-white shadow-sm scale-105"
+              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          )}
         >
           国交省 ({mlitCount ?? 0})
         </Link>
@@ -189,11 +218,11 @@ export default async function NewsPage({
       ) : (
         <>
           <ul className="flex flex-col gap-4">
-            {items.map((reg) => (
-              <li key={reg.id}>
+            {items.map((reg, index) => (
+              <li key={reg.id} className={itemAnimationClass(index)}>
                 <Link
                   href={`/news/${reg.id}`}
-                  className="block rounded border border-zinc-200 p-4 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                  className="block rounded-xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-sm mb-1">
                     {sourceBadge(reg.source)}

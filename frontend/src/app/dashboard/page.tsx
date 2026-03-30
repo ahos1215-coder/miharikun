@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import type {
   ShipProfile,
   UserMatch,
@@ -29,6 +30,19 @@ function applicabilityLabel(isApplicable: boolean | null) {
     return <span className="text-zinc-400">非該当</span>;
   }
   return <span className="text-amber-600">判定中</span>;
+}
+
+/** Staggered animation delay for ship cards */
+function shipCardDelay(index: number): string {
+  if (index >= 5) return "motion-preset-slide-up";
+  const delays = [
+    "motion-preset-slide-up",
+    "motion-preset-slide-up motion-delay-100",
+    "motion-preset-slide-up motion-delay-200",
+    "motion-preset-slide-up motion-delay-300",
+    "motion-preset-slide-up motion-delay-400",
+  ] as const;
+  return delays[index];
 }
 
 export default async function DashboardPage({
@@ -101,11 +115,11 @@ export default async function DashboardPage({
       <h1 className="text-2xl font-bold mb-6">ダッシュボード</h1>
 
       {shipList.length === 0 ? (
-        <div className="rounded border border-zinc-200 p-6 dark:border-zinc-800 text-center">
+        <div className="rounded-xl border border-zinc-200 p-6 shadow-sm dark:border-zinc-800 text-center motion-preset-fade">
           <p className="text-zinc-500 mb-4">船舶が登録されていません</p>
           <Link
             href="/ships/new"
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             船舶を登録する
           </Link>
@@ -115,28 +129,30 @@ export default async function DashboardPage({
           <div className="flex gap-2 mb-4">
             <Link
               href="/dashboard"
-              className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200",
                 !filterApplicable
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }`}
+              )}
             >
               [ALL] 全て表示
             </Link>
             <Link
               href="/dashboard?filter=applicable"
-              className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200",
                 filterApplicable
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }`}
+              )}
             >
               [CHECK] 該当のみ
             </Link>
           </div>
 
           <div className="flex flex-col gap-6">
-            {shipList.map((ship) => {
+            {shipList.map((ship, shipIndex) => {
               const allMatches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
                 // 該当 > 判定中 > 非該当 の順で表示
                 const order = (v: boolean | null) => v === true ? 0 : v === null ? 1 : 2;
@@ -149,7 +165,10 @@ export default async function DashboardPage({
               return (
                 <div
                   key={ship.id}
-                  className="rounded border border-zinc-200 p-4 dark:border-zinc-800"
+                  className={cn(
+                    "rounded-xl border border-zinc-200 p-6 shadow-sm hover:shadow-md transition-shadow dark:border-zinc-800",
+                    shipCardDelay(shipIndex)
+                  )}
                 >
                   <div className="mb-3 flex items-start justify-between">
                     <div>
@@ -187,7 +206,11 @@ export default async function DashboardPage({
                       {matches.map((m) => (
                         <li
                           key={m.id}
-                          className="rounded border border-zinc-100 p-3 dark:border-zinc-800 text-sm"
+                          className={cn(
+                            "rounded-lg border border-zinc-100 p-3 dark:border-zinc-800 text-sm transition-colors",
+                            m.is_applicable === true && "border-l-4 border-l-green-500",
+                            m.is_applicable === false && "opacity-60"
+                          )}
                         >
                           <div className="flex flex-wrap items-center gap-2 mb-1">
                             {applicabilityLabel(m.is_applicable)}

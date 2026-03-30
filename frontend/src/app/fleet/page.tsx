@@ -55,8 +55,6 @@ export default async function FleetPage() {
       if (m.is_applicable === true) {
         stat.applicableCount++;
       }
-      // user_matches には created_at がないため regulation の情報で代替
-      // ここでは match の regulation_id の存在を最終マッチとして使う
     }
 
     // 最終マッチ日は regulations テーブルから取得
@@ -95,17 +93,17 @@ export default async function FleetPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">[FLEET] フリート管理</h1>
+        <h1 className="text-2xl font-bold">フリート管理</h1>
         <Link
           href="/ships/new"
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 hover:scale-[1.02] transition-transform"
         >
-          [ADD] 船舶を追加
+          船舶を追加
         </Link>
       </div>
 
       {/* サマリーバー */}
-      <div className="rounded border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-4 mb-6 flex items-center justify-between">
+      <div className="motion-preset-fade rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-6 text-sm">
           <span className="font-semibold">
             フリート: <span className="text-blue-600">{totalShips}隻</span>
@@ -118,23 +116,23 @@ export default async function FleetPage() {
           href="/fleet/summary"
           className="text-sm text-blue-600 hover:underline"
         >
-          全規制サマリー →
+          全規制サマリー
         </Link>
       </div>
 
       {shipList.length === 0 ? (
-        <div className="rounded border border-zinc-200 dark:border-zinc-800 p-6 text-center">
+        <div className="rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6 text-center">
           <p className="text-zinc-500 mb-4">船舶が登録されていません</p>
           <Link
             href="/ships/new"
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             船舶を登録する
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {shipList.map((ship) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {shipList.map((ship, index) => {
             const stat = matchStats[ship.id] ?? {
               applicableCount: 0,
               lastMatchedAt: null,
@@ -142,14 +140,18 @@ export default async function FleetPage() {
             return (
               <div
                 key={ship.id}
-                className="rounded border border-zinc-200 dark:border-zinc-800 p-4 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+                className={`motion-preset-slide-up rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-4 hover:shadow-md transition-shadow ${
+                  index === 1 ? "motion-delay-75" :
+                  index === 2 ? "motion-delay-100" :
+                  index >= 3 ? "motion-delay-150" : ""
+                }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h2 className="font-semibold text-base">
-                      [SHIP] {ship.ship_name}
+                      {ship.ship_name}
                     </h2>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       {SHIP_TYPE_LABELS[ship.ship_type as ShipType] ??
                         ship.ship_type}{" "}
                       / {ship.gross_tonnage.toLocaleString()} GT
@@ -159,11 +161,11 @@ export default async function FleetPage() {
                     href={`/ships/${ship.id}`}
                     className="text-xs text-blue-600 hover:underline"
                   >
-                    [EDIT]
+                    編集
                   </Link>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-zinc-500 mt-3">
+                <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 mt-3">
                   <span>
                     該当規制:{" "}
                     <span
@@ -189,7 +191,7 @@ export default async function FleetPage() {
                     href={`/dashboard`}
                     className="text-xs text-blue-600 hover:underline"
                   >
-                    詳細を見る →
+                    詳細を見る
                   </Link>
                 </div>
               </div>

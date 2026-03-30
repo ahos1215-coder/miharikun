@@ -48,11 +48,13 @@ export default async function SettingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">通知設定</h1>
+      <h1 className="text-2xl font-bold mb-2">通知設定</h1>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
         通知の受信方法と頻度を設定できます。設定はいつでも変更可能です。
       </p>
-      <SettingsForm preferences={preferences} />
+      <div className="motion-preset-fade rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6">
+        <SettingsForm preferences={preferences} />
+      </div>
     </div>
   );
 }
