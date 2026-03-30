@@ -236,6 +236,7 @@ def _augment_prompt(prompt: str) -> str:
 {
   "status": "ok",
   "category": "<カテゴリ名>",
+  "headline": "<規制の内容を20〜30文字で要約した見出し>",
   "summary": "<日本語の要約 200字以内>",
   "severity": "<critical|warning|info|upcoming>",
   "confidence": <0.0〜1.0の数値>,
@@ -250,6 +251,8 @@ def _augment_prompt(prompt: str) -> str:
   "effective_date": "<施行日 or null>"
 }
 ```
+
+- "headline": 規制の内容を20〜30文字で要約した見出し。Yahoo!ニュースのように一般読者にもわかりやすい表現にすること。例: "閉囲区画の安全基準が改正", "NOx排出基準Tier IIIへ強化"
 """
     if "confidence" in prompt and "citations" in prompt:
         return prompt

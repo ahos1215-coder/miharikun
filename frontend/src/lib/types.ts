@@ -43,6 +43,7 @@ export interface Regulation {
   source_id: string;
   title: string;
   title_en: string | null;
+  headline: string | null;
   summary_ja: string | null;
   url: string | null;
   pdf_url: string | null;

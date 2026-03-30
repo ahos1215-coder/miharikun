@@ -133,6 +133,9 @@ class ClassifiedRegulation:
     category: str
     severity: str
 
+    # 見出し
+    headline: Optional[str]   # 20-30文字の短い見出し（Gemini 生成）
+
     # v4: AI 信頼性
     confidence: float         # 0.0-1.0
     citations: list[dict]     # [{"text": str, "page": int, "source": str}]
@@ -159,6 +162,7 @@ CLASSIFICATION_PROMPT = """\
 
 ```json
 {
+  "headline": "規制の内容を20〜30文字で要約した見出し（Yahoo!ニュースのように一般読者にもわかりやすい表現）",
   "summary_ja": "この通達の要点を200字以内で日本語要約",
   "applicable_ship_types": ["bulk_carrier", "container", "general_cargo", "roro", "pcc", "tanker_product", "tanker_crude", "lng", "lpg", "passenger", "all"],
   "applicable_gt_min": null,
@@ -187,6 +191,7 @@ CLASSIFICATION_PROMPT = """\
 - applicable_flags: 特定の船旗国にのみ適用される場合は列挙。全旗国なら ["all"]
 - applicable_crew_roles: 職種による適用区分（例: 機関士向けのみ → ["chief_engineer", "engineer"]）。全職種なら ["all"]
 - severity: 法的義務・検査要件の変更は "critical"、推奨事項・情報提供は "informational"、その中間は "important"
+- headline: 規制の内容を20〜30文字で要約した見出し。Yahoo!ニュースのように一般読者にもわかりやすい表現にすること。例: "閉囲区画の安全基準が改正", "NOx排出基準Tier IIIへ強化"
 - confidence: 分類全体の確信度（0.0〜1.0）。PDF から明確に読み取れる場合は高く、曖昧な場合は低く設定
 - citations: 分類の根拠となった PDF 内の原文を 1〜3 件引用。page は 1 始まりのページ番号
 - 判断に迷った場合は、より広い適用範囲（all）を選択し、confidence を低めに設定してください
@@ -402,6 +407,7 @@ def _build_regulation_from_classification(
         applicable_crew_roles=classification.get("applicable_crew_roles", ["all"]),
         category=classification.get("category", "other"),
         severity=classification.get("severity", "informational"),
+        headline=classification.get("headline"),
         confidence=confidence,
         citations=classification.get("citations", []),
         needs_review=needs_review,
@@ -478,6 +484,7 @@ def save_to_supabase(db: SupabaseClient, regulation: ClassifiedRegulation) -> bo
         "applicable_crew_roles": regulation.applicable_crew_roles,
         "category": regulation.category,
         "severity": regulation.severity,
+        "headline": regulation.headline,
         "confidence": regulation.confidence,
         "citations": regulation.citations,
         "needs_review": regulation.needs_review,

@@ -1,0 +1,1 @@
+ALTER TABLE regulations ADD COLUMN IF NOT EXISTS headline TEXT;

@@ -2,10 +2,67 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, HelpCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  Award,
+  HelpCircle,
+  Leaf,
+  List,
+  Search,
+  Shield,
+  Star,
+  Users,
+} from "lucide-react";
 import type { Regulation, Severity } from "@/lib/types";
 
 const PAGE_SIZE = 10;
+
+// --- Category tab definitions ---
+
+type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "class";
+
+interface TabDef {
+  key: TabKey;
+  label: string;
+  param: string;
+  icon: React.ReactNode;
+  keywords: string[];
+}
+
+const TABS: TabDef[] = [
+  { key: "all", label: "全て", param: "", icon: <List size={16} />, keywords: [] },
+  { key: "main", label: "主要", param: "main", icon: <Star size={16} />, keywords: [] },
+  {
+    key: "safety",
+    label: "安全",
+    param: "safety",
+    icon: <Shield size={16} />,
+    keywords: ["SOLAS", "ISM", "ISPS", "MSC", "安全", "救命", "防火", "構造", "航行"],
+  },
+  {
+    key: "environment",
+    label: "環境",
+    param: "environment",
+    icon: <Leaf size={16} />,
+    keywords: ["MARPOL", "MEPC", "環境", "油濁", "大気", "バラスト", "CII", "EEXI", "リサイクル"],
+  },
+  {
+    key: "crew",
+    label: "船員",
+    param: "crew",
+    icon: <Users size={16} />,
+    keywords: ["MLC", "STCW", "船員", "労働", "訓練", "資格"],
+  },
+  {
+    key: "class",
+    label: "船級",
+    param: "class",
+    icon: <Award size={16} />,
+    keywords: ["NK", "ClassNK", "旗国", "船級", "class"],
+  },
+];
+
+// --- Helper functions ---
 
 function severityBadge(severity: Severity) {
   switch (severity) {
@@ -76,40 +133,143 @@ function itemAnimationClass(index: number): string {
   return delays[index];
 }
 
+/** Build .or() filter string for keyword-based category filtering */
+function buildKeywordFilter(keywords: string[]): string {
+  const conditions: string[] = [];
+  for (const kw of keywords) {
+    conditions.push(`title.ilike.%${kw}%`);
+    conditions.push(`summary_ja.ilike.%${kw}%`);
+    conditions.push(`category.ilike.%${kw}%`);
+  }
+  return conditions.join(",");
+}
+
+// --- Main page component ---
+
 export default async function NewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; page?: string; q?: string }>;
+  searchParams: Promise<{ source?: string; page?: string; q?: string; tab?: string }>;
 }) {
   const params = await searchParams;
   const sourceFilter = params.source?.toUpperCase();
   const searchQuery = params.q?.trim() || "";
   const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const offset = (currentPage - 1) * PAGE_SIZE;
+  const activeTab = (params.tab as TabKey) || "all";
 
   const supabase = await createClient();
 
-  // フィルタ付きのクエリ（ページネーション）
+  // --- Auth check for 主要 tab ---
+  let userId: string | null = null;
+  let matchedRegulationIds: string[] | null = null;
+  let authError = false;
+
+  if (activeTab === "main") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      userId = user.id;
+      // Get user's ship profiles
+      const { data: ships } = await supabase
+        .from("ship_profiles")
+        .select("id")
+        .eq("user_id", user.id);
+
+      if (ships && ships.length > 0) {
+        const shipIds = ships.map((s: { id: string }) => s.id);
+        // Get matched regulation IDs
+        const { data: matches } = await supabase
+          .from("user_matches")
+          .select("regulation_id")
+          .in("ship_profile_id", shipIds)
+          .eq("is_applicable", true);
+
+        matchedRegulationIds = matches
+          ? matches.map((m: { regulation_id: string }) => m.regulation_id)
+          : [];
+      } else {
+        matchedRegulationIds = [];
+      }
+    } else {
+      authError = true;
+    }
+  }
+
+  // --- Also fetch matches for applicability badges (when user is logged in on any tab) ---
+  let allMatchedIds: Set<string> = new Set();
+  if (activeTab !== "main") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      userId = user.id;
+      const { data: ships } = await supabase
+        .from("ship_profiles")
+        .select("id")
+        .eq("user_id", user.id);
+
+      if (ships && ships.length > 0) {
+        const shipIds = ships.map((s: { id: string }) => s.id);
+        const { data: matches } = await supabase
+          .from("user_matches")
+          .select("regulation_id")
+          .in("ship_profile_id", shipIds)
+          .eq("is_applicable", true);
+
+        if (matches) {
+          allMatchedIds = new Set(matches.map((m: { regulation_id: string }) => m.regulation_id));
+        }
+      }
+    }
+  } else if (matchedRegulationIds) {
+    allMatchedIds = new Set(matchedRegulationIds);
+  }
+
+  // --- Build query ---
   let query = supabase
     .from("regulations")
     .select("id,source,source_id,title,category,severity,confidence,published_at,summary_ja", { count: "exact" })
     .order("published_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
+  // Source filter
   if (sourceFilter) {
     query = query.ilike("source", sourceFilter);
   }
 
+  // Search query
   if (searchQuery) {
     query = query.ilike("title", `%${searchQuery}%`);
   }
 
-  const { data: regulations, count: filteredCount } = await query;
-  const items = (regulations ?? []) as Regulation[];
-  const totalFiltered = filteredCount ?? 0;
+  // Category tab filter
+  const tabDef = TABS.find((t) => t.key === activeTab);
+
+  if (activeTab === "main") {
+    if (matchedRegulationIds && matchedRegulationIds.length > 0) {
+      query = query.in("id", matchedRegulationIds);
+    } else if (!authError) {
+      // User is logged in but has no matches — show empty
+      query = query.in("id", ["__no_match__"]);
+    }
+    // If authError, we skip filtering — the UI will show a login message instead
+  } else if (tabDef && tabDef.keywords.length > 0) {
+    query = query.or(buildKeywordFilter(tabDef.keywords));
+  }
+
+  // Only execute data query if not showing auth error for main tab
+  let items: Regulation[] = [];
+  let totalFiltered = 0;
+
+  if (activeTab === "main" && authError) {
+    // Don't query — show login message
+  } else {
+    const { data: regulations, count: filteredCount } = await query;
+    items = (regulations ?? []) as Regulation[];
+    totalFiltered = filteredCount ?? 0;
+  }
+
   const totalPages = Math.ceil(totalFiltered / PAGE_SIZE);
 
-  // ソース別件数
+  // --- Source counts ---
   const { count: totalCount } = await supabase
     .from("regulations")
     .select("*", { count: "exact", head: true });
@@ -124,48 +284,65 @@ export default async function NewsPage({
     .select("*", { count: "exact", head: true })
     .ilike("source", "MLIT");
 
-  // ページネーション用のURL構築
-  function pageUrl(page: number) {
-    const p = new URLSearchParams();
-    if (sourceFilter) p.set("source", sourceFilter.toLowerCase());
-    if (searchQuery) p.set("q", searchQuery);
-    if (page > 1) p.set("page", String(page));
-    const qs = p.toString();
-    return `/news${qs ? `?${qs}` : ""}`;
-  }
+  // --- URL builders ---
 
-  // ソースフィルタURL（検索クエリを保持）
-  function sourceUrl(source?: string) {
+  function buildUrl(overrides: { page?: number; source?: string; tab?: string; q?: string; clearSource?: boolean; clearTab?: boolean }) {
     const p = new URLSearchParams();
+    const tab = overrides.clearTab ? undefined : (overrides.tab ?? (activeTab !== "all" ? activeTab : undefined));
+    const source = overrides.clearSource ? undefined : (overrides.source !== undefined ? overrides.source : (sourceFilter ? sourceFilter.toLowerCase() : undefined));
+    const q = overrides.q !== undefined ? overrides.q : searchQuery;
+    const page = overrides.page ?? undefined;
+
+    if (tab) p.set("tab", tab);
     if (source) p.set("source", source);
-    if (searchQuery) p.set("q", searchQuery);
+    if (q) p.set("q", q);
+    if (page && page > 1) p.set("page", String(page));
+
     const qs = p.toString();
     return `/news${qs ? `?${qs}` : ""}`;
   }
 
-  // 検索クリアURL（ソースフィルタを保持）
+  function pageUrl(page: number) {
+    return buildUrl({ page });
+  }
+
+  function sourceUrl(source?: string) {
+    return buildUrl({ source: source ?? "", clearSource: !source, page: 1 });
+  }
+
+  function tabUrl(tab: TabKey) {
+    return buildUrl({ tab: tab === "all" ? "" : tab, clearTab: tab === "all", page: 1 });
+  }
+
   function clearSearchUrl() {
-    const p = new URLSearchParams();
-    if (sourceFilter) p.set("source", sourceFilter.toLowerCase());
-    const qs = p.toString();
-    return `/news${qs ? `?${qs}` : ""}`;
+    return buildUrl({ q: "" });
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">最新規制ニュース</h1>
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-5 dark:text-zinc-100">最新規制ニュース</h1>
 
-      <form method="GET" action="/news" className="flex gap-2 mb-4">
+      {/* Search bar */}
+      <form method="GET" action="/news" className="flex gap-2 mb-5">
+        {activeTab !== "all" && (
+          <input type="hidden" name="tab" value={activeTab} />
+        )}
         {sourceFilter && (
           <input type="hidden" name="source" value={sourceFilter.toLowerCase()} />
         )}
-        <input
-          type="text"
-          name="q"
-          defaultValue={searchQuery}
-          placeholder="規制を検索..."
-          className="flex-1 rounded-lg border border-zinc-300 px-4 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
+        <div className="relative flex-1">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+          />
+          <input
+            type="text"
+            name="q"
+            defaultValue={searchQuery}
+            placeholder="規制を検索..."
+            className="w-full rounded-lg border border-zinc-300 pl-9 pr-4 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+          />
+        </div>
         <button
           type="submit"
           className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
@@ -179,20 +356,47 @@ export default async function NewsPage({
           <span className="text-zinc-600 dark:text-zinc-400">
             「{searchQuery}」の検索結果: {totalFiltered}件
           </span>
-          <Link href={clearSearchUrl()} className="text-blue-600 hover:underline">
+          <Link href={clearSearchUrl()} className="text-blue-600 hover:underline dark:text-blue-400">
             クリア
           </Link>
         </div>
       )}
 
+      {/* Category tabs — horizontal scrollable */}
+      <div className="mb-4 -mx-4 px-4 overflow-x-auto scrollbar-hide">
+        <nav className="flex gap-1 min-w-max" role="tablist">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <Link
+                key={tab.key}
+                href={tabUrl(tab.key)}
+                role="tab"
+                aria-selected={isActive}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200",
+                  isActive
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800",
+                )}
+              >
+                {tab.icon}
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Source filter — secondary */}
       <div className="flex gap-2 mb-6 text-sm">
         <Link
           href={sourceUrl()}
           className={cn(
             "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
             !sourceFilter
-              ? "bg-blue-600 text-white shadow-sm scale-105"
-              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 shadow-sm"
+              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
           )}
         >
           全て ({totalCount ?? 0})
@@ -202,8 +406,8 @@ export default async function NewsPage({
           className={cn(
             "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
             sourceFilter === "NK"
-              ? "bg-emerald-600 text-white shadow-sm scale-105"
-              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
           )}
         >
           NK ({nkCount ?? 0})
@@ -213,68 +417,140 @@ export default async function NewsPage({
           className={cn(
             "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
             sourceFilter === "MLIT"
-              ? "bg-indigo-600 text-white shadow-sm scale-105"
-              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
           )}
         >
           国交省 ({mlitCount ?? 0})
         </Link>
       </div>
 
-      {items.length === 0 ? (
-        <p className="text-zinc-500">規制情報はまだありません</p>
-      ) : (
+      {/* Main tab — auth error message */}
+      {activeTab === "main" && authError && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center dark:border-blue-900 dark:bg-blue-950/30 motion-preset-fade">
+          <Star size={32} className="mx-auto mb-3 text-blue-400" />
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            ログインすると自船に該当する規制だけを表示できます
+          </p>
+          <Link
+            href="/login"
+            className="mt-3 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            ログイン
+          </Link>
+        </div>
+      )}
+
+      {/* Main tab — logged in but no matches */}
+      {activeTab === "main" && !authError && items.length === 0 && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900 motion-preset-fade">
+          <Star size={32} className="mx-auto mb-3 text-zinc-400" />
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            該当する規制はありません。船舶プロファイルを登録すると、マッチング結果がここに表示されます。
+          </p>
+          <Link
+            href="/ships"
+            className="mt-3 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            船舶を登録
+          </Link>
+        </div>
+      )}
+
+      {/* Regular empty state (non-main tabs) */}
+      {activeTab !== "main" && items.length === 0 && (
+        <p className="text-zinc-500 dark:text-zinc-400 py-8 text-center">
+          該当する規制情報はありません
+        </p>
+      )}
+
+      {/* News cards */}
+      {items.length > 0 && (
         <>
           <ul className="flex flex-col gap-4">
-            {items.map((reg, index) => (
-              <li key={reg.id} className={itemAnimationClass(index)}>
-                <Link
-                  href={`/news/${reg.id}`}
-                  className="block rounded-xl border border-zinc-200 p-4 shadow-sm dark:border-zinc-800 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  <div className="flex flex-wrap items-center gap-2 text-sm mb-1">
-                    {sourceBadge(reg.source)}
-                    {severityBadge(reg.severity)}
-                    {reg.category && (
-                      <span className="text-zinc-500">{reg.category}</span>
+            {items.map((reg, index) => {
+              const isNew = isWithin24Hours(reg.published_at);
+              const isApplicable = allMatchedIds.has(reg.id);
+
+              return (
+                <li key={reg.id} className={itemAnimationClass(index)}>
+                  <Link
+                    href={`/news/${reg.id}`}
+                    className="block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200 dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    {/* Top row: source + severity + date */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {sourceBadge(reg.source)}
+                        {severityBadge(reg.severity)}
+                        {confidenceLabel(reg.confidence)}
+                      </div>
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 ml-2">
+                        {formatDate(reg.published_at)}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1 leading-snug">
+                      {reg.title}
+                    </h3>
+
+                    {/* Summary */}
+                    {reg.summary_ja && (
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-2">
+                        {reg.summary_ja}
+                      </p>
                     )}
-                    {confidenceLabel(reg.confidence)}
-                  </div>
-                  <p className="font-medium">{reg.title}</p>
-                  {reg.summary_ja && (
-                    <p className="text-xs text-zinc-500 mt-1 line-clamp-2">
-                      {reg.summary_ja}
-                    </p>
-                  )}
-                  <p className="text-xs text-zinc-400 mt-1">
-                    {formatDate(reg.published_at)}
-                    {isWithin24Hours(reg.published_at) && (
-                      <Badge variant="new" className="ml-2">NEW</Badge>
-                    )}
-                  </p>
-                </Link>
-              </li>
-            ))}
+
+                    {/* Bottom row: category + badges */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {reg.category && (
+                        <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                          {reg.category}
+                        </span>
+                      )}
+                      {userId && isApplicable && (
+                        <Badge variant="success">該当</Badge>
+                      )}
+                      {isNew && (
+                        <Badge variant="new">NEW</Badge>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
 
+          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-6 text-sm">
+            <div className="flex items-center justify-center gap-4 mt-8 text-sm">
               {currentPage > 1 ? (
-                <Link href={pageUrl(currentPage - 1)} className="text-blue-600 hover:underline">
+                <Link
+                  href={pageUrl(currentPage - 1)}
+                  className="rounded-lg border border-zinc-300 px-4 py-2 text-zinc-700 hover:bg-zinc-50 transition-colors dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
                   ← 前へ
                 </Link>
               ) : (
-                <span className="text-zinc-300">← 前へ</span>
+                <span className="rounded-lg border border-zinc-200 px-4 py-2 text-zinc-300 dark:border-zinc-800 dark:text-zinc-700">
+                  ← 前へ
+                </span>
               )}
-              <span className="text-zinc-500">
+              <span className="text-zinc-500 dark:text-zinc-400 tabular-nums">
                 {currentPage} / {totalPages}
               </span>
               {currentPage < totalPages ? (
-                <Link href={pageUrl(currentPage + 1)} className="text-blue-600 hover:underline">
+                <Link
+                  href={pageUrl(currentPage + 1)}
+                  className="rounded-lg border border-zinc-300 px-4 py-2 text-zinc-700 hover:bg-zinc-50 transition-colors dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
                   次へ →
                 </Link>
               ) : (
-                <span className="text-zinc-300">次へ →</span>
+                <span className="rounded-lg border border-zinc-200 px-4 py-2 text-zinc-300 dark:border-zinc-800 dark:text-zinc-700">
+                  次へ →
+                </span>
               )}
             </div>
           )}

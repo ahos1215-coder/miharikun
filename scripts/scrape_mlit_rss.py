@@ -241,6 +241,7 @@ def build_regulation_record(
         record.update({
             "category": classification.get("category"),
             "severity": classification.get("severity"),
+            "headline": classification.get("headline"),
             "summary_ja": classification.get("summary"),
             "confidence": classification.get("confidence"),
             "citations": classification.get("citations"),
