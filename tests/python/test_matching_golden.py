@@ -406,3 +406,145 @@ class TestMatchOutputSchema:
         assert isinstance(result["reason"], str)
         assert isinstance(result["citations"], list)
         assert isinstance(result["needs_review"], bool)
+
+
+# ===========================================================================
+# テストケース — 条約ベースマッチング (Stage 0)
+# ===========================================================================
+
+class TestGoldenConventionBased:
+    """
+    条約ベースマッチング（Stage 0）のゴールデンセットテスト。
+    Gemini API 不要 — determine_compliance + キーワード照合のみ。
+    """
+
+    def test_msc581_enclosed_space(self):
+        """#C1 MSC.581 閉囲区画 → SOLAS Ch.III キーワードマッチ → 適用"""
+        reg = _base_regulation(
+            id="test-conv-001",
+            source="IMO",
+            source_id="MSC.581",
+            title="閉囲区画への進入に関する改正 MSC.581",
+            summary_ja="閉囲区画への進入に係る安全要件の改正。SOLAS Chapter III 関連。救命設備の点検手順を見直し。",
+            category="safety",
+            severity="important",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True
+        assert result["match_method"] == "convention_based"
+        assert result["confidence"] == 0.95
+        assert len(result["conventions"]) > 0
+        assert result["needs_review"] is False
+
+    def test_ism_code_safety_management(self):
+        """#C2 ISM + 安全管理 → SOLAS Ch.IX キーワードマッチ → 適用"""
+        reg = _base_regulation(
+            id="test-conv-002",
+            source="IMO",
+            source_id="MSC.600",
+            title="ISMコードに基づく安全管理体制の強化について",
+            summary_ja="ISM Code の安全管理要件改正。SMS 文書管理と内部監査の手順を見直し。",
+            category="safety",
+            severity="important",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True
+        assert result["match_method"] == "convention_based"
+        assert result["confidence"] == 0.95
+        assert len(result["conventions"]) > 0
+        assert result["needs_review"] is False
+
+    def test_marpol_annex_vi_sox(self):
+        """#C3 大気汚染 + SOx → MARPOL Annex VI キーワードマッチ → 適用"""
+        reg = _base_regulation(
+            id="test-conv-003",
+            source="IMO",
+            source_id="MEPC.400",
+            title="大気汚染防止に関する MARPOL Annex VI 改正: SOx排出規制強化",
+            summary_ja="MARPOL Annex VI の SOx 排出規制を強化。2027年以降 GT 400 以上の国際航行船舶に適用。",
+            category="environment",
+            severity="critical",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True
+        assert result["match_method"] == "convention_based"
+        assert result["confidence"] == 0.95
+        assert len(result["conventions"]) > 0
+        assert result["needs_review"] is False
+
+    def test_stcw_crew_training(self):
+        """#C4 STCW + 訓練 → STCW 条約キーワードマッチ → 適用"""
+        reg = _base_regulation(
+            id="test-conv-004",
+            source="IMO",
+            source_id="MSC.700",
+            title="STCW条約に基づく船員訓練要件の改正",
+            summary_ja="STCW Code 改正による乗組員の訓練基準の見直し。当直体制要件を更新。",
+            category="safety",
+            severity="important",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True
+        assert result["match_method"] == "convention_based"
+        assert result["confidence"] == 0.95
+        assert len(result["conventions"]) > 0
+        assert result["needs_review"] is False
+
+    def test_ship_recycling_ihm(self):
+        """#C5 リサイクル + IHM → Hong Kong Convention キーワードマッチ → 適用"""
+        reg = _base_regulation(
+            id="test-conv-005",
+            source="IMO",
+            source_id="MEPC.450",
+            title="シップリサイクル条約に基づく IHM 有害物質一覧表の更新要件",
+            summary_ja="Hong Kong Convention（HKC）に基づく IHM の更新手順改正。リサイクル関連。",
+            category="environment",
+            severity="important",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True
+        assert result["match_method"] == "convention_based"
+        assert result["confidence"] == 0.95
+        assert len(result["conventions"]) > 0
+        assert result["needs_review"] is False
+
+    def test_bwm_convention_ballast_water(self):
+        """#C6 バラスト水 → BWM Convention キーワードマッチ → 適用
+        BWM Convention は detail_conditions=None のため applicable 判定。
+        他の applicable 条約キーワードも同時マッチするため convention_based (True)。
+        """
+        reg = _base_regulation(
+            id="test-conv-006",
+            source="IMO",
+            source_id="MEPC.500",
+            title="バラスト水管理条約の改正について",
+            summary_ja="バラスト水処理装置の型式承認基準改定。BWMS の性能要件を見直し。",
+            category="environment",
+            severity="important",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True
+        assert result["match_method"] == "convention_based"
+        assert result["confidence"] == 0.95
+        assert len(result["conventions"]) > 0
+        assert result["needs_review"] is False
+
+    def test_passenger_only_for_bulk_carrier(self):
+        """#C7 旅客船限定規制 → Stage 1 (rule_based) で除外 → not_applicable
+        applicable_ship_types=["passenger"] のため、bulk_carrier は Stage 0 到達前に除外。
+        """
+        reg = _base_regulation(
+            id="test-conv-007",
+            source="IMO",
+            source_id="MSC.800",
+            title="旅客船の避難設備に関する安全基準の改正",
+            summary_ja="旅客船における救命設備および避難経路の追加要件。SOLAS 旅客船規定の改正。",
+            applicable_ship_types=["passenger"],
+            category="safety",
+            severity="critical",
+        )
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is False
+        assert result["match_method"] == "rule_based"
+        assert result["confidence"] == 1.0
+        assert result["conventions"] == []
