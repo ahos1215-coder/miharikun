@@ -1,9 +1,10 @@
 """
-マッチングエンジン v1 — 規制 × 船舶プロファイルの適用判定
+マッチングエンジン v2 — 規制 × 船舶プロファイルの適用判定
 =========================================================
-2段階マッチング:
+3段階マッチング:
+  Stage 0: 条約ベースマッチング（船に適用される条約のキーワード照合）
   Stage 1: ルールベースフィルタ（高速除外）
-  Stage 2: AI マッチング（Gemini、Stage 1 で判断できなかった場合のみ）
+  Stage 2: AI マッチング（Gemini、Stage 0/1 で判断できなかった場合のみ）
 
 使い方:
     from utils.matching import match_regulation_to_ship
@@ -11,10 +12,15 @@
     result = match_regulation_to_ship(regulation_dict, ship_dict)
     # {
     #   "is_applicable": True,
-    #   "match_method": "ai_matching",
-    #   "confidence": 0.92,
-    #   "reason": "GT 500 以上の国際航行船舶に適用（本船 GT 2,800）",
-    #   "citations": [...]
+    #   "match_method": "convention_based",
+    #   "confidence": 0.95,
+    #   "reason": "SOLAS Ch.II-1 適用船 — GT 500 以上の国際航行船舶",
+    #   "conventions": ["solas_ii1"],
+    #   "actions": [...],
+    #   "national_laws": [...],
+    #   "certificates": [...],
+    #   "needs_review": False,
+    #   "citations": None,
     # }
 """
 
@@ -27,9 +33,16 @@ import time
 from typing import Optional
 
 # utils/ 内の他モジュールを import 可能にする
+# scripts/ と scripts/utils/ の両方をパスに追加
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import requests
+
+try:
+    from utils.ship_compliance import determine_compliance, get_applicable_keywords
+except ImportError:
+    from ship_compliance import determine_compliance, get_applicable_keywords
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -202,13 +215,88 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Stage 0: 条約ベースマッチング
+# ---------------------------------------------------------------------------
+
+def _convention_match(regulation: dict, compliance: list[dict]) -> dict | None:
+    """
+    規制のタイトル/サマリーと、船に適用される条約のキーワードを照合。
+    マッチすれば条約ベースの判定結果を返す。マッチしなければ None。
+    """
+    reg_text = (
+        f"{regulation.get('title', '')} "
+        f"{regulation.get('summary_ja', '')} "
+        f"{regulation.get('category', '')}"
+    ).lower()
+
+    matched: list[dict] = []
+    for conv in compliance:
+        if conv["status"] == "not_applicable":
+            continue
+        for kw in conv.get("keywords", []):
+            if kw.lower() in reg_text:
+                matched.append(conv)
+                break
+
+    if not matched:
+        return None
+
+    # Best match (prefer "applicable" over "potential")
+    applicable = [m for m in matched if m["status"] == "applicable"]
+    potential = [m for m in matched if m["status"] == "potential"]
+
+    if applicable:
+        best = applicable[0]
+        logger.info(
+            f"[Stage0] convention_based: {best['convention']} {best.get('chapter', '')} "
+            f"— {len(matched)} 条約マッチ"
+        )
+        return {
+            "is_applicable": True,
+            "match_method": "convention_based",
+            "confidence": 0.95,
+            "reason": f"{best['convention']} {best.get('chapter', '')} 適用船 — {best['reason']}",
+            "conventions": [m.get("convention_id", "") for m in matched],
+            "actions": best.get("typical_actions", []),
+            "national_laws": best.get("national_laws", []),
+            "certificates": best.get("certificates", []),
+            "needs_review": False,
+            "citations": None,
+        }
+    elif potential:
+        best = potential[0]
+        logger.info(
+            f"[Stage0] potential_match: {best['convention']} — 要確認"
+        )
+        return {
+            "is_applicable": None,  # Unknown — needs user confirmation
+            "match_method": "potential_match",
+            "confidence": 0.5,
+            "reason": f"該当の可能性あり — {best.get('user_prompt', '')}",
+            "conventions": [m.get("convention_id", "") for m in matched],
+            "actions": [],
+            "national_laws": [],
+            "certificates": [],
+            "needs_review": True,
+            "citations": None,
+        }
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Stage 2: AI マッチング（Gemini）
 # ---------------------------------------------------------------------------
 
-def _build_matching_prompt(regulation: dict, ship: dict) -> str:
+def _build_matching_prompt(
+    regulation: dict,
+    ship: dict,
+    compliance: list[dict] | None = None,
+) -> str:
     """
     Gemini に送るマッチング判定プロンプトを構築する。
     PDF なしのテキストのみで判定させる（classify_pdf とは異なる）。
+    compliance が渡された場合は条約コンテキストを追加する。
     """
     ship_summary = (
         f"船名: {ship.get('ship_name', '不明')}\n"
@@ -305,7 +393,19 @@ def _build_matching_prompt(regulation: dict, ship: dict) -> str:
   ]
 }}
 ```
+
 """
+    # 条約コンテキストを追加（Stage 0 で判定不能だった場合の AI 補助情報）
+    if compliance:
+        applicable_convs = [c for c in compliance if c["status"] == "applicable"]
+        if applicable_convs:
+            prompt += "\n\n## この船に適用される条約・法令:\n"
+            for c in applicable_convs:
+                prompt += f"- {c['convention']} {c.get('chapter', '')}: {c.get('description', '')}\n"
+                if c.get("national_laws"):
+                    prompt += f"  関連国内法: {', '.join(c['national_laws'])}\n"
+            prompt += "\n上記の条約に関連する規制であれば「該当」と判定してください。\n"
+
     return prompt
 
 
@@ -370,13 +470,18 @@ def _parse_json_response(text: str) -> dict:
         return {}
 
 
-def ai_match(regulation: dict, ship: dict) -> dict:
+def ai_match(
+    regulation: dict,
+    ship: dict,
+    compliance: list[dict] | None = None,
+) -> dict:
     """
     Gemini に規制の要約・引用と船舶スペックを送り、適用/非適用を判定させる。
 
     Args:
-        regulation: regulations テーブルの行 dict（summary_ja, citations 等を含む）
-        ship:       ship_profiles テーブルの行 dict
+        regulation:  regulations テーブルの行 dict（summary_ja, citations 等を含む）
+        ship:        ship_profiles テーブルの行 dict
+        compliance:  determine_compliance() の結果（条約コンテキスト追加用）
 
     Returns:
         {
@@ -400,7 +505,7 @@ def ai_match(regulation: dict, ship: dict) -> dict:
     primary_model = os.environ.get("GEMINI_MODEL", _DEFAULT_PRIMARY_MODEL)
     fallback_model = os.environ.get("GEMINI_FALLBACK_MODEL", _DEFAULT_FALLBACK_MODEL)
 
-    prompt = _build_matching_prompt(regulation, ship)
+    prompt = _build_matching_prompt(regulation, ship, compliance=compliance)
     source_label = f"{regulation.get('source', '?')}/{regulation.get('source_id', '?')}"
 
     for model_label, model_name in [("primary", primary_model), ("fallback", fallback_model)]:
@@ -458,15 +563,16 @@ def ai_match(regulation: dict, ship: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 統合関数: ルールベース → AI の2段階マッチング
+# 統合関数: 条約ベース → ルールベース → AI の3段階マッチング
 # ---------------------------------------------------------------------------
 
 def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
     """
-    規制と船舶プロファイルの2段階マッチングを実行する。
+    規制と船舶プロファイルの3段階マッチングを実行する。
 
+    Stage 0: _convention_match — 条約ベースキーワード照合（高速・高精度）
     Stage 1: rule_based_filter — 高速除外（Gemini 不使用）
-    Stage 2: ai_match         — Gemini による精密判定（Stage 1 で needs_ai の場合のみ）
+    Stage 2: ai_match          — Gemini による精密判定（Stage 0/1 で判断できなかった場合のみ）
 
     Args:
         regulation: regulations テーブルの行 dict
@@ -474,11 +580,15 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
 
     Returns:
         {
-            "is_applicable":  bool | None,  # None = AI 失敗で不明
-            "match_method":   str,          # 'rule_based' | 'ai_matching'
+            "is_applicable":  bool | None,  # None = AI 失敗で不明 or 要ユーザー確認
+            "match_method":   str,          # 'convention_based' | 'potential_match' | 'rule_based' | 'ai_matching'
             "confidence":     float,        # 0.0〜1.0
             "reason":         str,
-            "citations":      list,
+            "conventions":    list[str],    # マッチした条約 ID
+            "actions":        list[dict],   # アクション項目
+            "national_laws":  list[str],    # 関連国内法
+            "certificates":   list[str],    # 関連証書
+            "citations":      list | None,
             "needs_review":   bool,         # confidence < 0.7 の場合 True
         }
     """
@@ -486,7 +596,7 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
     ship_label = f"{ship.get('ship_name', '?')} (GT {ship.get('gross_tonnage', '?')})"
     logger.info(f"マッチング開始: regulation={source_label} ship={ship_label}")
 
-    # --- Stage 1: ルールベースフィルタ ---
+    # --- Stage 1: ルールベースフィルタ（最初に明確な非該当を除外）---
     rule_result = rule_based_filter(regulation, ship)
 
     if rule_result == "not_applicable":
@@ -496,9 +606,28 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
             "match_method": "rule_based",
             "confidence": 1.0,
             "reason": "船種・GT・建造年・航行区域・旗国のいずれかが適用範囲外",
+            "conventions": [],
+            "actions": [],
+            "national_laws": [],
+            "certificates": [],
             "citations": [],
             "needs_review": False,
         }
+
+    # --- Stage 0: 条約ベースマッチング（ルールベースを通過したもの）---
+    compliance: list[dict] = []
+    try:
+        compliance = determine_compliance(ship)
+        convention_result = _convention_match(regulation, compliance)
+        if convention_result:
+            logger.info(
+                f"[Stage0] 条約マッチ確定: regulation={source_label} "
+                f"method={convention_result['match_method']}"
+            )
+            return convention_result
+        logger.debug(f"[Stage0] 条約マッチなし — Stage 2 へフォールスルー")
+    except Exception as e:
+        logger.warning(f"[Stage0] 条約ベースマッチング例外（Stage 2 へフォールスルー）: {e}")
 
     if rule_result == "applicable":
         # 現在このパスは使用しないが、将来の拡張のために保持
@@ -508,13 +637,17 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
             "match_method": "rule_based",
             "confidence": 1.0,
             "reason": "全適用条件を満たす",
+            "conventions": [],
+            "actions": [],
+            "national_laws": [],
+            "certificates": [],
             "citations": [],
             "needs_review": False,
         }
 
-    # --- Stage 2: AI マッチング ---
+    # --- Stage 2: AI マッチング（条約コンテキスト付き） ---
     logger.info(f"[Stage2] AI マッチング開始: regulation={source_label}")
-    ai_result = ai_match(regulation, ship)
+    ai_result = ai_match(regulation, ship, compliance=compliance)
 
     confidence = ai_result.get("confidence", 0.0)
     needs_review = confidence < _REVIEW_THRESHOLD
@@ -530,6 +663,10 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
         "match_method": "ai_matching",
         "confidence": confidence,
         "reason": ai_result.get("reason", ""),
+        "conventions": [],
+        "actions": [],
+        "national_laws": [],
+        "certificates": [],
         "citations": ai_result.get("citations") or [],
         "needs_review": needs_review,
     }
