@@ -34,6 +34,15 @@ function applicabilityLabel(isApplicable: boolean | null) {
   return <Badge variant="action">判定中</Badge>;
 }
 
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
 /** Staggered animation delay for ship cards */
 function shipCardDelay(index: number): string {
   if (index >= 5) return "motion-preset-slide-up";
@@ -226,6 +235,12 @@ export default async function DashboardPage({
                             {m.confidence !== null && (
                               <span className="text-xs text-zinc-400">
                                 確度 {Math.round(m.confidence * 100)}%
+                                {m.regulation?.published_at && ` | ${formatDate(m.regulation.published_at)}`}
+                              </span>
+                            )}
+                            {m.confidence === null && m.regulation?.published_at && (
+                              <span className="text-xs text-zinc-400">
+                                {formatDate(m.regulation.published_at)}
                               </span>
                             )}
                           </div>
