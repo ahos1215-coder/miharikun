@@ -64,6 +64,14 @@ export default async function Home() {
         </div>
       </div>
 
+      <div className="mt-10 max-w-lg rounded border border-zinc-200 px-6 py-4 text-center dark:border-zinc-700">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+          「毎朝5分で、自船に関係ある規制だけを確認。
+          <br />
+          もう膨大な通達を一つずつ読む必要はありません。」
+        </p>
+      </div>
+
       <div className="mt-10 flex flex-wrap justify-center gap-4 text-sm">
         <div className="rounded border border-zinc-200 px-5 py-3 text-center dark:border-zinc-700">
           <p className="text-2xl font-bold text-blue-600">{totalRegulations ?? 0}</p>

@@ -12,6 +12,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -19,6 +20,10 @@ import requests
 from utils.gemini_client import classify_pdf
 from utils.supabase_client import SupabaseClient
 from utils.line_notify import send_alert
+
+# レートリミット: アイテム間の最小待機秒数
+_GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "4"))
+_MAX_CONSECUTIVE_429 = 2
 
 # ---------------------------------------------------------------------------
 # ロガー
@@ -76,10 +81,17 @@ CLASSIFICATION_PROMPT = """
 def process_queue(
     source: str | None = None,
     limit: int = 20,
+    batch_size: int = 5,
     dry_run: bool = False,
 ) -> dict:
     """
     pending_queue を処理する。
+
+    Args:
+        source: 処理するソース（None=全ソース）
+        limit: キューから取得する最大件数
+        batch_size: 1回の実行で実際に処理する最大件数（レートリミット対策）
+        dry_run: True の場合は実際の処理をスキップ
 
     Returns:
         {"processed": int, "succeeded": int, "failed": int, "skipped": int}
@@ -92,16 +104,36 @@ def process_queue(
         return {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
 
     if len(queue) > limit:
-        logger.info(f"キュー {len(queue)} 件中 {limit} 件のみ処理")
+        logger.info(f"キュー {len(queue)} 件中 {limit} 件のみ取得")
         queue = queue[:limit]
 
-    stats = {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+    # batch_size でさらに絞る
+    effective_count = min(len(queue), batch_size)
+    if effective_count < len(queue):
+        logger.info(f"バッチサイズ制限: {len(queue)} 件中 {effective_count} 件のみ処理")
+        queue = queue[:effective_count]
 
-    for item in queue:
+    stats = {"processed": 0, "succeeded": 0, "failed": 0, "skipped": 0}
+    consecutive_429: int = 0
+
+    for idx, item in enumerate(queue):
         queue_id = item["id"]
         source_id = item.get("source_id", "?")
         pdf_url = item.get("pdf_url", "")
         item_source = item.get("source", "unknown")
+
+        # 連続 429 エラーチェック
+        if consecutive_429 >= _MAX_CONSECUTIVE_429:
+            logger.warning(
+                f"[Queue] Stopping early: {_MAX_CONSECUTIVE_429} consecutive 429 errors. "
+                "Will retry next hour."
+            )
+            break
+
+        # アイテム間の待機（最初のアイテムはスキップ）
+        if idx > 0 and not dry_run:
+            logger.info(f"アイテム間待機: {_GEMINI_MIN_INTERVAL:.0f}s")
+            time.sleep(_GEMINI_MIN_INTERVAL)
 
         logger.info(f"処理中: {source_id} ({item_source}) retry={item.get('retry_count', 0)}")
         stats["processed"] += 1
@@ -129,6 +161,12 @@ def process_queue(
 
         if result.get("status") != "ok":
             error_msg = result.get("error", "分類失敗")
+            # 429 エラーの連続回数をトラッキング
+            if "429" in error_msg:
+                consecutive_429 += 1
+                logger.warning(f"429 エラー検出 ({consecutive_429}/{_MAX_CONSECUTIVE_429}): {source_id}")
+            else:
+                consecutive_429 = 0
             client.increment_retry_count(queue_id, error_msg)
             stats["failed"] += 1
             continue
@@ -153,6 +191,7 @@ def process_queue(
         if success:
             client.delete_from_pending_queue(queue_id)
             stats["succeeded"] += 1
+            consecutive_429 = 0
             logger.info(f"成功: {source_id}")
         else:
             client.increment_retry_count(queue_id, "DB upsert 失敗")
@@ -169,16 +208,22 @@ def main():
     parser.add_argument("--source", choices=["nk", "mlit"], default=None,
                         help="処理するソース（省略時は全ソース）")
     parser.add_argument("--limit", type=int, default=20,
-                        help="1回の実行で処理する最大件数")
+                        help="キューから取得する最大件数")
+    parser.add_argument("--batch-size", type=int, default=5,
+                        help="1回の実行で実際に処理する件数（レートリミット対策）")
     parser.add_argument("--dry-run", action="store_true",
                         help="実際の処理をスキップ")
     args = parser.parse_args()
 
-    logger.info(f"開始: source={args.source or 'all'}, limit={args.limit}, dry_run={args.dry_run}")
+    logger.info(
+        f"開始: source={args.source or 'all'}, limit={args.limit}, "
+        f"batch_size={args.batch_size}, dry_run={args.dry_run}"
+    )
 
     stats = process_queue(
         source=args.source,
         limit=args.limit,
+        batch_size=args.batch_size,
         dry_run=args.dry_run,
     )
 

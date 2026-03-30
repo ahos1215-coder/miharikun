@@ -38,6 +38,13 @@ function confidenceLabel(confidence: number | null) {
   );
 }
 
+function isWithin24Hours(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const published = new Date(dateStr).getTime();
+  const now = Date.now();
+  return now - published < 24 * 60 * 60 * 1000;
+}
+
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "日付不明";
   return new Date(dateStr).toLocaleDateString("ja-JP", {
@@ -204,6 +211,9 @@ export default async function NewsPage({
                   )}
                   <p className="text-xs text-zinc-400 mt-1">
                     {formatDate(reg.published_at)}
+                    {isWithin24Hours(reg.published_at) && (
+                      <span className="ml-2 text-red-600 font-bold">[NEW]</span>
+                    )}
                   </p>
                 </Link>
               </li>

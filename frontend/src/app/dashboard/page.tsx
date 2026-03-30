@@ -172,7 +172,9 @@ export default async function DashboardPage({
 
                   {allMatches.length > 0 && (
                     <p className="text-xs text-zinc-500 mb-2">
-                      該当: {applicableCount}件 / 全: {allMatches.length}件
+                      該当: {allMatches.filter((m) => m.is_applicable === true).length}件
+                      {" / "}判定中: {allMatches.filter((m) => m.is_applicable === null).length}件
+                      {" / "}非該当: {allMatches.filter((m) => m.is_applicable === false).length}件
                     </p>
                   )}
 

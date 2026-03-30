@@ -58,6 +58,9 @@ export function Nav() {
               <Link href="/dashboard" className="hover:text-blue-600">
                 [DASH] ダッシュボード
               </Link>
+              <Link href="/fleet" className="hover:text-blue-600">
+                [FLEET] フリート
+              </Link>
               <Link href="/ships/new" className="hover:text-blue-600">
                 [SHIP] 船舶登録
               </Link>
@@ -112,6 +115,9 @@ export function Nav() {
             <>
               <Link href="/dashboard" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
                 [DASH] ダッシュボード
+              </Link>
+              <Link href="/fleet" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
+                [FLEET] フリート
               </Link>
               <Link href="/ships/new" className="hover:text-blue-600" onClick={() => setMenuOpen(false)}>
                 [SHIP] 船舶登録

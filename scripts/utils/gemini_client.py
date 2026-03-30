@@ -25,8 +25,26 @@ _TEMPERATURE = 0.1
 
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
+# レートリミッター: API 呼び出し間の最小間隔（秒）
+_GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "4"))
+_last_call_timestamp: float = 0.0
+
 
 # ---------- 内部ユーティリティ ----------
+
+def _rate_limit_wait() -> None:
+    """
+    前回の API 呼び出しから GEMINI_MIN_INTERVAL 秒経過するまで待機する。
+    バースト的なリクエストによる 429 エラーを防止する。
+    """
+    global _last_call_timestamp
+    if _last_call_timestamp > 0:
+        elapsed = time.time() - _last_call_timestamp
+        remaining = _GEMINI_MIN_INTERVAL - elapsed
+        if remaining > 0:
+            print(f"[Gemini] レートリミット待機: {remaining:.1f}s")
+            time.sleep(remaining)
+    _last_call_timestamp = time.time()
 
 def _exponential_backoff(attempt: int, base: float = _BASE_WAIT, max_wait: float = _MAX_WAIT) -> float:
     """
@@ -73,6 +91,9 @@ def _call_gemini_api(
     Gemini API を一度呼び出す。
     Returns: (success: bool, result: dict or error_str)
     """
+    # レートリミット: 前回呼び出しからの最小間隔を確保
+    _rate_limit_wait()
+
     # PDF を base64 エンコード
     pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
 

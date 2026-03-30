@@ -1,0 +1,85 @@
+name: e-Gov Public Comment Scraper
+
+on:
+  schedule:
+    # 毎週水曜 JST 10:00 = 火曜 UTC 01:00
+    - cron: '0 1 * * 2'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run（詳細取得/DB 書き込みをスキップ）'
+        type: boolean
+        default: false
+      limit:
+        description: '処理件数上限'
+        type: string
+        default: '20'
+
+jobs:
+  scrape-egov:
+    name: e-Gov パブコメスクレイピング
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: 依存パッケージをインストール
+        run: |
+          pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+
+      - name: e-Gov パブコメスクレイパーを実行
+        id: scrape
+        run: |
+          cd scripts
+
+          # 引数を組み立て
+          ARGS=""
+
+          # dry_run フラグ
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          # limit
+          LIMIT="${{ github.event.inputs.limit }}"
+          if [ -n "$LIMIT" ]; then
+            ARGS="$ARGS --limit $LIMIT"
+          fi
+
+          python scrape_egov.py $ARGS
+
+      - name: ログをアーティファクトとして保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: egov-logs-${{ github.run_number }}
+          path: |
+            scripts/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: 失敗時に LINE 通知
+        if: failure()
+        env:
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+        run: |
+          if [ -n "$LINE_NOTIFY_TOKEN" ]; then
+            curl -s -X POST https://notify-api.line.me/api/notify \
+              -H "Authorization: Bearer $LINE_NOTIFY_TOKEN" \
+              -F "message=[e-Gov パブコメ] GitHub Actions ワークフローが失敗しました。Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi

@@ -59,7 +59,7 @@ jobs:
           fi
 
           cd scripts
-          python process_queue.py $ARGS
+          python process_queue.py --batch-size 5 $ARGS
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
