@@ -26,9 +26,9 @@ on:
 
 jobs:
   scrape:
-    # self-hosted runner (Windows 11 ローカル PC) を使用
-    # ClassNK は GHA の IP をブロックするためローカル PC から実行する
-    runs-on: [self-hosted, Windows, nk-runner]
+    # [EXPERIMENT] Scrapling StealthyFetcher テスト — GHA 標準ランナーで NK にアクセスできるか検証
+    # 失敗した場合は [self-hosted, Windows, nk-runner] に戻すこと
+    runs-on: ubuntu-latest
     # Environment Protection Rules で外部 PR による無承認実行を防ぐ
     environment: production
     timeout-minutes: 60
@@ -37,26 +37,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11 (with system fallback)
-        # self-hosted では actions/setup-python が動作しない場合があるため
-        # システムの Python を優先的に利用し、なければ setup-python にフォールバックする
-        id: setup-python
-        shell: bash
-        run: |
-          # Python 3.11 を優先して探す（Windows: py ランチャー → python3.11 → python3 → python）
-          if py -3.11 --version 2>/dev/null; then
-            echo "PYTHON_CMD=py -3.11" >> "$GITHUB_ENV"
-            echo "Python 3.11 found via py launcher"
-          elif python3.11 --version 2>/dev/null; then
-            echo "PYTHON_CMD=python3.11" >> "$GITHUB_ENV"
-            echo "Python 3.11 found as python3.11"
-          elif python3 --version 2>/dev/null; then
-            echo "PYTHON_CMD=python3" >> "$GITHUB_ENV"
-            echo "Python found as python3"
-          else
-            echo "PYTHON_CMD=python" >> "$GITHUB_ENV"
-            echo "Falling back to python"
-          fi
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set Python command
+        run: echo "PYTHON_CMD=python" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         shell: bash
