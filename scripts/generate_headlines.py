@@ -77,14 +77,29 @@ def generate_headline(title: str, summary: str, category: str) -> str | None:
     if elapsed < MIN_INTERVAL:
         time.sleep(MIN_INTERVAL - elapsed)
 
-    prompt = f"""以下の海事規制の情報から、Yahoo!ニュースのような20〜30文字の短い見出しを1つだけ生成してください。
-見出しのみを返してください。説明は不要です。
+    prompt = f"""あなたはニュース編集者です。以下の海事規制の情報から、Yahoo!ニュースのような20〜30文字の見出しを作成してください。
+
+ルール:
+- 必ず20文字以上30文字以下にすること
+- 具体的な内容がわかる見出しにすること（「海事条約」のような曖昧な表現は禁止）
+- 見出しのテキストのみを1行で返すこと
+
+良い例:
+- 「閉囲区画の安全基準が大幅改正へ」(16文字)
+- 「NOx排出規制がTier IIIに強化、対象船拡大」(20文字)
+- 「シップリサイクル条約、キプロス批准で発効要件に近づく」(25文字)
+- 「MARPOL附属書VI改正、2026年から新燃料基準適用」(24文字)
+
+悪い例:
+- 「海事条約」（曖昧すぎる）
+- 「油」（短すぎる）
+- 「造船業」（内容がわからない）
 
 タイトル: {title}
 要約: {summary or 'なし'}
 カテゴリ: {category or 'なし'}
 
-見出し:"""
+見出し（20-30文字）:"""
 
     try:
         url = f"{GEMINI_API_BASE}/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -128,14 +143,30 @@ def main():
     parser = argparse.ArgumentParser(description="既存 regulations に headline を一括生成")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--force", action="store_true", help="既存 headline も再生成")
     args = parser.parse_args()
 
     if not SUPABASE_URL or not SUPABASE_KEY or not GEMINI_API_KEY:
         logger.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY が必要です")
         sys.exit(1)
 
-    logger.info(f"headline 未生成の regulations を取得中 (limit={args.limit})...")
-    regs = fetch_regulations_without_headline(args.limit)
+    if args.force:
+        logger.info(f"全 regulations を取得中 (force=true, limit={args.limit})...")
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/regulations",
+            params={
+                "select": "id,source,source_id,title,summary_ja,category",
+                "order": "created_at.desc",
+                "limit": str(args.limit),
+            },
+            headers=_headers(),
+            timeout=30,
+        )
+        resp.raise_for_status()
+        regs = resp.json()
+    else:
+        logger.info(f"headline 未生成の regulations を取得中 (limit={args.limit})...")
+        regs = fetch_regulations_without_headline(args.limit)
     logger.info(f"{len(regs)} 件の headline 未生成レコードを取得")
 
     if not regs:
