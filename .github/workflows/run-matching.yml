@@ -11,6 +11,10 @@ on:
         description: '処理する regulations の最大件数'
         type: number
         default: 50
+      force:
+        description: '全件再処理（既存マッチを無視）'
+        type: boolean
+        default: false
 
   # スクレイピング完了後に自動実行
   workflow_run:
@@ -56,6 +60,9 @@ jobs:
             fi
             if [ -n "${{ inputs.limit }}" ] && [ "${{ inputs.limit }}" != "0" ]; then
               ARGS="$ARGS --limit ${{ inputs.limit }}"
+            fi
+            if [ "${{ inputs.force }}" = "true" ]; then
+              ARGS="$ARGS --force"
             fi
           else
             # workflow_run トリガーの場合はデフォルト limit 50
