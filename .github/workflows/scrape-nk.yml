@@ -26,8 +26,9 @@ on:
 
 jobs:
   scrape:
-    # [EXPERIMENT] Scrapling StealthyFetcher テスト — GHA 標準ランナーで NK にアクセスできるか検証
-    # 失敗した場合は [self-hosted, Windows, nk-runner] に戻すこと
+    # 2026-03-30 検証: GHA ubuntu-latest から ClassNK に直接アクセス可能を確認
+    # 以前の 403 ブロックは UA 問題が原因だった（ca4e0f1 で解決済み）
+    # Self-hosted Runner は不要。IP ブロックが再発した場合のみ self-hosted に戻すこと
     runs-on: ubuntu-latest
     # Environment Protection Rules で外部 PR による無承認実行を防ぐ
     environment: production
