@@ -96,13 +96,15 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
     flag_state: str = ship.get("flag_state", "")
 
     # --- 船種フィルタ ---
+    # "all" は全船適用を意味するため除外しない
     applicable_ship_types: list[str] = regulation.get("applicable_ship_types") or []
-    if applicable_ship_types and ship_type not in applicable_ship_types:
-        logger.debug(
-            f"[rule] not_applicable: ship_type={ship_type!r} "
-            f"not in {applicable_ship_types}"
-        )
-        return "not_applicable"
+    if applicable_ship_types and "all" not in applicable_ship_types:
+        if ship_type not in applicable_ship_types:
+            logger.debug(
+                f"[rule] not_applicable: ship_type={ship_type!r} "
+                f"not in {applicable_ship_types}"
+            )
+            return "not_applicable"
 
     # --- GT 下限フィルタ ---
     applicable_gt_min: Optional[int] = regulation.get("applicable_gt_min")
@@ -132,9 +134,9 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
             return "not_applicable"
 
     # --- 航行区域フィルタ ---
+    # "all" は全航行区域適用を意味する
     applicable_routes: list[str] = regulation.get("applicable_routes") or []
-    if applicable_routes and navigation_area:
-        # 規制の applicable_routes と船の navigation_area が全く交差しない場合は非適用
+    if applicable_routes and "all" not in applicable_routes and navigation_area:
         if not set(applicable_routes) & set(navigation_area):
             logger.debug(
                 f"[rule] not_applicable: routes {applicable_routes} ∩ "
@@ -143,13 +145,15 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
             return "not_applicable"
 
     # --- 旗国フィルタ ---
+    # "all" は全旗国適用を意味する
     applicable_flags: list[str] = regulation.get("applicable_flags") or []
-    if applicable_flags and flag_state not in applicable_flags:
-        logger.debug(
-            f"[rule] not_applicable: flag_state={flag_state!r} "
-            f"not in {applicable_flags}"
-        )
-        return "not_applicable"
+    if applicable_flags and "all" not in applicable_flags:
+        if flag_state not in applicable_flags:
+            logger.debug(
+                f"[rule] not_applicable: flag_state={flag_state!r} "
+                f"not in {applicable_flags}"
+            )
+            return "not_applicable"
 
     # --- カテゴリ/キーワードによる非船舶規制フィルタ ---
     title: str = (regulation.get("title") or "").lower()
