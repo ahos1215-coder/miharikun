@@ -49,6 +49,7 @@ from utils.gemini_client import classify_pdf  # type: ignore
 from utils.gdrive_client import upload_json  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
 from utils.pdf_preprocess import preprocess_pdf, check_pdf_url  # type: ignore
+from utils.stealth_fetcher import stealth_get, stealth_download_bytes  # type: ignore
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -319,7 +320,6 @@ def generate_source_id(counter: int) -> str:
 def process_pdf(
     pdf_url: str,
     page_url: str,
-    session: requests.Session,
     client: SupabaseClient,
     known_pdf_urls: set[str],
     source_id: str,
@@ -348,12 +348,10 @@ def process_pdf(
         logger.info("[dry-run] PDF 処理をスキップ: %s", pdf_url)
         return False
 
-    # PDF ダウンロード
+    # PDF ダウンロード（stealth_download_bytes を使用）
     try:
-        resp = session.get(pdf_url, timeout=30)
-        resp.raise_for_status()
-        pdf_bytes = resp.content
-    except requests.exceptions.RequestException as e:
+        pdf_bytes = stealth_download_bytes(pdf_url, timeout=30)
+    except (requests.exceptions.RequestException, Exception) as e:
         logger.warning("PDF ダウンロードエラー: %s — %s", pdf_url, e)
         client.queue_pending(
             source="MLIT",
@@ -462,7 +460,6 @@ def process_pdf(
 def crawl(
     start_url: str,
     client: SupabaseClient,
-    session: requests.Session,
     robots_checker: RobotsChecker,
     max_pages: int,
     max_depth: int,
@@ -517,19 +514,18 @@ def crawl(
             current_url,
         )
 
-        # ページ取得
+        # ページ取得（stealth_get を使用）
         try:
             time.sleep(REQUEST_INTERVAL_SEC)
-            resp = session.get(current_url, timeout=15)
+            resp = stealth_get(current_url, timeout=15)
             resp.raise_for_status()
-            resp.encoding = resp.apparent_encoding
 
             html_content = resp.text
             content_bytes = resp.content
-            last_modified = resp.headers.get("Last-Modified", "")
+            last_modified = ""  # stealth_get の Response にはヘッダーがないため空文字
             content_length = len(content_bytes)
 
-        except requests.exceptions.RequestException as e:
+        except (requests.exceptions.RequestException, Exception) as e:
             logger.warning("ページ取得エラー: %s — %s", current_url, e)
             continue
 
@@ -590,7 +586,6 @@ def crawl(
                 success = process_pdf(
                     pdf_url=pdf_url,
                     page_url=current_url,
-                    session=session,
                     client=client,
                     known_pdf_urls=known_pdf_urls,
                     source_id=source_id,
@@ -668,10 +663,6 @@ def main() -> None:
         effective_depth,
     )
 
-    # HTTP セッション初期化
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT})
-
     # robots.txt チェッカー初期化
     robots_checker = RobotsChecker(user_agent=USER_AGENT)
 
@@ -682,7 +673,6 @@ def main() -> None:
         stats = crawl(
             start_url=CRAWL_START_URL,
             client=client,
-            session=session,
             robots_checker=robots_checker,
             max_pages=args.max_pages,
             max_depth=effective_depth,

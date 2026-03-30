@@ -43,6 +43,7 @@ from utils.gemini_client import classify_pdf  # type: ignore
 from utils.gdrive_client import upload_json  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
 from utils.pdf_preprocess import preprocess_pdf, check_pdf_url  # type: ignore
+from utils.stealth_fetcher import stealth_get, stealth_download_bytes  # type: ignore
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -144,17 +145,17 @@ def parse_published_date(entry: feedparser.FeedParserDict) -> Optional[datetime]
     return None
 
 
-def fetch_pdf_links(page_url: str, session: requests.Session) -> list[str]:
+def fetch_pdf_links(page_url: str) -> list[str]:
     """
     ページ URL にアクセスして PDF リンクを抽出する。
+    stealth_get を使用してブラウザフィンガープリントを回避する。
 
     Returns:
         PDF の URL リスト（絶対 URL）
     """
     try:
-        resp = session.get(page_url, timeout=15)
+        resp = stealth_get(page_url, timeout=15)
         resp.raise_for_status()
-        resp.encoding = resp.apparent_encoding  # 文字コード自動検出
 
         soup = BeautifulSoup(resp.text, "html.parser")
         pdf_links: list[str] = []
@@ -169,18 +170,16 @@ def fetch_pdf_links(page_url: str, session: requests.Session) -> list[str]:
         logger.debug("%d 件の PDF リンクを検出: %s", len(pdf_links), page_url)
         return pdf_links
 
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, Exception) as e:
         logger.warning("ページ取得エラー: %s — %s", page_url, e)
         return []
 
 
-def download_pdf(pdf_url: str, session: requests.Session) -> Optional[bytes]:
-    """PDF をダウンロードしてバイト列を返す。失敗時は None。"""
+def download_pdf(pdf_url: str) -> Optional[bytes]:
+    """PDF をダウンロードしてバイト列を返す。stealth_download_bytes を使用。失敗時は None。"""
     try:
-        resp = session.get(pdf_url, timeout=30)
-        resp.raise_for_status()
-        return resp.content
-    except requests.exceptions.RequestException as e:
+        return stealth_download_bytes(pdf_url, timeout=30)
+    except (requests.exceptions.RequestException, Exception) as e:
         logger.warning("PDF ダウンロードエラー: %s — %s", pdf_url, e)
         return None
 
@@ -323,7 +322,6 @@ def process_entries(
     entries: list[dict],
     known_urls: set[str],
     client: SupabaseClient,
-    session: requests.Session,
     dry_run: bool,
     limit: int,
 ) -> int:
@@ -362,7 +360,7 @@ def process_entries(
         pdf_links: list[str] = []
         if not dry_run:
             time.sleep(REQUEST_INTERVAL_SEC)
-            pdf_links = fetch_pdf_links(link, session)
+            pdf_links = fetch_pdf_links(link)
         else:
             logger.info("[dry-run] PDF リンク取得をスキップ: %s", link)
 
@@ -382,7 +380,7 @@ def process_entries(
                 primary_pdf_url = None
             else:
                 # PDF ダウンロード
-                pdf_bytes = download_pdf(primary_pdf_url, session)
+                pdf_bytes = download_pdf(primary_pdf_url)
                 if pdf_bytes:
                     # 前処理チェック
                     pdf_preprocess_result = preprocess_pdf(primary_pdf_url, pdf_bytes)
@@ -526,10 +524,6 @@ def main() -> None:
     # RSS URL リスト取得
     rss_urls = get_rss_urls()
 
-    # HTTP セッション初期化
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT})
-
     # Supabase クライアント初期化
     client = SupabaseClient()
 
@@ -550,7 +544,6 @@ def main() -> None:
             entries=entries,
             known_urls=known_urls,
             client=client,
-            session=session,
             dry_run=args.dry_run,
             limit=args.limit,
         )

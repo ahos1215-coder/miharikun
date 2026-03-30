@@ -4,8 +4,11 @@
 GHA から毎週月曜に実行し、各ユーザーの登録船舶に対する
 直近 7 日間の該当規制をまとめたサマリーを生成する。
 
+サマリーは Resend API（Next.js API Route 経由）でメール送信可能。
+SUMMARY_API_KEY が設定されていない場合はログ出力のみ（従来動作）。
+
 使い方:
-    python weekly_summary.py             # 通常実行（サマリーをログ出力）
+    python weekly_summary.py             # 通常実行（サマリー生成＋メール送信）
     python weekly_summary.py --dry-run   # DB アクセスのみ、送信処理なし
 """
 
@@ -15,7 +18,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 # scripts/ 内の utils/ を import 可能にする
 sys.path.insert(0, os.path.dirname(__file__))
@@ -38,6 +41,15 @@ logger.setLevel(logging.INFO)
 
 SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+# メール送信設定
+RESEND_API_URL: str = os.environ.get(
+    "RESEND_API_URL",
+    "https://miharikun.vercel.app/api/send-summary",
+)
+SUMMARY_API_KEY: str = os.environ.get("SUMMARY_API_KEY", "")
+# TODO: auth.users から取得する仕組みに置き換える
+NOTIFY_EMAIL: str = os.environ.get("NOTIFY_EMAIL", "")
 
 
 def _headers() -> dict[str, str]:
@@ -126,6 +138,110 @@ def fetch_recent_matches(since_iso: str) -> list[dict]:
     )
     logger.info(f"該当マッチ: {len(rows)} 件取得")
     return rows
+
+
+# ---------------------------------------------------------------------------
+# メール送信
+# ---------------------------------------------------------------------------
+
+MIHARIKUN_BASE_URL: str = os.environ.get(
+    "MIHARIKUN_BASE_URL", "https://miharikun.vercel.app"
+)
+
+
+def _email_configured() -> bool:
+    """メール送信に必要な設定が揃っているか判定"""
+    return bool(SUMMARY_API_KEY and NOTIFY_EMAIL)
+
+
+def build_email_payload(
+    to: str,
+    ships: list[dict],
+    matches: list[dict],
+    date_from: datetime,
+    date_to: datetime,
+) -> dict[str, Any]:
+    """
+    API Route `/api/send-summary` が期待する JSON ペイロードを組み立てる。
+
+    Args:
+        to: 送信先メールアドレス
+        ships: ユーザーの ship_profiles リスト
+        matches: ユーザーの user_matches リスト（regulations 結合済み）
+        date_from: 集計開始日
+        date_to: 集計終了日
+
+    Returns:
+        API に POST する dict
+    """
+    date_range = f"{date_from.strftime('%Y-%m-%d')} 〜 {date_to.strftime('%Y-%m-%d')}"
+
+    # ship_profile_id ごとにマッチをグループ化
+    matches_by_ship: dict[str, list[dict]] = defaultdict(list)
+    for m in matches:
+        ship_id = m.get("ship_profile_id", "")
+        matches_by_ship[ship_id].append(m)
+
+    ship_summaries: list[dict[str, Any]] = []
+    for ship in ships:
+        ship_id = ship["id"]
+        ship_matches = matches_by_ship.get(ship_id, [])
+
+        regulations: list[dict[str, Any]] = []
+        for m in ship_matches:
+            reg = m.get("regulations") or {}
+            reg_id = reg.get("id", "")
+            regulations.append({
+                "title": reg.get("title", "タイトル不明"),
+                "severity": reg.get("severity", "info"),
+                "confidence": float(m.get("confidence", 0.0)),
+                "reason": m.get("reason", ""),
+                "url": f"{MIHARIKUN_BASE_URL}/news/{reg_id}" if reg_id else "",
+            })
+
+        ship_summaries.append({
+            "shipName": ship.get("ship_name", "不明"),
+            "shipType": ship.get("ship_type", "unknown"),
+            "grossTonnage": ship.get("gross_tonnage", 0),
+            "regulations": regulations,
+        })
+
+    return {
+        "to": to,
+        "dateRange": date_range,
+        "ships": ship_summaries,
+    }
+
+
+def send_summary_email(payload: dict[str, Any]) -> bool:
+    """
+    Next.js API Route にサマリーメール送信リクエストを POST する。
+
+    Returns:
+        True: 送信成功, False: 送信失敗
+    """
+    try:
+        resp = requests.post(
+            RESEND_API_URL,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": SUMMARY_API_KEY,
+            },
+            timeout=30,
+        )
+        if resp.ok:
+            data = resp.json()
+            logger.info(f"メール送信成功: {data}")
+            return True
+        else:
+            logger.error(
+                f"メール送信失敗: HTTP {resp.status_code} — {resp.text}"
+            )
+            return False
+    except requests.RequestException as e:
+        logger.error(f"メール送信リクエストエラー: {e}")
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -265,12 +381,21 @@ def run_weekly_summary(dry_run: bool = False) -> None:
         if user_id:
             matches_by_user[user_id].append(m)
 
-    # 4. ユーザーごとにサマリーを生成
+    # 4. ユーザーごとにサマリーを生成・送信
     summary_count = 0
+    email_sent_count = 0
+    can_send_email = _email_configured() and not dry_run
+
+    if not _email_configured():
+        logger.info(
+            "SUMMARY_API_KEY または NOTIFY_EMAIL が未設定のため、"
+            "メール送信はスキップします（ログ出力のみ）"
+        )
 
     for user_id, ships in ships_by_user.items():
         user_matches = matches_by_user.get(user_id, [])
 
+        # テキストサマリー生成（ログ出力用）
         summary = generate_user_summary(
             user_id=user_id,
             ships=ships,
@@ -285,12 +410,27 @@ def run_weekly_summary(dry_run: bool = False) -> None:
             f"該当規制 {match_count} 件"
         )
 
-        if dry_run:
-            logger.info(f"[DRY RUN] サマリー生成のみ（送信なし）")
-
-        # 現時点ではログ出力のみ（メール送信は SMTP 設定後に実装）
+        # テキストサマリーを常にログ出力
         print(summary)
         print()
+
+        if dry_run:
+            logger.info("[DRY RUN] サマリー生成のみ（送信なし）")
+        elif can_send_email:
+            # メールペイロードを構築して送信
+            payload = build_email_payload(
+                to=NOTIFY_EMAIL,
+                ships=ships,
+                matches=user_matches,
+                date_from=date_from,
+                date_to=now,
+            )
+            logger.info(
+                f"メール送信中: {NOTIFY_EMAIL} "
+                f"(ships={len(payload['ships'])})"
+            )
+            if send_summary_email(payload):
+                email_sent_count += 1
 
         summary_count += 1
 
@@ -299,6 +439,7 @@ def run_weekly_summary(dry_run: bool = False) -> None:
     logger.info("週次サマリー生成完了:")
     logger.info(f"  対象ユーザー数: {summary_count}")
     logger.info(f"  該当マッチ総数: {len(recent_matches)}")
+    logger.info(f"  メール送信数: {email_sent_count}")
     logger.info("=" * 60)
 
 

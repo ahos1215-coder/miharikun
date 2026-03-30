@@ -97,11 +97,11 @@ def fetch_regulation(regulation_id: str) -> Optional[dict]:
 
 
 def fetch_ship_profile(ship_profile_id: str) -> Optional[dict]:
-    """ship_profiles テーブルから 1 件取得する。"""
+    """ship_profiles テーブルから 1 件取得する（user_id 含む）。"""
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/ship_profiles",
         params={
-            "select": "id,ship_name",
+            "select": "id,ship_name,user_id",
             "id": f"eq.{ship_profile_id}",
             "limit": "1",
         },
@@ -111,6 +111,80 @@ def fetch_ship_profile(ship_profile_id: str) -> Optional[dict]:
     resp.raise_for_status()
     rows = resp.json()
     return rows[0] if rows else None
+
+
+def fetch_user_preferences(user_id: str) -> dict:
+    """
+    user_preferences テーブルからユーザーの通知設定を取得する。
+    レコードが存在しない場合はデフォルト値を返す。
+    """
+    default_prefs: dict = {
+        "line_notify": False,
+        "email_notify": True,
+        "notify_severity": "critical",
+    }
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/user_preferences",
+            params={
+                "select": "line_notify,email_notify,notify_severity",
+                "user_id": f"eq.{user_id}",
+                "limit": "1",
+            },
+            headers=_headers(),
+            timeout=30,
+        )
+        resp.raise_for_status()
+        rows = resp.json()
+        if rows:
+            return rows[0]
+        logger.info(f"user_preferences が未登録 (user_id={user_id})。デフォルト値を使用。")
+        return default_prefs
+    except requests.RequestException as e:
+        logger.warning(f"user_preferences 取得失敗 (user_id={user_id}): {e}。デフォルト値を使用。")
+        return default_prefs
+
+
+# ---------------------------------------------------------------------------
+# 通知フィルタリング
+# ---------------------------------------------------------------------------
+
+# severity の優先度マップ（数値が大きいほど重要）
+_SEVERITY_PRIORITY: dict[str, int] = {
+    "informational": 0,
+    "action_required": 1,
+    "critical": 2,
+}
+
+
+def should_notify_line(
+    user_id: str,
+    prefs: dict,
+    regulation_severity: str,
+) -> tuple[bool, str]:
+    """
+    LINE 通知を送るべきかどうかを判定する。
+    Returns: (should_send, reason)
+    """
+    # line_notify が false なら送信しない
+    if not prefs.get("line_notify", False):
+        return False, f"Skipping LINE for user {user_id}: line_notify=false"
+
+    # severity フィルタ
+    threshold = prefs.get("notify_severity", "critical")
+    if threshold == "all":
+        return True, ""
+
+    threshold_level = _SEVERITY_PRIORITY.get(threshold, 2)
+    reg_level = _SEVERITY_PRIORITY.get(regulation_severity, 0)
+
+    if reg_level < threshold_level:
+        return False, (
+            f"Skipping: severity '{regulation_severity}' "
+            f"below threshold '{threshold}'"
+        )
+
+    return True, ""
 
 
 def mark_notified(match_id: str) -> bool:
@@ -173,11 +247,12 @@ def run_notify(dry_run: bool = False) -> None:
     if dry_run:
         logger.info("=== DRY RUN モード: 送信・DB更新をスキップします ===")
 
-    stats = {"sent": 0, "failed": 0, "skipped": 0}
+    stats = {"sent": 0, "failed": 0, "skipped": 0, "pref_skipped": 0}
 
-    # regulation / ship_profile のキャッシュ（同一 ID の再取得を防ぐ）
+    # regulation / ship_profile / user_preferences のキャッシュ（同一 ID の再取得を防ぐ）
     reg_cache: dict[str, Optional[dict]] = {}
     ship_cache: dict[str, Optional[dict]] = {}
+    prefs_cache: dict[str, dict] = {}
 
     for i, match in enumerate(matches, 1):
         match_id = match.get("id", "")
@@ -201,12 +276,30 @@ def run_notify(dry_run: bool = False) -> None:
         ship = ship_cache[ship_profile_id]
 
         ship_name = ship.get("ship_name", "不明な船舶") if ship else "不明な船舶"
+        user_id = ship.get("user_id", "") if ship else ""
+
+        # user_preferences を取得（キャッシュ有り）
+        if user_id and user_id not in prefs_cache:
+            prefs_cache[user_id] = fetch_user_preferences(user_id)
+        prefs = prefs_cache.get(user_id, {"line_notify": False, "email_notify": True, "notify_severity": "critical"})
+
+        # 通知フィルタリング
+        regulation_severity = regulation.get("severity", "informational")
+        send_line, skip_reason = should_notify_line(user_id, prefs, regulation_severity)
+
+        logger.info(f"[{i}/{len(matches)}] {ship_name} × {regulation.get('title', '?')[:40]}")
+
+        if not send_line:
+            logger.info(f"  [Notify] {skip_reason}")
+            stats["pref_skipped"] += 1
+            # 再処理を防ぐため notified=true にする
+            if not dry_run:
+                mark_notified(match_id)
+            continue
 
         # メッセージ組み立て
         body = build_message(ship_name, regulation, confidence)
         title = "[MIHARIKUN] 新規該当規制"
-
-        logger.info(f"[{i}/{len(matches)}] {ship_name} × {regulation.get('title', '?')[:40]}")
 
         if dry_run:
             logger.info(f"  [DRY RUN] タイトル: {title}")
@@ -232,9 +325,10 @@ def run_notify(dry_run: bool = False) -> None:
     # サマリー
     logger.info("=" * 60)
     logger.info("通知処理完了 サマリー:")
-    logger.info(f"  送信成功:  {stats['sent']}")
-    logger.info(f"  送信失敗:  {stats['failed']}")
-    logger.info(f"  スキップ:  {stats['skipped']}")
+    logger.info(f"  送信成功:       {stats['sent']}")
+    logger.info(f"  送信失敗:       {stats['failed']}")
+    logger.info(f"  設定でスキップ: {stats['pref_skipped']}")
+    logger.info(f"  データ不備:     {stats['skipped']}")
     logger.info("=" * 60)
 
 
