@@ -1,7 +1,21 @@
 import { Anchor } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+
+  const [
+    { count: totalRegulations },
+    { count: nkRegulations },
+    { count: mlitRegulations },
+    { count: totalShips },
+  ] = await Promise.all([
+    supabase.from("regulations").select("*", { count: "exact", head: true }),
+    supabase.from("regulations").select("*", { count: "exact", head: true }).ilike("source", "nk"),
+    supabase.from("regulations").select("*", { count: "exact", head: true }).ilike("source", "MLIT"),
+    supabase.from("ship_profiles").select("*", { count: "exact", head: true }),
+  ]);
   return (
     <div className="flex flex-col items-center justify-center gap-8 px-4 py-16">
       <Anchor className="h-16 w-16 text-blue-600" />
@@ -47,6 +61,21 @@ export default function Home() {
           <p className="mt-1 text-zinc-500">
             船型・トン数・航行区域から関係する規制だけを通知
           </p>
+        </div>
+      </div>
+
+      <div className="mt-10 flex flex-wrap justify-center gap-4 text-sm">
+        <div className="rounded border border-zinc-200 px-5 py-3 text-center dark:border-zinc-700">
+          <p className="text-2xl font-bold text-blue-600">{totalRegulations ?? 0}</p>
+          <p className="mt-1 text-zinc-500">監視中の規制</p>
+        </div>
+        <div className="rounded border border-zinc-200 px-5 py-3 text-center dark:border-zinc-700">
+          <p className="text-2xl font-bold text-emerald-600">{totalShips ?? 0}</p>
+          <p className="mt-1 text-zinc-500">登録船舶</p>
+        </div>
+        <div className="rounded border border-zinc-200 px-5 py-3 text-center dark:border-zinc-700">
+          <p className="text-lg font-bold text-zinc-700 dark:text-zinc-300">NK, 国交省</p>
+          <p className="mt-1 text-zinc-500">データソース</p>
         </div>
       </div>
     </div>

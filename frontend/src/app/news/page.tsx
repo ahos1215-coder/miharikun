@@ -50,10 +50,11 @@ function formatDate(dateStr: string | null) {
 export default async function NewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; page?: string }>;
+  searchParams: Promise<{ source?: string; page?: string; q?: string }>;
 }) {
   const params = await searchParams;
   const sourceFilter = params.source?.toUpperCase();
+  const searchQuery = params.q?.trim() || "";
   const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const offset = (currentPage - 1) * PAGE_SIZE;
 
@@ -68,6 +69,10 @@ export default async function NewsPage({
 
   if (sourceFilter) {
     query = query.ilike("source", sourceFilter);
+  }
+
+  if (searchQuery) {
+    query = query.ilike("title", `%${searchQuery}%`);
   }
 
   const { data: regulations, count: filteredCount } = await query;
@@ -94,7 +99,25 @@ export default async function NewsPage({
   function pageUrl(page: number) {
     const p = new URLSearchParams();
     if (sourceFilter) p.set("source", sourceFilter.toLowerCase());
+    if (searchQuery) p.set("q", searchQuery);
     if (page > 1) p.set("page", String(page));
+    const qs = p.toString();
+    return `/news${qs ? `?${qs}` : ""}`;
+  }
+
+  // ソースフィルタURL（検索クエリを保持）
+  function sourceUrl(source?: string) {
+    const p = new URLSearchParams();
+    if (source) p.set("source", source);
+    if (searchQuery) p.set("q", searchQuery);
+    const qs = p.toString();
+    return `/news${qs ? `?${qs}` : ""}`;
+  }
+
+  // 検索クリアURL（ソースフィルタを保持）
+  function clearSearchUrl() {
+    const p = new URLSearchParams();
+    if (sourceFilter) p.set("source", sourceFilter.toLowerCase());
     const qs = p.toString();
     return `/news${qs ? `?${qs}` : ""}`;
   }
@@ -103,21 +126,51 @@ export default async function NewsPage({
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-4">最新規制ニュース</h1>
 
+      <form method="GET" action="/news" className="flex gap-2 mb-4">
+        {sourceFilter && (
+          <input type="hidden" name="source" value={sourceFilter.toLowerCase()} />
+        )}
+        <input
+          type="text"
+          name="q"
+          defaultValue={searchQuery}
+          placeholder="規制を検索..."
+          className="flex-1 rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        />
+        <button
+          type="submit"
+          className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          検索
+        </button>
+      </form>
+
+      {searchQuery && (
+        <div className="flex items-center gap-2 mb-4 text-sm">
+          <span className="text-zinc-600 dark:text-zinc-400">
+            「{searchQuery}」の検索結果: {totalFiltered}件
+          </span>
+          <Link href={clearSearchUrl()} className="text-blue-600 hover:underline">
+            クリア
+          </Link>
+        </div>
+      )}
+
       <div className="flex gap-2 mb-6 text-sm">
         <Link
-          href="/news"
+          href={sourceUrl()}
           className={`rounded px-3 py-1 ${!sourceFilter ? "bg-blue-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
         >
           全て ({totalCount ?? 0})
         </Link>
         <Link
-          href="/news?source=nk"
+          href={sourceUrl("nk")}
           className={`rounded px-3 py-1 ${sourceFilter === "NK" ? "bg-emerald-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
         >
           NK ({nkCount ?? 0})
         </Link>
         <Link
-          href="/news?source=mlit"
+          href={sourceUrl("mlit")}
           className={`rounded px-3 py-1 ${sourceFilter === "MLIT" ? "bg-indigo-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}
         >
           国交省 ({mlitCount ?? 0})
