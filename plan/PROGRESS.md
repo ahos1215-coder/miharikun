@@ -173,12 +173,33 @@
 - [x] Security: TruffleHog + npm/pip audit + セキュリティチェックリスト ✅ (fab3c26)
 - [x] MCP: Google Drive MCP サーバー設定テンプレート ✅ (fab3c26)
 
+#### NK GHA 直接実行検証（2026-03-30）
+
+- [x] NK ワークフローを ubuntu-latest に一時変更 ✅ (3f8b9d1)
+- [x] dry-run テスト: **200 OK で成功** (50件パース、403 なし) ✅
+- [x] **発見: ClassNK は IP ではなく bot UA でブロックしていた** — UA 修正済みのため GHA 直接実行が可能
+- [x] NK ワークフローを ubuntu-latest に正式移行 ✅ (a92c89d)
+- [x] **Self-hosted Runner 不要に** — PC 再起動後の手動 run.cmd 実行が解消
+- [x] NK 30件本番実行開始（ubuntu-latest, Gemini 分類付き）⏳ 実行中
+
+#### 出自隠蔽技術の調査結果（将来 IP ブロック再発時の備え）
+
+| 手法 | 月額 | 信頼度 | 推奨度 |
+|------|------|--------|--------|
+| Tailscale トンネル (自宅PC経由) | $0 | 高 (日本IP) | ★★★★★ |
+| SmartProxy 住宅用プロキシ | $7-15 | 高 | ★★★★ |
+| ScrapingBee API | $0-49 | 良 | ★★★ |
+| Zyte API | $0-15 | 未検証 | ★★★ |
+| 無料プロキシ | $0 | 極低 | 使用禁止 |
+
+**結論**: 現在は GHA 直接実行で問題なし。再発時は Tailscale (無料) が最善。
+
 #### 残タスク
 
-- [ ] NK 過去データ一括取り込み（Gemini 枠回復後に再実行。8件成功済み、残りは pending_queue）
+- [ ] NK 30件本番実行の結果確認（⏳ 実行中）
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定（LINE 通知を有効化）
 - [ ] Google Drive MCP の認証設定（GOOGLE_SERVICE_ACCOUNT_JSON_PATH）
-- [ ] 00006_user_preferences.sql の Supabase 適用 ✅ 適用済み
+- [x] 00006_user_preferences.sql の Supabase 適用 ✅
 
 ## Phase 3: Fleet 管理 + 拡張 📋 未着手
 
