@@ -26,7 +26,8 @@ _TEMPERATURE = 0.1
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 # レートリミッター: API 呼び出し間の最小間隔（秒）
-_GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "4"))
+# 有料プラン (Tier 1) では 0.5 秒で十分。無料枠では 4 秒推奨。
+_GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "0.5"))
 _last_call_timestamp: float = 0.0
 
 
