@@ -1,0 +1,42 @@
+name: Generate Headlines
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '処理件数'
+        type: number
+        default: 100
+      dry_run:
+        description: 'Dry-run（DB書き込みなし）'
+        type: boolean
+        default: false
+
+jobs:
+  headlines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Generate headlines
+        run: |
+          ARGS="--limit ${{ inputs.limit }}"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          cd scripts
+          python generate_headlines.py $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
