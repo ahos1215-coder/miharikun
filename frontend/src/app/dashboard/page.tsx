@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Pencil } from "lucide-react";
 import type {
   ShipProfile,
   UserMatch,
@@ -14,22 +16,22 @@ import { SHIP_TYPE_LABELS } from "@/lib/types";
 function severityBadge(severity: Severity) {
   switch (severity) {
     case "critical":
-      return <span className="text-red-600 font-bold">[CRITICAL]</span>;
+      return <Badge variant="critical">Critical</Badge>;
     case "action_required":
-      return <span className="text-amber-600 font-bold">[ACTION]</span>;
+      return <Badge variant="action">要対応</Badge>;
     case "informational":
-      return <span className="text-zinc-500 font-bold">[INFO]</span>;
+      return <Badge variant="info">情報</Badge>;
   }
 }
 
 function applicabilityLabel(isApplicable: boolean | null) {
   if (isApplicable === true) {
-    return <span className="text-green-700 font-semibold">該当</span>;
+    return <Badge variant="success">該当</Badge>;
   }
   if (isApplicable === false) {
-    return <span className="text-zinc-400">非該当</span>;
+    return <Badge variant="info">非該当</Badge>;
   }
-  return <span className="text-amber-600">判定中</span>;
+  return <Badge variant="action">判定中</Badge>;
 }
 
 /** Staggered animation delay for ship cards */
@@ -136,7 +138,7 @@ export default async function DashboardPage({
                   : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               )}
             >
-              [ALL] 全て表示
+              全て表示
             </Link>
             <Link
               href="/dashboard?filter=applicable"
@@ -147,7 +149,7 @@ export default async function DashboardPage({
                   : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               )}
             >
-              [CHECK] 該当のみ
+              該当のみ
             </Link>
           </div>
 
@@ -183,9 +185,10 @@ export default async function DashboardPage({
                     </div>
                     <Link
                       href={`/ships/${ship.id}`}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                     >
-                      [EDIT] 編集
+                      <Pencil size={12} />
+                      編集
                     </Link>
                   </div>
 

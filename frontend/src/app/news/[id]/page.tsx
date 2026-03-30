@@ -1,28 +1,30 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
+import { ExternalLink, FileText, AlertTriangle } from "lucide-react";
 import type { Metadata } from "next";
 import type { Regulation, Severity, Citation } from "@/lib/types";
 
 function severityBadge(severity: Severity) {
   switch (severity) {
     case "critical":
-      return <span className="text-red-600 font-bold">[CRITICAL]</span>;
+      return <Badge variant="critical">Critical</Badge>;
     case "action_required":
-      return <span className="text-amber-600 font-bold">[ACTION]</span>;
+      return <Badge variant="action">要対応</Badge>;
     case "informational":
-      return <span className="text-zinc-500 font-bold">[INFO]</span>;
+      return <Badge variant="info">情報</Badge>;
   }
 }
 
 function sourceBadge(source: string) {
   if (source === "NK") {
-    return <span className="text-emerald-700 font-semibold">[NK]</span>;
+    return <Badge variant="nk">NK</Badge>;
   }
   if (source === "MLIT") {
-    return <span className="text-indigo-700 font-semibold">[MLIT]</span>;
+    return <Badge variant="mlit">国交省</Badge>;
   }
-  return <span className="text-zinc-500 font-semibold">[{source}]</span>;
+  return <Badge>{source}</Badge>;
 }
 
 function confidenceDisplay(confidence: number | null) {
@@ -38,13 +40,13 @@ function confidenceDisplay(confidence: number | null) {
   if (confidence >= 0.5) {
     return (
       <span className="text-amber-600 font-semibold">
-        {pct}% [!] 要確認
+        {pct}% <AlertTriangle size={12} className="inline" /> 要確認
       </span>
     );
   }
   return (
     <span className="text-red-600 font-semibold">
-      {pct}% [?] AI不確実
+      {pct}% <AlertTriangle size={12} className="inline" /> AI不確実
     </span>
   );
 }
@@ -123,7 +125,7 @@ export default async function RegulationDetailPage({
           {sourceBadge(reg.source)}
           {severityBadge(reg.severity)}
           {reg.category && (
-            <span className="text-zinc-500">{reg.category}</span>
+            <Badge variant="default">{reg.category}</Badge>
           )}
         </div>
 
@@ -147,8 +149,9 @@ export default async function RegulationDetailPage({
         </dl>
 
         {reg.needs_review && (
-          <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 mb-4">
-            [!] この分類はAIの確度が低いため、原文の確認を推奨します
+          <div className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 mb-4">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            この分類はAIの確度が低いため、原文の確認を推奨します
           </div>
         )}
 
@@ -192,7 +195,8 @@ export default async function RegulationDetailPage({
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline"
             >
-              [LINK] 原文を見る
+              <ExternalLink size={14} className="inline mr-1" />
+              原文を見る
             </a>
           )}
           {reg.pdf_url && (
@@ -202,7 +206,8 @@ export default async function RegulationDetailPage({
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline"
             >
-              [PDF] PDF を開く
+              <FileText size={14} className="inline mr-1" />
+              PDF を開く
             </a>
           )}
         </div>

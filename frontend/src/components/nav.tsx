@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { Anchor } from "lucide-react";
+import { Anchor, Menu, X, Sun, Moon, Monitor } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -117,17 +117,17 @@ export function Nav() {
               }}
               className="text-zinc-500 hover:text-blue-600 text-xs font-mono transition-colors"
             >
-              {theme === "light" ? "[LIGHT]" : theme === "dark" ? "[DARK]" : "[AUTO]"}
+              {theme === "light" ? <Sun size={16} /> : theme === "dark" ? <Moon size={16} /> : <Monitor size={16} />}
             </button>
           )}
         </div>
 
         {/* Mobile hamburger */}
         <button
-          className="sm:hidden text-sm font-bold"
+          className="sm:hidden p-1"
           onClick={() => setMenuOpen((prev) => !prev)}
         >
-          {menuOpen ? "[X]" : "[MENU]"}
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </nav>
 
@@ -179,7 +179,7 @@ export function Nav() {
               }}
               className="text-zinc-500 hover:text-blue-600 text-xs font-mono transition-colors"
             >
-              {theme === "light" ? "[LIGHT]" : theme === "dark" ? "[DARK]" : "[AUTO]"}
+              {theme === "light" ? <Sun size={16} /> : theme === "dark" ? <Moon size={16} /> : <Monitor size={16} />}
             </button>
           )}
         </div>

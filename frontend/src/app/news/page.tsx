@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, HelpCircle } from "lucide-react";
 import type { Regulation, Severity } from "@/lib/types";
 
 const PAGE_SIZE = 10;
@@ -8,22 +10,22 @@ const PAGE_SIZE = 10;
 function severityBadge(severity: Severity) {
   switch (severity) {
     case "critical":
-      return <span className="text-red-600 font-bold">[CRITICAL]</span>;
+      return <Badge variant="critical">Critical</Badge>;
     case "action_required":
-      return <span className="text-amber-600 font-bold">[ACTION]</span>;
+      return <Badge variant="action">要対応</Badge>;
     case "informational":
-      return <span className="text-zinc-500 font-bold">[INFO]</span>;
+      return <Badge variant="info">情報</Badge>;
   }
 }
 
 function sourceBadge(source: string) {
   if (source === "nk" || source === "NK") {
-    return <span className="text-emerald-700 font-semibold">[NK]</span>;
+    return <Badge variant="nk">NK</Badge>;
   }
   if (source === "MLIT") {
-    return <span className="text-indigo-700 font-semibold">[MLIT]</span>;
+    return <Badge variant="mlit">国交省</Badge>;
   }
-  return <span className="text-zinc-500 font-semibold">[{source}]</span>;
+  return <Badge>{source}</Badge>;
 }
 
 function confidenceLabel(confidence: number | null) {
@@ -31,11 +33,17 @@ function confidenceLabel(confidence: number | null) {
   if (confidence >= 0.8) return null;
   if (confidence >= 0.5) {
     return (
-      <span className="text-amber-600 text-xs ml-2">[!] 要確認</span>
+      <Badge variant="action" className="ml-2">
+        <AlertTriangle size={12} className="mr-1" />
+        要確認
+      </Badge>
     );
   }
   return (
-    <span className="text-red-500 text-xs ml-2">[?] AI不確実</span>
+    <Badge variant="critical" className="ml-2">
+      <HelpCircle size={12} className="mr-1" />
+      AI不確実
+    </Badge>
   );
 }
 
@@ -241,7 +249,7 @@ export default async function NewsPage({
                   <p className="text-xs text-zinc-400 mt-1">
                     {formatDate(reg.published_at)}
                     {isWithin24Hours(reg.published_at) && (
-                      <span className="ml-2 text-red-600 font-bold">[NEW]</span>
+                      <Badge variant="new" className="ml-2">NEW</Badge>
                     )}
                   </p>
                 </Link>
