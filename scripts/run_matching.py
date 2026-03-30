@@ -182,7 +182,7 @@ def upsert_match(
 # メイン処理
 # ---------------------------------------------------------------------------
 
-def run_matching(dry_run: bool = False, limit: Optional[int] = None) -> None:
+def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool = False) -> None:
     """バッチマッチングのメインロジック"""
 
     if not _supabase_configured():
@@ -202,7 +202,11 @@ def run_matching(dry_run: bool = False, limit: Optional[int] = None) -> None:
         return
 
     # 3. 既存マッチを取得してスキップ対象を特定
-    existing_matches = fetch_existing_matches()
+    if force:
+        existing_matches: set[tuple[str, str]] = set()
+        logger.info("FORCE モード: 既存マッチを全て無視し、全ペアを再処理します")
+    else:
+        existing_matches = fetch_existing_matches()
 
     # 4. 未マッチペアを計算
     pairs_to_process: list[tuple[dict, dict]] = []
@@ -309,15 +313,22 @@ def main() -> None:
         default=None,
         help="処理する regulations の最大件数（最新 N 件）",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="既存の全マッチング結果を無視し、全ペアを再処理する",
+    )
     args = parser.parse_args()
 
     logger.info("バッチマッチング開始")
     if args.dry_run:
         logger.info("モード: DRY RUN")
+    if args.force:
+        logger.info("モード: FORCE（全件再処理）")
     if args.limit:
         logger.info(f"規制取得上限: {args.limit} 件")
 
-    run_matching(dry_run=args.dry_run, limit=args.limit)
+    run_matching(dry_run=args.dry_run, limit=args.limit, force=args.force)
 
     logger.info("バッチマッチング終了")
 
