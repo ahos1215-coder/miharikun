@@ -3,7 +3,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Pencil } from "lucide-react";
+import {
+  Pencil,
+  FileEdit,
+  Wrench,
+  GraduationCap,
+  FileCheck,
+  ClipboardList,
+} from "lucide-react";
 import type {
   ShipProfile,
   UserMatch,
@@ -12,6 +19,7 @@ import type {
   ShipType,
 } from "@/lib/types";
 import { SHIP_TYPE_LABELS } from "@/lib/types";
+import { PotentialMatchCard } from "./PotentialMatchCard";
 
 function severityBadge(severity: Severity) {
   switch (severity) {
@@ -41,6 +49,99 @@ function formatDate(dateStr: string | null) {
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+// --- Action item detection from reason text ---
+
+interface ActionItem {
+  label: string;
+  icon: React.ReactNode;
+  colorClass: string;
+}
+
+const ACTION_PATTERNS: { pattern: RegExp; item: ActionItem }[] = [
+  {
+    pattern: /SMS改訂|SMS\s*改[訂定]|安全管理.*改訂/i,
+    item: {
+      label: "SMS改訂",
+      icon: <FileEdit size={12} />,
+      colorClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    },
+  },
+  {
+    pattern: /設備工事|設備.*改[造修]|工事/,
+    item: {
+      label: "設備工事",
+      icon: <Wrench size={12} />,
+      colorClass: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    },
+  },
+  {
+    pattern: /乗組員訓練|訓練|教育.*実施/,
+    item: {
+      label: "乗組員訓練",
+      icon: <GraduationCap size={12} />,
+      colorClass: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    },
+  },
+  {
+    pattern: /証書更新|証書.*取得|証書.*発行|検査.*受検/,
+    item: {
+      label: "証書更新",
+      icon: <FileCheck size={12} />,
+      colorClass: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    },
+  },
+  {
+    pattern: /書類整備|書類.*準備|記録.*整備|文書.*改訂/,
+    item: {
+      label: "書類整備",
+      icon: <ClipboardList size={12} />,
+      colorClass: "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300",
+    },
+  },
+];
+
+function extractActionItems(reason: string | null): ActionItem[] {
+  if (!reason) return [];
+  const items: ActionItem[] = [];
+  for (const { pattern, item } of ACTION_PATTERNS) {
+    if (pattern.test(reason)) {
+      items.push(item);
+    }
+  }
+  return items;
+}
+
+// --- National law extraction from reason text ---
+
+const NATIONAL_LAW_PATTERNS = [
+  /船舶救命設備規則/,
+  /船舶消防設備規則/,
+  /船舶安全法/,
+  /船舶職員.*法/,
+  /海洋汚染.*防止法/,
+  /船員法/,
+  /港則法/,
+  /海上交通安全法/,
+  /船舶設備規程/,
+  /船舶防火構造規則/,
+  /船舶復原性規則/,
+  /船舶機関規則/,
+  /危険物船舶運送.*貯蔵規則/,
+  /船舶のトン数.*測度.*法/,
+];
+
+function extractNationalLaws(reason: string | null): string[] {
+  if (!reason) return [];
+  const laws: string[] = [];
+  for (const pattern of NATIONAL_LAW_PATTERNS) {
+    const match = reason.match(pattern);
+    if (match) {
+      laws.push(match[0]);
+    }
+  }
+  return [...new Set(laws)];
 }
 
 /** Staggered animation delay for ship cards */
@@ -262,6 +363,49 @@ export default async function DashboardPage({
                                 ? "AI による判定を再試行中です。しばらくお待ちください。"
                                 : m.reason}
                             </p>
+                          )}
+                          {/* Task 1: Action items for applicable matches */}
+                          {m.is_applicable === true && (() => {
+                            const actions = extractActionItems(m.reason);
+                            if (actions.length === 0) return null;
+                            return (
+                              <div className="mt-2">
+                                <p className="text-[10px] font-medium text-zinc-400 mb-1">
+                                  対応が必要な項目
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {actions.map((action) => (
+                                    <span
+                                      key={action.label}
+                                      className={cn(
+                                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                                        action.colorClass
+                                      )}
+                                    >
+                                      {action.icon}
+                                      {action.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          {/* Task 3: National laws for applicable matches */}
+                          {m.is_applicable === true && (() => {
+                            const laws = extractNationalLaws(m.reason);
+                            if (laws.length === 0) return null;
+                            return (
+                              <p className="text-[11px] text-zinc-400 mt-1">
+                                関連国内法: {laws.join("、")}
+                              </p>
+                            );
+                          })()}
+                          {/* Task 2: Potential match confirmation UI */}
+                          {m.is_applicable === null && m.match_method === "potential_match" && (
+                            <PotentialMatchCard
+                              matchId={m.id}
+                              reason={m.reason}
+                            />
                           )}
                         </li>
                       ))}

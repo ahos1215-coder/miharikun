@@ -14,7 +14,7 @@
 | Phase 0: 基盤構築 | — | ✅ 完了 | 2026-03-29 |
 | Phase 1 R1: スクレイパー構築 | R1 | ✅ 完了 | 2026-03-29 |
 | Phase 1 R2: DB + 検証 + マッチング基盤 | R2 | ✅ 完了 | 2026-03-29 |
-| Phase 2: Ship Specs + マッチング + 超軽量 UI | — | 📋 未着手 ← 次 | — |
+| Phase 2: Ship Specs + マッチング + 超軽量 UI | — | ✅ 完了 | 2026-03-30 |
 | Phase 3: Fleet 管理 + 拡張 | — | 📋 未着手 | — |
 
 ---
@@ -117,7 +117,7 @@
 
 ---
 
-## Phase 2: Ship Specs + マッチング + 超軽量 UI ⏳ 作業中
+## Phase 2: Ship Specs + マッチング + 超軽量 UI ✅ 完了
 
 > 設計書: `plan/STRATEGIC_PIVOT_v5.md` §4
 
@@ -180,7 +180,7 @@
 - [x] **発見: ClassNK は IP ではなく bot UA でブロックしていた** — UA 修正済みのため GHA 直接実行が可能
 - [x] NK ワークフローを ubuntu-latest に正式移行 ✅ (a92c89d)
 - [x] **Self-hosted Runner 不要に** — PC 再起動後の手動 run.cmd 実行が解消
-- [x] NK 30件本番実行開始（ubuntu-latest, Gemini 分類付き）⏳ 実行中
+- [x] NK 本番実行完了（ubuntu-latest, Gemini 分類付き, 40件 upsert）✅
 
 #### 出自隠蔽技術の調査結果（将来 IP ブロック再発時の備え）
 
@@ -194,9 +194,35 @@
 
 **結論**: 現在は GHA 直接実行で問題なし。再発時は Tailscale (無料) が最善。
 
+#### 推論型コンプライアンスエンジン（2026-03-30）
+
+- [x] maritime_knowledge.py: 43条約ルール, 871キーワード, 国内法マッピング ✅
+- [x] ship_compliance.py: 5項目→適用条約自動推論 + Potential Match ✅
+- [x] matching.py v3: Stage1(ルール)→Stage0(条約)→Stage2(AI) 3段階 ✅
+- [x] "all" バグ修正: ルールベースが全船適用規制を非該当と判定するバグ修正 ✅
+- [x] --force オプション: 全件再マッチング機能 ✅
+
+#### Yahoo!ニュース風ポータル（2026-03-30）
+
+- [x] news/page.tsx: 6タブ(全て/主要/安全/環境/船員/船級) + カードデザイン ✅
+- [x] Gemini headline生成: 20-30文字の短い見出し ✅
+- [x] 00007_headline.sql マイグレーション ✅
+
+#### Gemini 有料プラン移行（2026-03-30）
+
+- [x] Tier 1 Pay-as-you-go に切り替え ✅
+- [x] レートリミッター 4秒→0.5秒に短縮 ✅
+- [x] NK 全件取り込み: 40件 upsert, 429ゼロ ✅
+- [x] 全件再マッチング: 88件, convention_based 57件 ✅
+
+#### NK ubuntu-latest 移行（2026-03-30）
+
+- [x] GHA直接実行テスト: 200 OK, 403なし ✅
+- [x] Self-hosted Runner 不要に ✅
+- [x] 出自隠蔽調査: Tailscale推奨（将来の備え）✅
+
 #### 残タスク
 
-- [ ] NK 30件本番実行の結果確認（⏳ 実行中）
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定（LINE 通知を有効化）
 - [ ] Google Drive MCP の認証設定（GOOGLE_SERVICE_ACCOUNT_JSON_PATH）
 - [x] 00006_user_preferences.sql の Supabase 適用 ✅
@@ -265,3 +291,14 @@
 - 2026-03-30 00:10 — [Agent/Sonnet] Golden Set: マッチング精度テスト 19件 (全通過 1.68s)
 - 2026-03-30 00:10 — [Agent/Sonnet] Security: TruffleHog + audit + チェックリスト
 - 2026-03-30 00:10 — [Agent/Sonnet] MCP: Google Drive MCP 設定 + セットアップガイド
+- 2026-03-30 — [Lead/Opus] 推論型コンプライアンスエンジン: maritime_knowledge.py (43条約, 871キーワード) + ship_compliance.py (適用条約自動推論)
+- 2026-03-30 — [Lead/Opus] matching.py v3: Stage1(ルール)→Stage0(条約)→Stage2(AI) 3段階パイプライン
+- 2026-03-30 — [Lead/Opus] "all" バグ修正: ルールベースが全船適用規制を非該当と判定する問題を修正
+- 2026-03-30 — [Lead/Opus] --force オプション追加: 全件再マッチング機能
+- 2026-03-30 — [Lead/Opus] Yahoo!ニュース風ポータル: news/page.tsx 6タブ + カードデザイン + Gemini headline生成
+- 2026-03-30 — [Lead/Opus] 00007_headline.sql マイグレーション作成
+- 2026-03-30 — [User] Gemini 有料プラン移行: Tier 1 Pay-as-you-go, レートリミッター 4秒→0.5秒
+- 2026-03-30 — [Lead/Opus] NK 全件取り込み: 40件 upsert, 429ゼロ (有料プラン効果)
+- 2026-03-30 — [Lead/Opus] 全件再マッチング: 88件処理, convention_based 57件
+- 2026-03-30 — [Lead/Opus] NK ubuntu-latest 移行確定: GHA直接実行 200 OK, Self-hosted Runner 不要に
+- 2026-03-30 — [Lead/Opus] 出自隠蔽技術調査: Tailscale推奨（将来のIP ブロック再発時の備え）

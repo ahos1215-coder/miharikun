@@ -130,6 +130,70 @@ export default async function FleetSummaryPage() {
     countBySeverity[g.regulation.severity]++;
   }
 
+  // アクション要約: 規制カテゴリ・タイトルからアクション種別を推定
+  interface ActionCount {
+    label: string;
+    count: number;
+    icon: string;
+    className: string;
+  }
+
+  let smsRevision = 0;
+  let equipmentMod = 0;
+  let crewTraining = 0;
+  let certUpdate = 0;
+
+  for (const g of regulationGroups) {
+    const title = (g.regulation.title + " " + (g.regulation.category ?? "")).toLowerCase();
+    const summary = (g.regulation.summary_ja ?? "").toLowerCase();
+    const combined = title + " " + summary;
+
+    // SOLAS/ISM → SMS改訂 + 訓練
+    if (/solas|ism|安全管理|safety management/.test(combined)) {
+      smsRevision++;
+      crewTraining++;
+    }
+    // MARPOL → 証書更新 + 書類整備
+    else if (/marpol|環境|emission|排出|汚染/.test(combined)) {
+      certUpdate++;
+    }
+    // 設備系 → 設備工事
+    else if (/equipment|設備|機器|装置|installation/.test(combined)) {
+      equipmentMod++;
+    }
+    // その他 → 証書更新をデフォルトに
+    else {
+      certUpdate++;
+    }
+  }
+
+  const actionCounts: ActionCount[] = [
+    {
+      label: "SMS改訂",
+      count: smsRevision,
+      icon: "📋",
+      className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
+    },
+    {
+      label: "乗組員訓練",
+      count: crewTraining,
+      icon: "👥",
+      className: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
+    },
+    {
+      label: "設備工事",
+      count: equipmentMod,
+      icon: "🔧",
+      className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800",
+    },
+    {
+      label: "証書更新",
+      count: certUpdate,
+      icon: "📄",
+      className: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+    },
+  ];
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
@@ -141,6 +205,30 @@ export default async function FleetSummaryPage() {
           フリート一覧へ
         </Link>
       </div>
+
+      {/* アクション要約 */}
+      {regulationGroups.length > 0 && (
+        <div className="motion-preset-fade rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-4 mb-4">
+          <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+            アクション要約
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {actionCounts.map((action) => (
+              <div
+                key={action.label}
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-center",
+                  action.className,
+                )}
+              >
+                <div className="text-lg mb-0.5">{action.icon}</div>
+                <div className="text-xl font-bold">{action.count}</div>
+                <div className="text-xs font-medium mt-0.5">{action.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* サマリーバー */}
       <div className="motion-preset-fade rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-4 mb-6">
