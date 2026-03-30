@@ -5,12 +5,19 @@ import { Anchor } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import type { User } from "@supabase/supabase-js";
 
 export function Nav() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -72,6 +79,17 @@ export function Nav() {
               ログイン
             </Link>
           )}
+          {mounted && (
+            <button
+              onClick={() => {
+                const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+                setTheme(next);
+              }}
+              className="text-zinc-500 hover:text-blue-600 text-xs font-mono"
+            >
+              {theme === "light" ? "[LIGHT]" : theme === "dark" ? "[DARK]" : "[AUTO]"}
+            </button>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -119,6 +137,17 @@ export function Nav() {
             >
               ログイン
             </Link>
+          )}
+          {mounted && (
+            <button
+              onClick={() => {
+                const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+                setTheme(next);
+              }}
+              className="text-zinc-500 hover:text-blue-600 text-xs font-mono"
+            >
+              {theme === "light" ? "[LIGHT]" : theme === "dark" ? "[DARK]" : "[AUTO]"}
+            </button>
           )}
         </div>
       )}

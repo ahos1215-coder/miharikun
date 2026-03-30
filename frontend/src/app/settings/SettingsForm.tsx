@@ -7,6 +7,7 @@ import {
   NOTIFY_SEVERITY_LABELS,
 } from "@/lib/types";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const severityOptions = Object.keys(NOTIFY_SEVERITY_LABELS) as NotifySeverity[];
 
@@ -49,7 +50,7 @@ export default function SettingsForm({ preferences }: SettingsFormProps) {
       return;
     }
 
-    setMessage("設定を保存しました");
+    toast.success("設定を保存しました");
   }
 
   return (

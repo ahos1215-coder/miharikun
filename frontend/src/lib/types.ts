@@ -108,6 +108,25 @@ export const NAV_AREA_LABELS: Record<NavigationArea, string> = {
   smooth_water: "平水",
 };
 
+// --- Email-specific types (used by weekly summary email template) ---
+
+export interface EmailRegulationItem {
+  title: string;
+  severity: string;
+  confidence: number;
+  reason: string;
+  url: string;
+}
+
+export interface EmailShipSummary {
+  shipName: string;
+  shipType: string;
+  grossTonnage: number;
+  regulations: EmailRegulationItem[];
+}
+
+// --- User preferences ---
+
 export type NotifySeverity = "all" | "critical" | "action_required";
 
 export interface UserPreferences {

@@ -12,6 +12,7 @@ import {
 } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const inputClass =
   "mt-1 block w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900";
@@ -83,11 +84,13 @@ export function ShipEditForm({ ship }: ShipEditFormProps) {
       .eq("id", ship.id);
 
     if (updateError) {
+      toast.error("操作に失敗しました");
       setError(updateError.message);
       setLoading(false);
       return;
     }
 
+    toast.success("船舶情報を更新しました");
     router.push("/dashboard");
     router.refresh();
   }
@@ -107,11 +110,13 @@ export function ShipEditForm({ ship }: ShipEditFormProps) {
       .eq("id", ship.id);
 
     if (deleteError) {
+      toast.error("操作に失敗しました");
       setError(deleteError.message);
       setLoading(false);
       return;
     }
 
+    toast.success("船舶を削除しました");
     router.push("/dashboard");
     router.refresh();
   }

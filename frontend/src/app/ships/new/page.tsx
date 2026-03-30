@@ -11,6 +11,7 @@ import {
 } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const inputClass =
   "mt-1 block w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900";
@@ -83,11 +84,13 @@ export default function ShipNewPage() {
       });
 
     if (insertError) {
+      toast.error("登録に失敗しました");
       setError(insertError.message);
       setLoading(false);
       return;
     }
 
+    toast.success("船舶を登録しました");
     router.push("/dashboard");
     router.refresh();
   }

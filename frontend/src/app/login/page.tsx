@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Anchor } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   return (
@@ -42,6 +43,7 @@ function LoginForm() {
       if (error) {
         setError(error.message);
       } else {
+        toast.success("確認メールを送信しました");
         setMessage("確認メールを送信しました。メールのリンクをクリックしてください。");
       }
     } else {
