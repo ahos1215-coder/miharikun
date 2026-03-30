@@ -156,9 +156,13 @@ export default async function DashboardPage({
           <div className="flex flex-col gap-6">
             {shipList.map((ship, shipIndex) => {
               const allMatches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
-                // 該当 > 判定中 > 非該当 の順で表示
+                // 該当 > 判定中 > 非該当 の順、同じなら掲載日の新しい順
                 const order = (v: boolean | null) => v === true ? 0 : v === null ? 1 : 2;
-                return order(a.is_applicable) - order(b.is_applicable);
+                const orderDiff = order(a.is_applicable) - order(b.is_applicable);
+                if (orderDiff !== 0) return orderDiff;
+                const dateA = a.regulation?.published_at ?? "";
+                const dateB = b.regulation?.published_at ?? "";
+                return dateB.localeCompare(dateA);
               });
               const applicableCount = allMatches.filter((m) => m.is_applicable === true).length;
               const matches = filterApplicable
