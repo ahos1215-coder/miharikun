@@ -162,11 +162,23 @@
 - [x] カスタムドメイン: https://miharikun.vercel.app ✅
 - [x] Vercel 自動デプロイ (Git push → 自動ビルド) ✅
 
+#### フルアップグレード（2026-03-30）
+
+- [x] PWA 強化: モバイルナビ (ハンバーガー), Loading/404/Error ページ ✅ (517352a)
+- [x] Settings 実装: user_preferences テーブル + 通知設定フォーム ✅ (517352a)
+- [x] Admin ヘルス: /admin/health システム状態ダッシュボード ✅ (517352a)
+- [x] Scrapling 統合: NK スクレイパーに StealthyFetcher + graceful fallback ✅ (fab3c26)
+- [x] Golden Set テスト: マッチング精度バリデーション 19テスト全通過 ✅ (fab3c26)
+- [x] PWA 船上命綱: 4段階キャッシュ + オフラインページ + 復帰通知 ✅ (fab3c26)
+- [x] Security: TruffleHog + npm/pip audit + セキュリティチェックリスト ✅ (fab3c26)
+- [x] MCP: Google Drive MCP サーバー設定テンプレート ✅ (fab3c26)
+
 #### 残タスク
 
 - [ ] NK 過去データ一括取り込み（Gemini 枠回復後に再実行。8件成功済み、残りは pending_queue）
-- [ ] Service Worker キャッシュ（オフライン対応）
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定（LINE 通知を有効化）
+- [ ] Google Drive MCP の認証設定（GOOGLE_SERVICE_ACCOUNT_JSON_PATH）
+- [ ] 00006_user_preferences.sql の Supabase 適用 ✅ 適用済み
 
 ## Phase 3: Fleet 管理 + 拡張 📋 未着手
 
@@ -224,3 +236,11 @@
 - 2026-03-29 23:10 — [Agent/Sonnet] LINE 通知: notify_matches.py + ワークフロー連携
 - 2026-03-29 23:10 — [Agent/Sonnet] Playwright E2E テスト: 9テスト (landing/news/auth)
 - 2026-03-29 23:20 — [Lead/Opus] Vercel 自動デプロイ設定完了 (Git push → 自動ビルド)
+- 2026-03-30 00:00 — [Agent/Sonnet] PWA: モバイルナビ + Loading/404/Error ページ
+- 2026-03-30 00:00 — [Agent/Sonnet] Settings: user_preferences テーブル + 通知設定フォーム
+- 2026-03-30 00:00 — [Agent/Sonnet] Admin: /admin/health システムヘルスダッシュボード
+- 2026-03-30 00:00 — [Agent/Sonnet] PWA: Service Worker 4段階キャッシュ + オフライン対応
+- 2026-03-30 00:10 — [Agent/Sonnet] Scrapling: NK stealth_fetcher 統合 + graceful fallback
+- 2026-03-30 00:10 — [Agent/Sonnet] Golden Set: マッチング精度テスト 19件 (全通過 1.68s)
+- 2026-03-30 00:10 — [Agent/Sonnet] Security: TruffleHog + audit + チェックリスト
+- 2026-03-30 00:10 — [Agent/Sonnet] MCP: Google Drive MCP 設定 + セットアップガイド
