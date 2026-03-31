@@ -175,9 +175,9 @@ const ONBOARD_ACTION_RULES: {
     }],
   },
   {
-    keywords: ["訓練", "STCW", "ドリル", "操練"],
+    keywords: ["STCW", "ドリル", "操練", "能力証明", "海技資格"],
     actions: [{
-      label: "訓練・操練の実施",
+      label: "STCW関連訓練・操練の実施",
       icon: GraduationCap,
       side: "onboard",
       details: [
@@ -335,7 +335,7 @@ const SHORE_ACTION_RULES: {
     }],
   },
   {
-    keywords: ["STCW", "訓練", "資格", "manning"],
+    keywords: ["STCW", "資格証明", "manning", "配乗", "船員法改正"],
     actions: [{
       label: "船員配乗・訓練管理",
       icon: GraduationCap,
