@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Pencil, BookOpen } from "lucide-react";
 import { ComplianceGauge } from "@/components/dashboard/compliance-gauge";
 import { TimelineStrip } from "@/components/dashboard/timeline-strip";
 import { GlassRegulationCard } from "@/components/dashboard/glass-regulation-card";
@@ -73,13 +73,22 @@ export function DashboardShell({ shipData, showAll, activeTabKey }: DashboardShe
               totalCount={sd.totalCount}
               potentialCount={sd.potentialCount}
             />
-            <Link
-              href={sd.ship.editHref}
-              className="absolute top-4 right-4 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-cyan-400 transition-colors"
-            >
-              <Pencil size={12} />
-              編集
-            </Link>
+            <div className="absolute top-4 right-4 flex items-center gap-3">
+              <Link
+                href={`${sd.ship.editHref}/publications`}
+                className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-cyan-400 transition-colors"
+              >
+                <BookOpen size={12} />
+                書籍
+              </Link>
+              <Link
+                href={sd.ship.editHref}
+                className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-cyan-400 transition-colors"
+              >
+                <Pencil size={12} />
+                編集
+              </Link>
+            </div>
           </div>
 
           {/* Timeline Strip */}

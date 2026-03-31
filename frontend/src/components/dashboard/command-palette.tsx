@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Ship, FileText, Settings, BarChart3, Home, Command } from "lucide-react";
+import { Search, Ship, FileText, Settings, BarChart3, Home, Command, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CommandItem {
@@ -62,6 +62,14 @@ export function CommandPalette() {
       icon: <Settings size={16} />,
       action: () => router.push("/settings"),
       keywords: ["settings", "設定", "通知", "LINE", "メール"],
+    },
+    {
+      id: "publications",
+      label: "備付書籍管理",
+      description: "船内備付書籍の版数管理",
+      icon: <BookOpen size={16} />,
+      action: () => router.push("/dashboard"),
+      keywords: ["publications", "書籍", "備付", "海図", "水路誌", "条約集"],
     },
     {
       id: "home",

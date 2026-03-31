@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   SHIP_TYPE_LABELS,
@@ -13,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BookOpen } from "lucide-react";
 
 const inputClass =
   "mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900";
@@ -124,6 +126,18 @@ export function ShipEditForm({ ship }: ShipEditFormProps) {
   return (
     <div className="mx-auto max-w-lg p-4">
       <h1 className="mb-6 text-xl font-bold">船舶編集</h1>
+
+      {/* 備付書籍管理リンク */}
+      <Link
+        href={`/ships/${ship.id}/publications`}
+        className="mb-6 flex items-center gap-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm transition-all hover:bg-cyan-500/10 hover:border-cyan-500/30 dark:border-cyan-500/20 dark:bg-cyan-500/5"
+      >
+        <BookOpen size={20} className="text-cyan-500 shrink-0" />
+        <div>
+          <p className="font-medium text-zinc-900 dark:text-zinc-100">備付書籍管理</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">この船に必要な書籍の一覧と版数管理</p>
+        </div>
+      </Link>
 
       <div className="motion-preset-fade rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
