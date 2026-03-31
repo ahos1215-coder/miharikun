@@ -7,8 +7,10 @@ import { ComplianceGauge } from "@/components/dashboard/compliance-gauge";
 import { TimelineStrip } from "@/components/dashboard/timeline-strip";
 import { GlassRegulationCard } from "@/components/dashboard/glass-regulation-card";
 import { PotentialMatchCard } from "./PotentialMatchCard";
+import { PublicationsSummary } from "@/components/dashboard/publications-summary";
 import { Badge } from "@/components/ui/badge";
 import type { Regulation } from "@/lib/types";
+import type { PublicationRef } from "@/lib/publication-data";
 
 interface TimelineItem {
   id: string;
@@ -44,6 +46,7 @@ interface ShipSectionData {
   potentialMatches: MatchData[];
   hasMorePotential: boolean;
   totalPotential: number;
+  requiredPublications: PublicationRef[];
 }
 
 interface DashboardShellProps {
@@ -94,6 +97,14 @@ export function DashboardShell({ shipData, showAll, activeTabKey }: DashboardShe
           {/* Timeline Strip */}
           {sd.timelineItems.length > 0 && (
             <TimelineStrip items={sd.timelineItems} />
+          )}
+
+          {/* Publications Summary */}
+          {sd.requiredPublications.length > 0 && (
+            <PublicationsSummary
+              shipId={sd.ship.id}
+              publications={sd.requiredPublications}
+            />
           )}
 
           {/* Regulation cards */}

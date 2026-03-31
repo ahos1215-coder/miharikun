@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
   ArrowUpDown,
+  BookOpen,
   Flag,
   HelpCircle,
   Leaf,
@@ -16,12 +17,13 @@ import {
 } from "lucide-react";
 import type { Regulation, Severity } from "@/lib/types";
 import { DeadlineBadge } from "@/components/deadline-badge";
+import { getPublicationsByRecency } from "@/lib/publication-data";
 
 const PAGE_SIZE = 10;
 
 // --- Category tab definitions ---
 
-type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "domestic";
+type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "domestic" | "publications";
 type SortKey = "newest" | "effective";
 
 interface TabDef {
@@ -62,6 +64,13 @@ const TABS: TabDef[] = [
     param: "domestic",
     icon: <Flag size={16} />,
     keywords: ["船舶安全法", "海防法", "船員法", "NK", "ClassNK", "旗国", "船級", "テクニカル"],
+  },
+  {
+    key: "publications",
+    label: "備付書籍",
+    param: "publications",
+    icon: <BookOpen size={16} />,
+    keywords: [],
   },
 ];
 
@@ -552,15 +561,63 @@ export default async function NewsPage({
         </div>
       )}
 
+      {/* Publications tab */}
+      {activeTab === "publications" && (
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+            主要な海事書籍の最新版情報（発行日の新しい順）
+          </p>
+          <div className="flex flex-col gap-3">
+            {getPublicationsByRecency().map((pub, i) => {
+              const catColors: Record<string, string> = {
+                A: "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
+                B: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
+                C: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+                D: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+              };
+              const catLabels: Record<string, string> = { A: "条約", B: "航海用", C: "旗国/船級", D: "マニュアル" };
+              return (
+                <div
+                  key={pub.id}
+                  className={cn(
+                    "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950",
+                    i < 5 ? "motion-preset-fade" : "",
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium", catColors[pub.category])}>
+                      {catLabels[pub.category]}
+                    </span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{pub.publisher}</span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">
+                    {pub.titleJa}
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{pub.title}</p>
+                  <div className="flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
+                    <span>最新版: <strong className="text-zinc-600 dark:text-zinc-300">{pub.currentEdition}</strong></span>
+                    <span>発行: <strong className="text-zinc-600 dark:text-zinc-300 tabular-nums">{pub.editionDate}</strong></span>
+                    <span>更新: {pub.updateCycle}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
+                    根拠: {pub.legalBasis}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Regular empty state (non-main tabs) */}
-      {activeTab !== "main" && items.length === 0 && (
+      {activeTab !== "main" && activeTab !== "publications" && items.length === 0 && (
         <p className="text-zinc-500 dark:text-zinc-400 py-8 text-center">
           該当する規制情報はありません
         </p>
       )}
 
       {/* News cards */}
-      {items.length > 0 && (
+      {activeTab !== "publications" && items.length > 0 && (
         <>
           <ul className="flex flex-col gap-4">
             {items.map((reg, index) => {

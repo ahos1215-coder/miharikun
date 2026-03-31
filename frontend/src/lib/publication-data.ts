@@ -1,0 +1,498 @@
+/**
+ * 備付書籍マスターデータ（フロントエンド用）
+ * scripts/utils/publication_requirements.py と同期
+ */
+
+export interface PublicationRef {
+  id: string;
+  title: string;
+  titleJa: string;
+  category: "A" | "B" | "C" | "D";
+  publisher: string;
+  currentEdition: string;
+  editionDate: string; // YYYY-MM-DD
+  legalBasis: string;
+  updateCycle: string;
+  /** 適用条件: ship_type, gt_min, navigation, convention など */
+  appliesTo: {
+    allShips?: boolean;
+    conventions?: string[];
+    shipTypes?: string[];
+    gtMin?: number;
+    navigation?: string[];
+    flagState?: string;
+    classSociety?: string;
+  };
+}
+
+// ─── カテゴリ A: 条約書籍 ───
+
+export const PUBLICATIONS: PublicationRef[] = [
+  {
+    id: "SOLAS_CONSOLIDATED",
+    title: "SOLAS Consolidated Edition 2024",
+    titleJa: "SOLAS統合版 2024",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2024 Edition",
+    editionDate: "2024-01-01",
+    legalBasis: "SOLAS 1974 as amended",
+    updateCycle: "約2〜3年",
+    appliesTo: { conventions: ["SOLAS"], gtMin: 500, navigation: ["international"] },
+  },
+  {
+    id: "MARPOL_CONSOLIDATED",
+    title: "MARPOL Consolidated Edition",
+    titleJa: "MARPOL統合版 (附属書I〜VI)",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2022 Edition",
+    editionDate: "2022-01-01",
+    legalBasis: "MARPOL 73/78",
+    updateCycle: "約3年",
+    appliesTo: { conventions: ["MARPOL"], gtMin: 400 },
+  },
+  {
+    id: "IMDG_CODE",
+    title: "IMDG Code (Amendment 42-24)",
+    titleJa: "国際海上危険物規程",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "Amendment 42-24",
+    editionDate: "2024-01-01",
+    legalBasis: "SOLAS Chapter VII",
+    updateCycle: "2年",
+    appliesTo: { conventions: ["SOLAS"], shipTypes: ["bulk_carrier", "tanker", "container", "general_cargo", "roro"] },
+  },
+  {
+    id: "IBC_CODE",
+    title: "IBC Code",
+    titleJa: "国際バルクケミカルコード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2022 Edition",
+    editionDate: "2022-01-01",
+    legalBasis: "SOLAS VII / MARPOL Annex II",
+    updateCycle: "不定期",
+    appliesTo: { shipTypes: ["chemical"] },
+  },
+  {
+    id: "IGC_CODE",
+    title: "IGC Code",
+    titleJa: "国際ガスキャリアコード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2016 Edition",
+    editionDate: "2016-01-01",
+    legalBasis: "SOLAS Chapter VII",
+    updateCycle: "不定期",
+    appliesTo: { shipTypes: ["lpg", "lng"] },
+  },
+  {
+    id: "ISM_CODE",
+    title: "ISM Code",
+    titleJa: "国際安全管理コード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2018 Edition",
+    editionDate: "2018-01-01",
+    legalBasis: "SOLAS Chapter IX",
+    updateCycle: "不定期",
+    appliesTo: { conventions: ["SOLAS"], gtMin: 500, navigation: ["international"] },
+  },
+  {
+    id: "ISPS_CODE",
+    title: "ISPS Code",
+    titleJa: "国際船舶・港湾施設保安コード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2003 Edition (with amendments)",
+    editionDate: "2003-12-01",
+    legalBasis: "SOLAS Chapter XI-2",
+    updateCycle: "不定期",
+    appliesTo: { conventions: ["SOLAS"], gtMin: 500, navigation: ["international"] },
+  },
+  {
+    id: "STCW",
+    title: "STCW Convention and Code",
+    titleJa: "STCW条約及びコード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2017 Edition",
+    editionDate: "2017-01-01",
+    legalBasis: "STCW 1978 (Manila 2010)",
+    updateCycle: "不定期",
+    appliesTo: { allShips: true },
+  },
+  {
+    id: "MLC_2006",
+    title: "Maritime Labour Convention, 2006",
+    titleJa: "海上労働条約 2006",
+    category: "A",
+    publisher: "ILO",
+    currentEdition: "2022 Consolidated Edition",
+    editionDate: "2022-01-01",
+    legalBasis: "MLC 2006",
+    updateCycle: "不定期",
+    appliesTo: { allShips: true },
+  },
+  {
+    id: "COLREG",
+    title: "COLREG 1972",
+    titleJa: "海上衝突予防規則条約",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2003 Consolidated Edition",
+    editionDate: "2003-01-01",
+    legalBasis: "COLREG 1972",
+    updateCycle: "不定期",
+    appliesTo: { allShips: true },
+  },
+  {
+    id: "LOAD_LINES",
+    title: "Load Lines Convention 1966/Protocol 1988",
+    titleJa: "国際満載喫水線条約",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2021 Edition",
+    editionDate: "2021-01-01",
+    legalBasis: "LL 1966/Protocol 1988",
+    updateCycle: "不定期",
+    appliesTo: { navigation: ["international"] },
+  },
+  {
+    id: "IAMSAR_VOL3",
+    title: "IAMSAR Manual Volume III",
+    titleJa: "国際航空海上捜索救助マニュアル 第III巻 (船上用)",
+    category: "A",
+    publisher: "IMO/ICAO",
+    currentEdition: "2022 Edition",
+    editionDate: "2022-01-01",
+    legalBasis: "SOLAS V/33",
+    updateCycle: "約3年",
+    appliesTo: { conventions: ["SOLAS"], navigation: ["international"] },
+  },
+  {
+    id: "LSA_CODE",
+    title: "LSA Code",
+    titleJa: "国際救命設備コード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2023 Edition",
+    editionDate: "2023-01-01",
+    legalBasis: "SOLAS Chapter III",
+    updateCycle: "不定期",
+    appliesTo: { conventions: ["SOLAS"], navigation: ["international"] },
+  },
+  {
+    id: "FSS_CODE",
+    title: "FSS Code",
+    titleJa: "国際防火安全システムコード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2015 Edition",
+    editionDate: "2015-01-01",
+    legalBasis: "SOLAS Chapter II-2",
+    updateCycle: "不定期",
+    appliesTo: { conventions: ["SOLAS"], navigation: ["international"] },
+  },
+  {
+    id: "CSS_CODE",
+    title: "CSS Code",
+    titleJa: "貨物積付・固縛安全コード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2021 Edition",
+    editionDate: "2021-01-01",
+    legalBasis: "SOLAS Chapter VI",
+    updateCycle: "不定期",
+    appliesTo: { conventions: ["SOLAS"], shipTypes: ["bulk_carrier", "tanker", "container", "general_cargo", "roro"] },
+  },
+  {
+    id: "IMSBC_CODE",
+    title: "IMSBC Code",
+    titleJa: "国際海上固体ばら積み貨物コード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "Amendment 07-23",
+    editionDate: "2023-12-01",
+    legalBasis: "SOLAS Chapter VI",
+    updateCycle: "2年",
+    appliesTo: { shipTypes: ["bulk_carrier"] },
+  },
+  {
+    id: "BWM_CONVENTION",
+    title: "BWM Convention",
+    titleJa: "バラスト水管理条約",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2017 (in force)",
+    editionDate: "2017-09-08",
+    legalBasis: "BWM Convention 2004",
+    updateCycle: "不定期",
+    appliesTo: { navigation: ["international"] },
+  },
+  {
+    id: "NOX_TECHNICAL_CODE",
+    title: "NOx Technical Code",
+    titleJa: "NOx技術コード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2008 Edition (with 2013 amendments)",
+    editionDate: "2013-01-01",
+    legalBasis: "MARPOL Annex VI",
+    updateCycle: "不定期",
+    appliesTo: { conventions: ["MARPOL"], gtMin: 400 },
+  },
+  {
+    id: "ESP_CODE",
+    title: "ESP Code",
+    titleJa: "強化検査プログラムコード",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2011 Edition (with amendments)",
+    editionDate: "2011-01-01",
+    legalBasis: "SOLAS Chapter XI-1",
+    updateCycle: "不定期",
+    appliesTo: { shipTypes: ["bulk_carrier", "tanker"], gtMin: 500, navigation: ["international"] },
+  },
+
+  // ─── カテゴリ B: 航海用刊行物 ───
+  {
+    id: "JHO_CHART_CATALOG",
+    title: "海図総目録 (Chart Catalogue)",
+    titleJa: "海図総目録",
+    category: "B",
+    publisher: "海上保安庁 水路部",
+    currentEdition: "2024年版",
+    editionDate: "2024-04-01",
+    legalBasis: "SOLAS V/27",
+    updateCycle: "年次",
+    appliesTo: { flagState: "JPN" },
+  },
+  {
+    id: "JHO_SAILING_DIRECTIONS",
+    title: "水路誌 (Sailing Directions)",
+    titleJa: "水路誌",
+    category: "B",
+    publisher: "海上保安庁 水路部",
+    currentEdition: "2024年版",
+    editionDate: "2024-01-01",
+    legalBasis: "SOLAS V/27",
+    updateCycle: "年次補遺",
+    appliesTo: { flagState: "JPN" },
+  },
+  {
+    id: "JHO_LIST_OF_LIGHTS",
+    title: "灯台表 (List of Lights)",
+    titleJa: "灯台表",
+    category: "B",
+    publisher: "海上保安庁 水路部",
+    currentEdition: "2024年版",
+    editionDate: "2024-01-01",
+    legalBasis: "SOLAS V/27",
+    updateCycle: "年次",
+    appliesTo: { flagState: "JPN" },
+  },
+  {
+    id: "JHO_TIDE_TABLES",
+    title: "潮汐表 (Tide Tables)",
+    titleJa: "潮汐表",
+    category: "B",
+    publisher: "海上保安庁 水路部",
+    currentEdition: "2025年版",
+    editionDate: "2025-01-01",
+    legalBasis: "SOLAS V/27",
+    updateCycle: "年次",
+    appliesTo: { flagState: "JPN" },
+  },
+  {
+    id: "JHO_NAUTICAL_ALMANAC",
+    title: "天測暦 (Nautical Almanac)",
+    titleJa: "天測暦",
+    category: "B",
+    publisher: "海上保安庁 水路部",
+    currentEdition: "2025年版",
+    editionDate: "2025-01-01",
+    legalBasis: "SOLAS V/27",
+    updateCycle: "年次",
+    appliesTo: { navigation: ["international"] },
+  },
+  {
+    id: "ADMIRALTY_MARINERS_HANDBOOK",
+    title: "Admiralty Mariner's Handbook (NP100)",
+    titleJa: "アドミラルティ航海者ハンドブック",
+    category: "B",
+    publisher: "UKHO",
+    currentEdition: "2024 Edition",
+    editionDate: "2024-01-01",
+    legalBasis: "SOLAS V/27",
+    updateCycle: "不定期",
+    appliesTo: { navigation: ["international"] },
+  },
+  {
+    id: "INT_CODE_OF_SIGNALS",
+    title: "International Code of Signals (Pub.102)",
+    titleJa: "国際信号書",
+    category: "B",
+    publisher: "IMO/NGA",
+    currentEdition: "2005 Edition",
+    editionDate: "2005-01-01",
+    legalBasis: "SOLAS V/21",
+    updateCycle: "不定期",
+    appliesTo: { allShips: true },
+  },
+
+  // ─── カテゴリ C: 旗国・船級 ───
+  {
+    id: "JPN_SHIP_SAFETY_ACT",
+    title: "船舶安全法関連法令集",
+    titleJa: "船舶安全法関連法令集",
+    category: "C",
+    publisher: "海文堂",
+    currentEdition: "2024年版",
+    editionDate: "2024-04-01",
+    legalBasis: "船舶安全法",
+    updateCycle: "年次",
+    appliesTo: { flagState: "JPN" },
+  },
+  {
+    id: "JPN_SEAFARERS_ACT",
+    title: "船員法関連法令集",
+    titleJa: "船員法関連法令集",
+    category: "C",
+    publisher: "海文堂",
+    currentEdition: "2024年版",
+    editionDate: "2024-04-01",
+    legalBasis: "船員法",
+    updateCycle: "年次",
+    appliesTo: { flagState: "JPN" },
+  },
+  {
+    id: "NK_RULES",
+    title: "ClassNK Rules and Guidance",
+    titleJa: "ClassNK 鋼船規則・検査要領",
+    category: "C",
+    publisher: "ClassNK",
+    currentEdition: "2024 Edition",
+    editionDate: "2024-01-01",
+    legalBasis: "船級要件",
+    updateCycle: "年次改正",
+    appliesTo: { classSociety: "NK" },
+  },
+
+  // ─── カテゴリ D: 船上マニュアル ───
+  {
+    id: "SMS_MANUAL",
+    title: "Safety Management Manual (SMS)",
+    titleJa: "安全管理マニュアル (SMS)",
+    category: "D",
+    publisher: "船社作成",
+    currentEdition: "船社固有",
+    editionDate: "2024-01-01",
+    legalBasis: "ISM Code",
+    updateCycle: "随時改訂",
+    appliesTo: { conventions: ["SOLAS"], gtMin: 500, navigation: ["international"] },
+  },
+  {
+    id: "SOPEP",
+    title: "Shipboard Oil Pollution Emergency Plan (SOPEP)",
+    titleJa: "船舶油汚染緊急計画 (SOPEP)",
+    category: "D",
+    publisher: "船社作成・旗国承認",
+    currentEdition: "船社固有",
+    editionDate: "2024-01-01",
+    legalBasis: "MARPOL Annex I Reg.37",
+    updateCycle: "随時改訂",
+    appliesTo: { gtMin: 400 },
+  },
+  {
+    id: "GARBAGE_PLAN",
+    title: "Garbage Management Plan",
+    titleJa: "廃棄物管理計画",
+    category: "D",
+    publisher: "船社作成",
+    currentEdition: "船社固有",
+    editionDate: "2024-01-01",
+    legalBasis: "MARPOL Annex V Reg.10",
+    updateCycle: "随時改訂",
+    appliesTo: { allShips: true },
+  },
+  {
+    id: "SEEMP",
+    title: "Ship Energy Efficiency Management Plan (SEEMP)",
+    titleJa: "エネルギー効率管理計画 (SEEMP)",
+    category: "D",
+    publisher: "船社作成",
+    currentEdition: "Part III (CII)",
+    editionDate: "2023-01-01",
+    legalBasis: "MARPOL Annex VI Reg.26",
+    updateCycle: "随時改訂",
+    appliesTo: { gtMin: 400 },
+  },
+  {
+    id: "SSP",
+    title: "Ship Security Plan (SSP)",
+    titleJa: "船舶保安計画 (SSP)",
+    category: "D",
+    publisher: "船社作成・旗国承認",
+    currentEdition: "船社固有",
+    editionDate: "2024-01-01",
+    legalBasis: "ISPS Code Part A",
+    updateCycle: "随時改訂",
+    appliesTo: { conventions: ["SOLAS"], gtMin: 500, navigation: ["international"] },
+  },
+  {
+    id: "CSM",
+    title: "Cargo Securing Manual (CSM)",
+    titleJa: "貨物固縛マニュアル (CSM)",
+    category: "D",
+    publisher: "船社作成・船級承認",
+    currentEdition: "船社固有",
+    editionDate: "2024-01-01",
+    legalBasis: "SOLAS VI/5.6, CSS Code",
+    updateCycle: "随時改訂",
+    appliesTo: { shipTypes: ["bulk_carrier", "tanker", "container", "general_cargo", "roro"] },
+  },
+  {
+    id: "BWMP",
+    title: "Ballast Water Management Plan (BWMP)",
+    titleJa: "バラスト水管理計画 (BWMP)",
+    category: "D",
+    publisher: "船社作成・旗国承認",
+    currentEdition: "船社固有",
+    editionDate: "2024-01-01",
+    legalBasis: "BWM Convention",
+    updateCycle: "随時改訂",
+    appliesTo: { navigation: ["international"] },
+  },
+];
+
+/**
+ * 船舶スペックから必要な書籍を判定
+ */
+export function getRequiredPublications(ship: {
+  ship_type: string;
+  gross_tonnage: number;
+  navigation_area: string[];
+  flag_state: string;
+  classification_society: string;
+}): PublicationRef[] {
+  return PUBLICATIONS.filter((pub) => {
+    const a = pub.appliesTo;
+    if (a.allShips) return true;
+    if (a.shipTypes && !a.shipTypes.includes(ship.ship_type)) return false;
+    if (a.gtMin && ship.gross_tonnage < a.gtMin) return false;
+    if (a.navigation && !a.navigation.some((n) => ship.navigation_area.includes(n))) return false;
+    if (a.flagState && ship.flag_state !== a.flagState) return false;
+    if (a.classSociety && ship.classification_society !== a.classSociety) return false;
+    return true;
+  });
+}
+
+/**
+ * 最新版の発行日でソート（新しい順）
+ */
+export function getPublicationsByRecency(): PublicationRef[] {
+  return [...PUBLICATIONS].sort((a, b) => b.editionDate.localeCompare(a.editionDate));
+}

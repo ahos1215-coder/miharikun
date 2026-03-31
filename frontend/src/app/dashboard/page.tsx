@@ -17,6 +17,7 @@ import type {
   ShipType,
 } from "@/lib/types";
 import { SHIP_TYPE_LABELS } from "@/lib/types";
+import { getRequiredPublications } from "@/lib/publication-data";
 import { DashboardShell } from "./dashboard-shell";
 
 /* ──────────────────── category tab definitions ──────────────────── */
@@ -160,6 +161,15 @@ export default async function DashboardPage({
       .sort((a, b) => a.daysUntil - b.daysUntil)
       .slice(0, 10);
 
+    // Build required publications list
+    const requiredPubs = getRequiredPublications({
+      ship_type: ship.ship_type,
+      gross_tonnage: ship.gross_tonnage,
+      navigation_area: ship.navigation_area,
+      flag_state: ship.flag_state,
+      classification_society: ship.classification_society,
+    });
+
     return {
       ship,
       allCount: allShipMatches.length,
@@ -170,6 +180,7 @@ export default async function DashboardPage({
       timelineItems,
       hasMorePotential: potentialMatches.length > 3,
       totalPotential: potentialMatches.length,
+      requiredPublications: requiredPubs,
     };
   });
 
@@ -298,6 +309,7 @@ export default async function DashboardPage({
                 })),
                 hasMorePotential: sd.hasMorePotential,
                 totalPotential: sd.totalPotential,
+                requiredPublications: sd.requiredPublications,
               }))}
               showAll={showAll}
               activeTabKey={activeTabKey}
