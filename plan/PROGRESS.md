@@ -271,6 +271,32 @@
 - [x] Vercel 自動デプロイ + カスタムドメイン ✅
 - [x] PWA 4段階キャッシュ + オフラインページ ✅
 
+### ユーザーフィードバック + 排他キーワード強化（2026-03-29）
+- [x] FeedbackButtons コンポーネント (thumbs up/down) ✅
+- [x] /api/feedback エンドポイント (user_feedback / needs_review 更新) ✅
+- [x] ダッシュボードに FeedbackButtons 統合 (convention_based / ai_matching のみ) ✅
+- [x] 00008_feedback.sql マイグレーション (user_feedback, feedback_at, needs_review) ✅
+- [x] KEYWORD_EXCLUSIONS: 8条約の排他ルール (min_keyword_matches, required_any, single_keyword_insufficient) ✅
+- [x] matching.py: _passes_exclusion_check() で cross-contamination 防止 ✅
+- [x] ship_compliance.py: convention_id が "UNKNOWN" になるバグ修正 (rule["id"] を使用) ✅
+- [x] 全70テスト通過 + TSC エラーゼロ ✅
+- [ ] **ユーザー作業**: 00008_feedback.sql を Supabase ダッシュボードで実行
+
+### Vibe OS 導入 + Maritime Command Center（2026-03-31）
+- [x] plan/PERSONAS.md 新規作成 (4ロール自動憑依システム) ✅
+- [x] CLAUDE.md 更新 (Vibe OS セクション + 鉄の掟4条 + v6方針) ✅
+- [x] framer-motion インストール ✅
+- [x] globals.css: Glassmorphism + glow + gauge アニメーション + ダークスクロールバー ✅
+- [x] ComplianceGauge: SVGアニメーション付き円形ゲージ ✅
+- [x] TimelineStrip: 施行日横スクロールタイムライン (urgency色変化) ✅
+- [x] GlassRegulationCard: Glassmorphismパネル + luminous glow ✅
+- [x] CommandPalette: Cmd+K コマンドパレット (9コマンド) ✅
+- [x] DashboardShell: Framer Motion staggered animation wrapper ✅
+- [x] Dashboard page.tsx: Maritime Command Center 完全リデザイン ✅
+- [x] Badge: ダークファースト カラースキーム更新 ✅
+- [x] layout.tsx: CommandPalette + Sonner dark theme 統合 ✅
+- [x] TSC --noEmit エラーゼロ + next build 成功 ✅
+
 ### 残タスク
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定
 - [ ] RESEND_API_KEY を Vercel env に設定
@@ -357,3 +383,12 @@
 - 2026-03-31 — [Lead/Opus] UI/UXプロ化: Badgeシステム + ランディングリデザイン + ダークモード + Sonner
 - 2026-03-31 — [Lead/Opus] インフラ: CI/Security Scan/PWA強化 + generate-headlines.yml ワークフロー
 - 2026-03-31 — [Lead/Opus] ドキュメント全面更新: PROGRESS.md + HANDOFF.md + STRATEGIC_ROADMAP_v6.md
+- 2026-03-29 — [Agent/Opus] ユーザーフィードバック: FeedbackButtons + /api/feedback + 00008_feedback.sql
+- 2026-03-29 — [Agent/Opus] 排他キーワード強化: KEYWORD_EXCLUSIONS (8条約) + _passes_exclusion_check()
+- 2026-03-29 — [Agent/Opus] バグ修正: ship_compliance.py の convention_id が "UNKNOWN" になる問題
+- 2026-03-31 — [Lead/Opus] Vibe OS 導入: plan/PERSONAS.md (4ロール自動憑依) + CLAUDE.md 更新
+- 2026-03-31 — [Role C/Opus] Maritime Command Center: ダッシュボード完全リデザイン
+- 2026-03-31 — [Role C/Opus] ComplianceGauge (SVGアニメーション) + TimelineStrip (横スクロール) + GlassRegulationCard (Glassmorphism)
+- 2026-03-31 — [Role C/Opus] CommandPalette (Cmd+K, 9コマンド) + globals.css (glow/glass/gauge/skeleton)
+- 2026-03-31 — [Role C/Opus] framer-motion 導入, Badge ダークファースト化, Sonner dark theme
+- 2026-03-31 — [Role D/Opus] Doc-Sync: PROGRESS.md + HANDOFF.md 更新, TSC + next build 全パス

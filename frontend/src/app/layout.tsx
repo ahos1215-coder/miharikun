@@ -4,6 +4,7 @@ import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
 import { SwRegister } from "@/components/sw-register";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CommandPalette } from "@/components/dashboard/command-palette";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -38,7 +39,8 @@ export default function RootLayout({
           <Nav />
           <main className="flex-1">{children}</main>
           <Footer />
-          <Toaster position="top-right" />
+          <CommandPalette />
+          <Toaster position="top-right" richColors theme="dark" />
         </ThemeProvider>
       </body>
     </html>

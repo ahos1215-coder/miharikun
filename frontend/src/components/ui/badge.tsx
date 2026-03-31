@@ -8,15 +8,15 @@ interface BadgeProps {
 
 export function Badge({ children, variant = "default", className }: BadgeProps) {
   const variants = {
-    default: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    critical: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-    action: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-    info: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-    success: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    new: "bg-red-500 text-white",
-    nk: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-    mlit: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
-    egov: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    default: "bg-zinc-500/15 text-zinc-300 border border-zinc-500/20 dark:bg-zinc-500/15 dark:text-zinc-300",
+    critical: "bg-rose-500/15 text-rose-300 border border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-300",
+    action: "bg-amber-500/15 text-amber-300 border border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-300",
+    info: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/15 dark:bg-zinc-500/10 dark:text-zinc-400",
+    success: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300",
+    new: "bg-rose-500 text-white border border-rose-400/30",
+    nk: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300",
+    mlit: "bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 dark:bg-indigo-500/15 dark:text-indigo-300",
+    egov: "bg-purple-500/15 text-purple-300 border border-purple-500/20 dark:bg-purple-500/15 dark:text-purple-300",
   };
 
   return (
