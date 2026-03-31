@@ -15,7 +15,7 @@
 | Phase 1 R1: スクレイパー構築 | R1 | ✅ 完了 | 2026-03-29 |
 | Phase 1 R2: DB + 検証 + マッチング基盤 | R2 | ✅ 完了 | 2026-03-29 |
 | Phase 2: Ship Specs + マッチング + 超軽量 UI | — | ✅ 完了 | 2026-03-30 |
-| Phase 3: Fleet 管理 + 拡張 | — | 📋 未着手 | — |
+| Phase 3: Fleet + 拡張 + コンプライアンスエンジン | — | ⏳ 作業中 | 2026-03-31 |
 
 ---
 
@@ -227,12 +227,56 @@
 - [ ] Google Drive MCP の認証設定（GOOGLE_SERVICE_ACCOUNT_JSON_PATH）
 - [x] 00006_user_preferences.sql の Supabase 適用 ✅
 
-## Phase 3: Fleet 管理 + 拡張 📋 未着手
+## Phase 3: Fleet + 拡張 + コンプライアンスエンジン ⏳ 作業中
 
-- [ ] Fleet 管理（複数船一括）
-- [ ] e-Gov パブコメ監視
-- [ ] LINE リアルタイム通知
-- [ ] ユーザーフィードバック（AI 精度改善ループ）
+### 推論型コンプライアンスエンジン（2026-03-30）
+- [x] maritime_knowledge.py: 43条約, 871キーワード, 12 SMS章, 船側/会社側アクション ✅
+- [x] ship_compliance.py: 5項目→適用条約自動推論 + Potential Match ✅
+- [x] matching.py v3: Stage1(ルール)→Stage0(条約)→Stage2(AI) 3段階 ✅
+- [x] "all" バグ修正 + --force 全件再マッチングオプション ✅
+- [x] Gemini Tier 1 移行 (429→0, 0.5秒間隔) ✅
+- [x] NK ubuntu-latest 移行 (Self-hosted Runner 不要) ✅
+
+### 精度極限向上（2026-03-31）
+- [x] Step 1: フロントを Gemini データに直接接続 (ハルシネーション排除) ✅
+- [x] Step 2: Pydantic バリデーション (validation.py) ✅
+- [x] Step 3: Chain of Verification (CoVe) — 低確信度の自動検証 ✅
+- [x] Step 4: 単語境界マッチング — ISM≠tourism ✅
+- [x] Golden Set 29テスト全通過 (ルール19 + 条約7 + アクション精度3) ✅
+
+### Yahoo!ニュース風ポータル + プロUI（2026-03-30〜31）
+- [x] 専門タブ: SOLAS/安全, MARPOL/環境, STCW/船員, 国内法/旗国 ✅
+- [x] headline 一括生成 (453件) + PDF名除去 ✅
+- [x] 適用日ソート + 船側/会社側ラベル + SMS章番号推論 ✅
+- [x] 詳細ページ: AI分析 vs キーワード推論の明示 ✅
+
+### Fleet管理 + 通知（2026-03-30）
+- [x] /fleet: 全船一覧 + 適用条約バッジ + コンプライアンス率 ✅
+- [x] /fleet/summary: 管理者ビュー + アクション要約 ✅
+- [x] e-Gov パブコメスクレイパー ✅
+- [x] LINE通知 (user_preferences連携) ✅
+- [x] 週次サマリーメール (Resend API接続) ✅
+
+### UI/UX プロ化（2026-03-30）
+- [x] Badge システム (bracket text 全廃→カラフルピルバッジ) ✅
+- [x] ランディングページ完全リデザイン (6セクション) ✅
+- [x] Sonner トースト + next-themes ダークモード ✅
+- [x] モバイルハンバーガーメニュー + Loading/404/Error ✅
+- [x] tailwindcss-motion アニメーション ✅
+
+### インフラ強化（2026-03-30）
+- [x] Scrapling StealthyFetcher (NK + MLIT) ✅
+- [x] CI (TypeScript + pytest + ESLint) ✅
+- [x] Security Scan (TruffleHog + npm/pip audit) ✅
+- [x] Vercel 自動デプロイ + カスタムドメイン ✅
+- [x] PWA 4段階キャッシュ + オフラインページ ✅
+
+### 残タスク
+- [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定
+- [ ] RESEND_API_KEY を Vercel env に設定
+- [ ] フロントエンド単体テスト (Jest/Vitest)
+- [ ] Gemini プロンプトの DSPy 最適化 (本番フィードバック蓄積後)
+- [ ] LlamaIndex RAG (条約原文のインデキシング、将来)
 
 ---
 
@@ -302,3 +346,14 @@
 - 2026-03-30 — [Lead/Opus] 全件再マッチング: 88件処理, convention_based 57件
 - 2026-03-30 — [Lead/Opus] NK ubuntu-latest 移行確定: GHA直接実行 200 OK, Self-hosted Runner 不要に
 - 2026-03-30 — [Lead/Opus] 出自隠蔽技術調査: Tailscale推奨（将来のIP ブロック再発時の備え）
+- 2026-03-31 — [Lead/Opus] Phase 3 開始: Fleet管理 + e-Gov + headline生成 + UI全面リニューアル
+- 2026-03-31 — [Lead/Opus] 推論型コンプライアンスエンジン: maritime_knowledge.py (43条約, 871キーワード) + ship_compliance.py
+- 2026-03-31 — [Lead/Opus] matching.py v3: 3段階パイプライン (Stage1ルール→Stage0条約→Stage2 AI)
+- 2026-03-31 — [Lead/Opus] 精度極限向上4Step: validation.py (Pydantic), CoVe検証, 単語境界マッチング
+- 2026-03-31 — [Lead/Opus] Golden Set テスト29件全通過 (ルール19 + 条約7 + アクション精度3)
+- 2026-03-31 — [Lead/Opus] Yahoo!ニュース風ポータル: 専門タブ + headline一括生成 + 適用日ソート
+- 2026-03-31 — [Lead/Opus] Fleet管理: /fleet (全船一覧) + /fleet/summary (管理者ビュー)
+- 2026-03-31 — [Lead/Opus] e-Gov パブコメスクレイパー (scrape_egov.py + scrape-egov.yml)
+- 2026-03-31 — [Lead/Opus] UI/UXプロ化: Badgeシステム + ランディングリデザイン + ダークモード + Sonner
+- 2026-03-31 — [Lead/Opus] インフラ: CI/Security Scan/PWA強化 + generate-headlines.yml ワークフロー
+- 2026-03-31 — [Lead/Opus] ドキュメント全面更新: PROGRESS.md + HANDOFF.md + STRATEGIC_ROADMAP_v6.md
