@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { BookOpen, ExternalLink } from "lucide-react";
+import { BookOpen, CheckCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PublicationRef } from "@/lib/publication-data";
 
@@ -26,7 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   D: "マニュアル",
 };
 
-type StatusLevel = "green" | "amber" | "red";
+type StatusLevel = "green" | "amber" | "red" | "verified" | "update_likely";
 
 interface StatusInfo {
   level: StatusLevel;
@@ -36,6 +36,16 @@ interface StatusInfo {
 }
 
 const STATUS_MAP: Record<StatusLevel, Omit<StatusInfo, "level">> = {
+  verified: {
+    label: "Verified",
+    dotClass: "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.6)]",
+    rowClass: "",
+  },
+  update_likely: {
+    label: "Update likely",
+    dotClass: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]",
+    rowClass: "bg-amber-500/5",
+  },
   green: {
     label: "最新",
     dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]",
@@ -53,9 +63,27 @@ const STATUS_MAP: Record<StatusLevel, Omit<StatusInfo, "level">> = {
   },
 };
 
-function getEditionStatus(editionDate: string): StatusInfo {
+function isAnnualPublication(updateCycle: string): boolean {
+  return updateCycle.includes("年次");
+}
+
+function getEditionStatus(pub: PublicationRef): StatusInfo {
   const now = new Date();
-  const edition = new Date(editionDate);
+  const currentYear = now.getFullYear();
+  const editionYear = new Date(pub.editionDate).getFullYear();
+
+  // Annual publications: check Verified / Update likely
+  if (isAnnualPublication(pub.updateCycle)) {
+    if (editionYear === currentYear) {
+      return { level: "verified", ...STATUS_MAP["verified"] };
+    }
+    if (editionYear === currentYear - 1) {
+      return { level: "update_likely", ...STATUS_MAP["update_likely"] };
+    }
+  }
+
+  // Fallback to existing G/A/R logic
+  const edition = new Date(pub.editionDate);
   const diffYears = (now.getTime() - edition.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
   let level: StatusLevel;
@@ -77,9 +105,9 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
   const remaining = publications.length - preview.length;
 
   const statusCounts = useMemo(() => {
-    const counts = { green: 0, amber: 0, red: 0 };
+    const counts = { verified: 0, update_likely: 0, green: 0, amber: 0, red: 0 };
     for (const pub of publications) {
-      const { level } = getEditionStatus(pub.editionDate);
+      const { level } = getEditionStatus(pub);
       counts[level]++;
     }
     return counts;
@@ -105,14 +133,20 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
         </Link>
       </div>
 
-      <div className="flex gap-3 mb-3 text-xs">
+      <div className="flex gap-3 mb-3 text-xs flex-wrap">
+        {statusCounts.verified > 0 && (
+          <span className="flex items-center gap-1.5 text-emerald-400">
+            <CheckCircle size={12} />
+            確認済 {statusCounts.verified}
+          </span>
+        )}
         <span className="flex items-center gap-1.5 text-zinc-400">
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
           最新 {statusCounts.green}
         </span>
         <span className="flex items-center gap-1.5 text-zinc-400">
           <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
-          要確認 {statusCounts.amber}
+          要確認 {statusCounts.amber + statusCounts.update_likely}
         </span>
         <span className="flex items-center gap-1.5 text-zinc-400">
           <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.5)]" />
@@ -133,7 +167,8 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
           </thead>
           <tbody>
             {preview.map((pub, i) => {
-              const status = getEditionStatus(pub.editionDate);
+              const status = getEditionStatus(pub);
+              const editionYear = new Date(pub.editionDate).getFullYear();
               return (
                 <motion.tr
                   key={pub.id}
@@ -158,10 +193,22 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
                     {pub.editionDate.slice(0, 7)}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="flex items-center justify-center gap-1.5">
-                      <span className={cn("w-2 h-2 rounded-full shrink-0", status.dotClass)} />
-                      <span className="text-zinc-400">{status.label}</span>
-                    </span>
+                    {status.level === "verified" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.6)]" />
+                        Verified {editionYear}
+                      </span>
+                    ) : status.level === "update_likely" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.6)]" />
+                        Update likely
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <span className={cn("w-2 h-2 rounded-full shrink-0", status.dotClass)} />
+                        <span className="text-zinc-400">{status.label}</span>
+                      </span>
+                    )}
                   </td>
                 </motion.tr>
               );

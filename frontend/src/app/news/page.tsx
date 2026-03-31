@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowUpDown,
   BookOpen,
+  CheckCircle,
   Flag,
   HelpCircle,
   Leaf,
@@ -576,6 +577,10 @@ export default async function NewsPage({
                 D: "bg-amber-500/15 text-amber-300 border-amber-500/20",
               };
               const catLabels: Record<string, string> = { A: "条約", B: "航海用", C: "旗国/船級", D: "マニュアル" };
+              const editionYear = new Date(pub.editionDate).getFullYear();
+              const currentYear = new Date().getFullYear();
+              const isAnnual = pub.updateCycle.includes("年次");
+              const isVerified = isAnnual && editionYear === currentYear;
               return (
                 <div
                   key={pub.id}
@@ -589,6 +594,12 @@ export default async function NewsPage({
                       {catLabels[pub.category]}
                     </span>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">{pub.publisher}</span>
+                    {isVerified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-500 dark:text-emerald-400">
+                        <CheckCircle size={11} />
+                        {editionYear}年版確認済
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">
                     {pub.titleJa}

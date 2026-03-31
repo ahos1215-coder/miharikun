@@ -427,3 +427,9 @@
 - 2026-03-31 — [Agent B/Role B] seed_publications.py + check_publication_updates.py + GHA 2ワークフロー
 - 2026-03-31 — [Agent C/Role C] G/A/R ステータス可視化 (発光ドット + 行ハイライト + サマリーカウント)
 - 2026-03-31 — [Role D/Opus] 全ドキュメント最終同期: HANDOFF.md + STRATEGIC_ROADMAP_v6.md + PROGRESS.md
+- 2026-03-31 — [Agent A/Role A] 書籍ID統一: PUB_X_NNN → 記述的ID (67件全件) + applicability_rules JSON追加
+- 2026-03-31 — [Agent A/Role A] 2026年版更新: 潮汐表/天測暦/灯台表/海図総目録/NK Rules を2026年版に
+- 2026-03-31 — [Agent A/Role B] 00011_publications_v2.sql: applicability_rules JSONB + last_verified_at + verified_by
+- 2026-03-31 — [Agent C/Role C] Verified バッジ: 年次刊行物の2026年版を ✓ Verified 2026 で表示
+- 2026-03-31 — [Agent C/Role C] publication-data.ts: 2026年版更新 + フォールバック化コメント追加
+- 2026-03-31 — [Role D/Opus] 統合チェック: 121テスト全通過 + TSC + next build 全パス + 旧IDゼロ確認

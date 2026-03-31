@@ -182,16 +182,10 @@ class TestCoastalCargoSmall:
 
     def test_solas_not_applicable(self):
         """SOLAS統合版が含まれないこと（300GT・沿海はSOLAS非適用想定）"""
-        # 300GT沿海船はSOLAS条約船ではないが、
-        # determine_compliance の結果次第。SOLAS適用外なら含まれない。
         solas_pubs = [
             p for p in self.pubs
-            if p["publication_id"] == "PUB_A_001"  # SOLAS Consolidated
+            if p["publication_id"] == "SOLAS_CONSOLIDATED"
         ]
-        # SOLASがnot_applicableなら含まれないはず
-        # ただし compliance engine の実装次第なので、含まれても OK とする場合は
-        # このテストの assertion を調整する
-        # ここでは「含まれない」ことを期待
         assert len(solas_pubs) == 0, "300GT沿海船にSOLAS統合版は不要のはず"
 
     def test_domestic_law_included(self):
@@ -233,7 +227,7 @@ class TestLNGShip:
 
     def test_ibc_code_not_included(self):
         """IBC Code が含まれないこと"""
-        ibc_pubs = [p for p in self.pubs if p["publication_id"] == "PUB_A_004"]
+        ibc_pubs = [p for p in self.pubs if p["publication_id"] == "IBC_CODE"]
         assert len(ibc_pubs) == 0, "LNG船にIBC Code は不要"
 
     def test_smpep_included(self):
@@ -258,7 +252,7 @@ class TestChemicalTanker:
 
     def test_igc_code_not_included(self):
         """IGC Code が含まれないこと"""
-        igc_pubs = [p for p in self.pubs if p["publication_id"] == "PUB_A_005"]
+        igc_pubs = [p for p in self.pubs if p["publication_id"] == "IGC_CODE"]
         assert len(igc_pubs) == 0, "ケミカルタンカーにIGC Code は不要"
 
     def test_smpep_included(self):
@@ -341,7 +335,7 @@ class TestCategoryDManuals:
             "build_year": 2020,
         }
         pubs = determine_required_publications(ship)
-        sopep_pubs = [p for p in pubs if p["publication_id"] == "PUB_D_059"]
+        sopep_pubs = [p for p in pubs if p["publication_id"] == "SOPEP"]
         assert len(sopep_pubs) == 0, "400GT未満にSOPEPは不要"
 
     def test_ssp_for_isps_ship(self):

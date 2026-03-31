@@ -54,6 +54,7 @@ STATIC_FIELDS = [
     "current_edition_date",
     "legal_basis",
     "update_cycle",
+    "applicability_rules",
 ]
 
 

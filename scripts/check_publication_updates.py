@@ -43,7 +43,7 @@ if not logger.handlers:
 def check_imo_publications() -> list[dict]:
     """
     IMO Publishing の最新版をチェック。
-    Returns: [{"publication_id": "PUB_A_001", "latest_edition": "2025 Edition", "latest_date": "2025-01-01"}]
+    Returns: [{"publication_id": "SOLAS_CONSOLIDATED", "latest_edition": "2025 Edition", "latest_date": "2025-01-01"}]
     """
     # TODO: 将来 IMO Publishing のスクレイピングを実装
     logger.info("[IMO] スクレイパー未実装 — スキップ")
@@ -53,7 +53,7 @@ def check_imo_publications() -> list[dict]:
 def check_jho_publications() -> list[dict]:
     """
     海上保安庁 水路部（日本水路協会）の最新版をチェック。
-    Returns: [{"publication_id": "PUB_B_028", "latest_edition": "...", "latest_date": "..."}]
+    Returns: [{"publication_id": "JHO_CHART_CATALOG", "latest_edition": "...", "latest_date": "..."}]
     """
     # TODO: 将来 日本水路協会サイトのスクレイピングを実装
     logger.info("[JHO] スクレイパー未実装 — スキップ")
@@ -63,7 +63,7 @@ def check_jho_publications() -> list[dict]:
 def check_nk_publications() -> list[dict]:
     """
     ClassNK の最新版をチェック。
-    Returns: [{"publication_id": "PUB_C_050", "latest_edition": "...", "latest_date": "..."}]
+    Returns: [{"publication_id": "NK_TECHNICAL_INFO", "latest_edition": "...", "latest_date": "..."}]
     """
     # TODO: 将来 ClassNK サイトのスクレイピングを実装
     logger.info("[ClassNK] スクレイパー未実装 — スキップ")
@@ -73,7 +73,7 @@ def check_nk_publications() -> list[dict]:
 def check_ukho_publications() -> list[dict]:
     """
     UKHO (UK Hydrographic Office) の最新版をチェック。
-    Returns: [{"publication_id": "PUB_B_033", "latest_edition": "...", "latest_date": "..."}]
+    Returns: [{"publication_id": "ADMIRALTY_MARINERS_HANDBOOK", "latest_edition": "...", "latest_date": "..."}]
     """
     # TODO: 将来 UKHO サイトのスクレイピングを実装
     logger.info("[UKHO] スクレイパー未実装 — スキップ")
@@ -83,7 +83,7 @@ def check_ukho_publications() -> list[dict]:
 def check_ilo_publications() -> list[dict]:
     """
     ILO (MLC 2006) の最新版をチェック。
-    Returns: [{"publication_id": "PUB_A_010", "latest_edition": "...", "latest_date": "..."}]
+    Returns: [{"publication_id": "MLC_2006", "latest_edition": "...", "latest_date": "..."}]
     """
     # TODO: 将来 ILO サイトのスクレイピングを実装
     logger.info("[ILO] スクレイパー未実装 — スキップ")

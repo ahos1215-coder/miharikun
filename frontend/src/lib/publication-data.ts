@@ -1,5 +1,8 @@
 /**
- * 備付書籍マスターデータ（フロントエンド用）
+ * 備付書籍マスターデータ（オフライン用フォールバック）
+ * メインのデータソースは Supabase publications テーブル。
+ * DB にアクセスできない場合のみこのデータを使用する。
+ *
  * scripts/utils/publication_requirements.py と同期
  */
 
@@ -265,8 +268,8 @@ export const PUBLICATIONS: PublicationRef[] = [
     titleJa: "海図総目録",
     category: "B",
     publisher: "海上保安庁 水路部",
-    currentEdition: "2024年版",
-    editionDate: "2024-04-01",
+    currentEdition: "2026年版",
+    editionDate: "2026-04-01",
     legalBasis: "SOLAS V/27",
     updateCycle: "年次",
     appliesTo: { flagState: "JPN" },
@@ -289,8 +292,8 @@ export const PUBLICATIONS: PublicationRef[] = [
     titleJa: "灯台表",
     category: "B",
     publisher: "海上保安庁 水路部",
-    currentEdition: "2024年版",
-    editionDate: "2024-01-01",
+    currentEdition: "2026年版",
+    editionDate: "2026-01-01",
     legalBasis: "SOLAS V/27",
     updateCycle: "年次",
     appliesTo: { flagState: "JPN" },
@@ -301,8 +304,8 @@ export const PUBLICATIONS: PublicationRef[] = [
     titleJa: "潮汐表",
     category: "B",
     publisher: "海上保安庁 水路部",
-    currentEdition: "2025年版",
-    editionDate: "2025-01-01",
+    currentEdition: "2026年版",
+    editionDate: "2026-01-01",
     legalBasis: "SOLAS V/27",
     updateCycle: "年次",
     appliesTo: { flagState: "JPN" },
@@ -313,8 +316,8 @@ export const PUBLICATIONS: PublicationRef[] = [
     titleJa: "天測暦",
     category: "B",
     publisher: "海上保安庁 水路部",
-    currentEdition: "2025年版",
-    editionDate: "2025-01-01",
+    currentEdition: "2026年版",
+    editionDate: "2026-01-01",
     legalBasis: "SOLAS V/27",
     updateCycle: "年次",
     appliesTo: { navigation: ["international"] },
