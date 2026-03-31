@@ -1,0 +1,43 @@
+name: Extract Applicability Rules
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '既存ルールも再抽出'
+        type: boolean
+        default: false
+      limit:
+        description: '処理件数制限（空欄=全件）'
+        type: string
+        default: ''
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: Extract applicability rules
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          LIMIT="${{ github.event.inputs.limit }}"
+          if [ -n "$LIMIT" ]; then
+            ARGS="$ARGS --limit $LIMIT"
+          fi
+          python scripts/extract_applicability_rules.py $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

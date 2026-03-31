@@ -1,10 +1,11 @@
 """
-マッチングエンジン v2 — 規制 × 船舶プロファイルの適用判定
+マッチングエンジン v3 — 規制 × 船舶プロファイルの適用判定
 =========================================================
-3段階マッチング:
-  Stage 0: 条約ベースマッチング（船に適用される条約のキーワード照合）
+4段階マッチング:
   Stage 1: ルールベースフィルタ（高速除外）
-  Stage 2: AI マッチング（Gemini、Stage 0/1 で判断できなかった場合のみ）
+  Stage 0: 条約ベースマッチング（船に適用される条約のキーワード照合）
+  Stage 2: applicability_rules 評価（API不要、JSONB ルール照合）
+  Stage 3: AI マッチング（Gemini、Stage 0/1/2 で判断できなかった場合のみ）
 
 使い方:
     from utils.matching import match_regulation_to_ship
@@ -694,6 +695,139 @@ JSON形式で回答:
         return result
 
 
+# ---------------------------------------------------------------------------
+# Stage 2: applicability_rules 評価（API不要）
+# ---------------------------------------------------------------------------
+
+def _not_applicable_result(reason: str) -> dict:
+    """applicability_rules 評価で非適用と判定された場合の結果 dict を返す。"""
+    return {
+        "is_applicable": False,
+        "match_method": "rule_evaluated",
+        "confidence": 0.95,
+        "reason": reason,
+        "conventions": [],
+        "actions": [],
+        "national_laws": [],
+        "certificates": [],
+        "onboard_actions": [],
+        "shore_actions": [],
+        "sms_chapters": [],
+        "effective_date": None,
+        "citations": [],
+        "needs_review": False,
+    }
+
+
+def evaluate_applicability_rules(regulation: dict, ship: dict) -> dict | None:
+    """
+    regulation の applicability_rules JSON を船舶スペックと照合し、
+    適用/非適用を判定する。Gemini API は呼ばない。
+
+    Args:
+        regulation: regulations テーブルの行 dict（applicability_rules JSONB を含む）
+        ship:       ship_profiles テーブルの行 dict
+
+    Returns:
+        判定結果 dict、または applicability_rules がない場合は None
+    """
+    rules = regulation.get("applicability_rules")
+    if not rules or not isinstance(rules, dict):
+        return None  # ルールなし → Stage 2 判定不能
+
+    # 船舶向けでない規制は即非適用
+    if rules.get("is_ship_regulation") is False:
+        return _not_applicable_result(
+            f"この規制は{rules.get('target_audience', '不明')}向けであり、船舶オペレーター向けではありません"
+        )
+
+    ship_type = ship.get("ship_type", "")
+    gt = ship.get("gross_tonnage", 0)
+    nav = ship.get("navigation_area") or []
+    flag = ship.get("flag_state", "")
+    build_year = ship.get("build_year", 0)
+    radio = ship.get("radio_equipment") or []
+
+    # 船種チェック（除外リスト）
+    excluded = rules.get("excluded_types") or []
+    if excluded and ship_type in excluded:
+        return _not_applicable_result(f"船種 {ship_type} は除外対象")
+
+    # 船種チェック（適用リスト）
+    rule_types = rules.get("ship_types") or []
+    if rule_types and ship_type not in rule_types:
+        return _not_applicable_result(
+            f"船種 {ship_type} は適用対象外 (対象: {rule_types})"
+        )
+
+    # GT チェック
+    gt_min = rules.get("gt_min")
+    gt_max = rules.get("gt_max")
+    if gt_min is not None and gt is not None and gt < gt_min:
+        return _not_applicable_result(f"GT {gt} < 下限 {gt_min}")
+    if gt_max is not None and gt is not None and gt > gt_max:
+        return _not_applicable_result(f"GT {gt} > 上限 {gt_max}")
+
+    # 航行区域チェック
+    rule_nav = rules.get("navigation") or []
+    if rule_nav and nav:
+        if not set(rule_nav) & set(nav):
+            return _not_applicable_result(
+                f"航行区域 {nav} は適用対象外 (対象: {rule_nav})"
+            )
+
+    # 旗国チェック
+    rule_flag = rules.get("flag_state")
+    if rule_flag and flag and flag != rule_flag:
+        return _not_applicable_result(
+            f"旗国 {flag} は適用対象外 (対象: {rule_flag})"
+        )
+
+    # 建造年チェック
+    build_after = rules.get("build_year_after")
+    build_before = rules.get("build_year_before")
+    if build_after and build_year and build_year < build_after:
+        return _not_applicable_result(f"建造年 {build_year} < {build_after}")
+    if build_before and build_year and build_year > build_before:
+        return _not_applicable_result(f"建造年 {build_year} > {build_before}")
+
+    # 無線設備チェック
+    rule_radio = rules.get("radio_equipment") or []
+    if rule_radio and not set(rule_radio) & set(radio):
+        return _not_applicable_result(f"必要な無線設備 {rule_radio} が未搭載")
+
+    # 全条件クリア → 適用
+    conventions = rules.get("conventions") or []
+    reason_parts = []
+    if rule_types:
+        reason_parts.append(f"船種 {ship_type} が適用対象")
+    if gt_min:
+        reason_parts.append(f"GT {gt} ≥ {gt_min}")
+    if conventions:
+        reason_parts.append(f"関連条約: {', '.join(conventions)}")
+
+    return {
+        "is_applicable": True,
+        "match_method": "rule_evaluated",
+        "confidence": 0.90,
+        "reason": "。".join(reason_parts) if reason_parts else "適用条件に合致",
+        "conventions": conventions,
+        "actions": [],
+        "national_laws": [],
+        "certificates": [],
+        "onboard_actions": regulation.get("onboard_actions") or [],
+        "shore_actions": regulation.get("shore_actions") or [],
+        "sms_chapters": regulation.get("sms_chapters") or [],
+        "effective_date": None,
+        "citations": [],
+        "needs_review": False,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: AI マッチング（Gemini） — フォールバック
+# ---------------------------------------------------------------------------
+
 def ai_match(
     regulation: dict,
     ship: dict,
@@ -813,9 +947,10 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
     """
     規制と船舶プロファイルの3段階マッチングを実行する。
 
-    Stage 0: _convention_match — 条約ベースキーワード照合（高速・高精度）
-    Stage 1: rule_based_filter — 高速除外（Gemini 不使用）
-    Stage 2: ai_match          — Gemini による精密判定（Stage 0/1 で判断できなかった場合のみ）
+    Stage 1: rule_based_filter           — 高速除外（Gemini 不使用）
+    Stage 0: _convention_match           — 条約ベースキーワード照合（高速・高精度）
+    Stage 2: evaluate_applicability_rules — applicability_rules JSONB 評価（API不要）
+    Stage 3: ai_match                    — Gemini による精密判定（フォールバック）
 
     Args:
         regulation: regulations テーブルの行 dict
@@ -888,8 +1023,17 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
             "needs_review": False,
         }
 
-    # --- Stage 2: AI マッチング（条約コンテキスト付き） ---
-    logger.info(f"[Stage2] AI マッチング開始: regulation={source_label}")
+    # --- Stage 2: applicability_rules 評価（API不要） ---
+    rules_result = evaluate_applicability_rules(regulation, ship)
+    if rules_result is not None:
+        logger.info(
+            f"[Stage2] {rules_result['match_method']}: "
+            f"is_applicable={rules_result['is_applicable']} regulation={source_label}"
+        )
+        return rules_result
+
+    # --- Stage 3: Gemini AI フォールバック（applicability_rules がない場合のみ） ---
+    logger.info(f"[Stage3] applicability_rules なし → Gemini AI フォールバック: regulation={source_label}")
     ai_result = ai_match(regulation, ship, compliance=compliance)
 
     confidence = ai_result.get("confidence", 0.0)
