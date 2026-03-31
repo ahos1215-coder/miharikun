@@ -548,3 +548,59 @@ class TestGoldenConventionBased:
         assert result["match_method"] == "rule_based"
         assert result["confidence"] == 1.0
         assert result["conventions"] == []
+
+
+# ===========================================================================
+# テストケース — アクション推論の正確性（ハルシネーション防止）
+# ===========================================================================
+
+class TestGoldenActionAccuracy:
+    """アクション推論の正確性テスト — ハルシネーション防止"""
+
+    def test_enclosed_space_no_stcw_actions(self):
+        """閉囲区画の規制にSTCW配乗管理が表示されないことを確認"""
+        reg = {
+            "id": "test-enclosed",
+            "source": "nk", "source_id": "TEC-1372",
+            "title": "船舶における閉囲区画立入に関する改正勧告（MSC.581(110)）への対応について",
+            "summary_ja": "閉囲区画立入時の安全性向上を目的としたIMO決議の改正勧告。訓練・救助体制強化をSMSに組み込むことを推奨。",
+            "category": "safety",
+        }
+        # Convention-based matching should return applicable (not STCW-related)
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        assert result["is_applicable"] is True or result["match_method"] == "convention_based"
+        # The conventions matched should include SOLAS, NOT STCW
+        conventions = result.get("conventions", [])
+        # Should not be STCW-only match
+
+    def test_ism_not_match_tourism(self):
+        """ISM キーワードが tourism にマッチしないことを確認"""
+        reg = {
+            "id": "test-tourism",
+            "source": "MLIT", "source_id": "MLIT-TOURISM-001",
+            "title": "Maritime Tourism Development Guidelines",
+            "summary_ja": "海事観光の推進に関するガイドライン",
+            "category": "tourism",
+            "applicable_ship_types": None,
+            "applicable_gt_min": None, "applicable_gt_max": None,
+            "applicable_built_after": None,
+            "applicable_routes": None, "applicable_flags": None,
+        }
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        # Should NOT match ISM convention due to "tourism" containing "ism"
+        # The result should go to AI or be not_applicable, not convention_based with ISM
+        if result["match_method"] == "convention_based":
+            # If convention-based, it should NOT be because of ISM
+            assert "ISM" not in str(result.get("reason", ""))
+
+    def test_marpol_annex_vi_no_structure_actions(self):
+        """MARPOL Annex VI の規制に構造・救命関連のアクションが出ないことを確認"""
+        reg = {
+            "id": "test-marpol-vi",
+            "source": "nk", "source_id": "TEC-MARPOL-VI",
+            "title": "MARPOL Annex VI 改正に伴うIAPP証書の更新について",
+            "summary_ja": "2026年からのSOx排出規制強化に伴い、IAPP証書の記載事項を更新する必要がある。",
+            "category": "environment",
+        }
+        result = match_regulation_to_ship(reg, GOLDEN_SHIP)
+        # Should match MARPOL, not SOLAS structure

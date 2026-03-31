@@ -44,6 +44,11 @@ try:
 except ImportError:
     from ship_compliance import determine_compliance, get_applicable_keywords
 
+try:
+    from utils.validation import validate_matching
+except ImportError:
+    from validation import validate_matching
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -70,6 +75,24 @@ _TEMPERATURE = 0.1
 
 # confidence < この閾値の場合は "needs_review" フラグを立てる（フロント側で「要確認」表示）
 _REVIEW_THRESHOLD = 0.7
+
+
+# ---------------------------------------------------------------------------
+# キーワードマッチングヘルパー
+# ---------------------------------------------------------------------------
+
+def _keyword_in_text(keyword: str, text: str) -> bool:
+    """
+    キーワードがテキスト内に存在するか判定。
+    英語キーワード: 単語境界マッチ（ISM が tourism にマッチしないように）
+    日本語キーワード: 部分文字列マッチ
+    """
+    kw_lower = keyword.lower()
+    # ASCII only かつ英字のみ = English keyword → use word boundary
+    if kw_lower.isascii() and kw_lower.isalpha():
+        return bool(re.search(r'\b' + re.escape(kw_lower) + r'\b', text, re.IGNORECASE))
+    else:
+        return kw_lower in text
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +219,7 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
                 "船舶", "船上", "搭載", "乗組員", "航行",
                 "solas", "marpol", "stcw", "ism",
             ]
-            if not any(sk in combined_text for sk in _SHIP_OVERRIDE_KEYWORDS):
+            if not any(_keyword_in_text(sk, combined_text) for sk in _SHIP_OVERRIDE_KEYWORDS):
                 logger.debug(
                     f"[rule] not_applicable: インフラ/施設キーワード {kw!r} がヒット"
                 )
@@ -234,7 +257,7 @@ def _convention_match(regulation: dict, compliance: list[dict]) -> dict | None:
         if conv["status"] == "not_applicable":
             continue
         for kw in conv.get("keywords", []):
-            if kw.lower() in reg_text:
+            if _keyword_in_text(kw, reg_text):
                 matched.append(conv)
                 break
 
@@ -493,6 +516,106 @@ def _parse_json_response(text: str) -> dict:
         return {}
 
 
+def _verify_matching_result(
+    regulation: dict,
+    ship: dict,
+    initial_result: dict,
+) -> dict:
+    """
+    Chain of Verification (CoVe) — 低確信度の結果を検証して精度を向上させる。
+    confidence 0.4-0.84 の結果のみ対象。それ以外はそのまま返す。
+    """
+    confidence = initial_result.get("confidence", 0.0)
+
+    # 高確信度 (>= 0.85) または極低確信度 (< 0.4) はスキップ
+    if confidence >= 0.85 or confidence < 0.4:
+        return initial_result
+
+    logger.info(f"[CoVe] 検証開始: confidence={confidence:.2f}")
+
+    # Step 1: 検証質問を生成
+    reason = initial_result.get("reason", "")
+    is_applicable = initial_result.get("is_applicable")
+    reg_title = regulation.get("title", "")
+    ship_type = ship.get("ship_type", "")
+    gt = ship.get("gross_tonnage", "不明")
+
+    verification_prompt = f"""以下のAI判定結果を検証してください。
+
+判定対象:
+- 規制: {reg_title}
+- 船舶: {ship_type}, GT {gt}
+- 判定: {"該当" if is_applicable else "非該当"}
+- 理由: {reason}
+
+以下の3つの検証質問に、規制の内容のみに基づいて簡潔に回答してください:
+
+1. この規制は本当に{ship_type}（総トン数{gt}GT）に適用されるか？適用条件を引用せよ。
+2. 判定理由に記載されたGT閾値や船種条件は、規制文書に実際に記載されているか？
+3. この規制への対応として挙げられた事項は、規制の内容と矛盾していないか？
+
+JSON形式で回答:
+```json
+{{
+  "q1_answer": "回答",
+  "q1_verified": true/false,
+  "q2_answer": "回答",
+  "q2_verified": true/false,
+  "q3_answer": "回答",
+  "q3_verified": true/false,
+  "corrected_applicable": true/false/null,
+  "corrected_confidence": 0.0-1.0,
+  "correction_reason": "修正理由（修正がない場合は空文字）"
+}}
+```"""
+
+    # Step 2: Gemini に検証を依頼
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+
+    success, text = _call_gemini_text(model, api_key, verification_prompt)
+    if not success:
+        logger.warning(f"[CoVe] 検証API呼び出し失敗: {text[:100]}")
+        return initial_result
+
+    # Step 3: 検証結果をパース
+    verification = _parse_json_response(text)
+    if not verification:
+        logger.warning("[CoVe] 検証結果のパース失敗")
+        return initial_result
+
+    # Step 4: 検証結果に基づいて修正
+    verified_count = sum(1 for k in ["q1_verified", "q2_verified", "q3_verified"] if verification.get(k, False))
+
+    logger.info(f"[CoVe] 検証結果: {verified_count}/3 verified")
+
+    if verified_count >= 2:
+        # 2/3以上検証成功 → 元の結果を信頼、ただし confidence を少し上げる
+        result = initial_result.copy()
+        result["confidence"] = min(1.0, confidence + 0.1)
+        logger.info(f"[CoVe] 検証パス: confidence {confidence:.2f} → {result['confidence']:.2f}")
+        return result
+    else:
+        # 検証失敗 → 修正結果を採用
+        corrected_applicable = verification.get("corrected_applicable")
+        corrected_confidence = verification.get("corrected_confidence", confidence * 0.5)
+        correction_reason = verification.get("correction_reason", "")
+
+        result = initial_result.copy()
+        if corrected_applicable is not None:
+            result["is_applicable"] = corrected_applicable
+        result["confidence"] = max(0.0, min(1.0, float(corrected_confidence)))
+        if correction_reason:
+            result["reason"] = f"{result['reason']} [CoVe修正: {correction_reason}]"
+        result["needs_review"] = True
+
+        logger.info(
+            f"[CoVe] 修正適用: applicable={corrected_applicable}, "
+            f"confidence={result['confidence']:.2f}, reason={correction_reason[:50]}"
+        )
+        return result
+
+
 def ai_match(
     regulation: dict,
     ship: dict,
@@ -549,6 +672,8 @@ def ai_match(
                     last_error = "JSON 抽出失敗"
                     break
 
+                parsed = validate_matching(parsed)  # Pydantic バリデーション
+
                 is_applicable = parsed.get("is_applicable")
                 confidence = float(parsed.get("confidence", 0.0))
                 reason = parsed.get("reason", "")
@@ -558,7 +683,7 @@ def ai_match(
                     f"[AI] 判定完了 regulation={source_label} "
                     f"is_applicable={is_applicable} confidence={confidence:.2f}"
                 )
-                return {
+                ai_result = {
                     "is_applicable": is_applicable,
                     "confidence": confidence,
                     "reason": reason,
@@ -568,6 +693,11 @@ def ai_match(
                     "effective_date": parsed.get("effective_date"),
                     "citations": citations,
                 }
+
+                # CoVe verification for medium-confidence results
+                ai_result = _verify_matching_result(regulation, ship, ai_result)
+
+                return ai_result
 
             last_error = str(result)
             if not _should_retry(last_error):

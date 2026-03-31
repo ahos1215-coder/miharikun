@@ -58,6 +58,9 @@ export interface Regulation {
   applicable_ship_types: string[] | null;
   applicable_gt_min: number | null;
   applicable_gt_max: number | null;
+  onboard_actions: string[] | null;
+  shore_actions: string[] | null;
+  sms_chapters: string[] | null;
   created_at: string;
 }
 

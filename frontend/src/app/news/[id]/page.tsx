@@ -15,6 +15,8 @@ import {
   FileCheck,
   Anchor,
   Building2,
+  Brain,
+  Info,
 } from "lucide-react";
 import type { Metadata } from "next";
 import type { Regulation, Severity, Citation } from "@/lib/types";
@@ -438,6 +440,21 @@ function inferDetailedActions(
   return { onboard, shore };
 }
 
+const SMS_TITLES: Record<string, string> = {
+  "1": "一般",
+  "2": "安全及び環境保護に関する方針",
+  "3": "会社の責任と権限",
+  "4": "管理責任者の指定",
+  "5": "船長の責任と権限",
+  "6": "資源及び人員",
+  "7": "船上作業の計画の策定",
+  "8": "緊急事態への準備",
+  "9": "不適合、事故及び危険な状態の報告及び分析",
+  "10": "船舶及び設備の保守整備",
+  "11": "文書管理",
+  "12": "会社による検証、見直し及び評価",
+};
+
 async function fetchRegulation(id: string): Promise<Regulation | null> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -575,12 +592,107 @@ export default async function RegulationDetailPage({
         })()}
 
         {(() => {
-          const { onboard, shore } = inferDetailedActions(reg.category, reg.title, reg.summary_ja);
+          const hasGeminiActions =
+            (reg.onboard_actions?.length ?? 0) > 0 ||
+            (reg.shore_actions?.length ?? 0) > 0;
+
+          if (hasGeminiActions) {
+            // Priority 1: Gemini AI data from DB
+            return (
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-zinc-500">
+                    想定対応事項
+                  </h2>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    <Brain size={11} />
+                    AI分析に基づく対応事項
+                  </span>
+                </div>
+
+                {(reg.onboard_actions?.length ?? 0) > 0 && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-blue-700 dark:text-blue-400 mb-3">
+                      <Anchor size={14} />
+                      船側対応（Onboard Action）
+                    </h3>
+                    <ul className="ml-4 space-y-1.5">
+                      {reg.onboard_actions!.map((action, i) => (
+                        <li
+                          key={i}
+                          className="text-sm text-zinc-700 dark:text-zinc-300 list-disc"
+                        >
+                          {action}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {(reg.shore_actions?.length ?? 0) > 0 && (
+                  <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900 dark:bg-purple-950/20">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-purple-700 dark:text-purple-400 mb-3">
+                      <Building2 size={14} />
+                      会社側対応（Shore-side Action）
+                    </h3>
+                    <ul className="ml-4 space-y-1.5">
+                      {reg.shore_actions!.map((action, i) => (
+                        <li
+                          key={i}
+                          className="text-sm text-zinc-700 dark:text-zinc-300 list-disc"
+                        >
+                          {action}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {(reg.sms_chapters?.length ?? 0) > 0 && (
+                  <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                    <h3 className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-2">
+                      <BookOpen size={12} />
+                      関連 SMS 章
+                    </h3>
+                    <ul className="ml-4 space-y-0.5">
+                      {reg.sms_chapters!.map((ch, i) => {
+                        const chapterNum = ch.replace(/[^0-9]/g, "");
+                        const title = SMS_TITLES[chapterNum];
+                        return (
+                          <li
+                            key={i}
+                            className="text-xs text-zinc-600 dark:text-zinc-400 list-disc"
+                          >
+                            {title
+                              ? `参考: SMS 第${chapterNum}章 ${title}`
+                              : `参考: SMS ${ch}`}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // Priority 2: Keyword inference fallback
+          const { onboard, shore } = inferDetailedActions(
+            reg.category,
+            reg.title,
+            reg.summary_ja
+          );
           return (
             <div className="mb-6 space-y-4">
-              <h2 className="text-sm font-semibold text-zinc-500">
-                想定対応事項
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-zinc-500">
+                  想定対応事項
+                </h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  <Info size={11} />
+                  キーワード推論に基づく参考情報（精度が低い場合があります）
+                </span>
+              </div>
 
               {onboard.length > 0 && (
                 <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
@@ -599,7 +711,10 @@ export default async function RegulationDetailPage({
                           </div>
                           <ul className="ml-5 space-y-0.5">
                             {a.details.map((d, i) => (
-                              <li key={i} className="text-xs text-zinc-600 dark:text-zinc-400 list-disc">
+                              <li
+                                key={i}
+                                className="text-xs text-zinc-600 dark:text-zinc-400 list-disc"
+                              >
                                 {d}
                               </li>
                             ))}
@@ -628,7 +743,10 @@ export default async function RegulationDetailPage({
                           </div>
                           <ul className="ml-5 space-y-0.5">
                             {a.details.map((d, i) => (
-                              <li key={i} className="text-xs text-zinc-600 dark:text-zinc-400 list-disc">
+                              <li
+                                key={i}
+                                className="text-xs text-zinc-600 dark:text-zinc-400 list-disc"
+                              >
                                 {d}
                               </li>
                             ))}
