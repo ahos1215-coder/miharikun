@@ -168,6 +168,7 @@ export default async function DashboardPage({
       navigation_area: ship.navigation_area,
       flag_state: ship.flag_state,
       classification_society: ship.classification_society,
+      radio_equipment: ship.radio_equipment ?? [],
     });
 
     return {

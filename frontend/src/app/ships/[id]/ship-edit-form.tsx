@@ -6,6 +6,7 @@ import {
   SHIP_TYPE_LABELS,
   CLASSIFICATION_LABELS,
   NAV_AREA_LABELS,
+  RADIO_EQUIPMENT_LABELS,
   ShipProfile,
   ShipType,
   ClassificationSociety,
@@ -22,6 +23,7 @@ const inputClass =
 const shipTypes = Object.keys(SHIP_TYPE_LABELS) as ShipType[];
 const classificationSocieties = Object.keys(CLASSIFICATION_LABELS) as ClassificationSociety[];
 const navAreas = Object.keys(NAV_AREA_LABELS) as NavigationArea[];
+const radioEquipmentOptions = Object.keys(RADIO_EQUIPMENT_LABELS);
 
 interface ShipEditFormProps {
   ship: ShipProfile;
@@ -47,6 +49,11 @@ export function ShipEditForm({ ship }: ShipEditFormProps) {
     ship.routes ? ship.routes.join(", ") : "",
   );
   const [imoNumber, setImoNumber] = useState(ship.imo_number ?? "");
+  const [radioEquipment, setRadioEquipment] = useState<string[]>(ship.radio_equipment ?? []);
+
+  function handleRadioChange(eq: string, checked: boolean) {
+    setRadioEquipment(prev => checked ? [...prev, eq] : prev.filter(e => e !== eq));
+  }
 
   function handleNavAreaChange(area: NavigationArea, checked: boolean) {
     setNavigationArea((prev) =>
@@ -82,6 +89,7 @@ export function ShipEditForm({ ship }: ShipEditFormProps) {
           ? routes.split(",").map((r) => r.trim()).filter(Boolean)
           : null,
         imo_number: imoNumber || null,
+        radio_equipment: radioEquipment,
       })
       .eq("id", ship.id);
 
@@ -343,6 +351,30 @@ export function ShipEditForm({ ship }: ShipEditFormProps) {
                 placeholder="例: 東京-シンガポール, 横浜-ロサンゼルス"
                 className={inputClass}
               />
+            </div>
+          </fieldset>
+
+          {/* --- 無線設備 --- */}
+          <fieldset className="space-y-4">
+            <legend className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+              無線設備
+            </legend>
+            <div className="border-t border-zinc-100 dark:border-zinc-800" />
+            <div>
+              <span className="block text-sm font-medium">搭載設備（複数選択可）</span>
+              <div className="mt-2 space-y-2">
+                {radioEquipmentOptions.map((eq) => (
+                  <label key={eq} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={radioEquipment.includes(eq)}
+                      onChange={(e) => handleRadioChange(eq, e.target.checked)}
+                      className="accent-blue-600 h-4 w-4"
+                    />
+                    {RADIO_EQUIPMENT_LABELS[eq]}
+                  </label>
+                ))}
+              </div>
             </div>
           </fieldset>
 

@@ -33,6 +33,7 @@ export interface ShipProfile {
   navigation_area: NavigationArea[];
   routes: string[] | null;
   imo_number: string | null;
+  radio_equipment: string[];
   created_at: string;
   updated_at: string;
 }
@@ -201,4 +202,15 @@ export const PUBLICATION_STATUS_LABELS: Record<PublicationStatus, string> = {
   missing: "未所持",
   unknown: "未確認",
   not_required: "不要",
+};
+
+export const RADIO_EQUIPMENT_LABELS: Record<string, string> = {
+  gmdss_a1: "GMDSS A1 海域",
+  gmdss_a2: "GMDSS A2 海域",
+  gmdss_a3: "GMDSS A3 海域",
+  gmdss_a4: "GMDSS A4 海域",
+  ais: "AIS (自動船舶識別装置)",
+  vdr: "VDR (航海情報記録装置)",
+  lrit: "LRIT (長距離船舶識別追跡)",
+  ssas: "SSAS (船舶保安警報装置)",
 };

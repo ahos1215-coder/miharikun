@@ -22,6 +22,7 @@ export interface PublicationRef {
     navigation?: string[];
     flagState?: string;
     classSociety?: string;
+    radioEquipment?: string[];
   };
 }
 
@@ -466,6 +467,68 @@ export const PUBLICATIONS: PublicationRef[] = [
     updateCycle: "随時改訂",
     appliesTo: { navigation: ["international"] },
   },
+
+  // ─── GMDSS / 無線設備関連 ───
+  {
+    id: "GMDSS_HANDBOOK",
+    title: "GMDSS Manual",
+    titleJa: "GMDSS マニュアル",
+    category: "A",
+    publisher: "IMO",
+    currentEdition: "2019 Edition",
+    editionDate: "2019-01-01",
+    legalBasis: "SOLAS Chapter IV",
+    updateCycle: "不定期",
+    appliesTo: { radioEquipment: ["gmdss_a1", "gmdss_a2", "gmdss_a3", "gmdss_a4"] },
+  },
+  {
+    id: "ITU_RADIO_REGULATIONS",
+    title: "ITU Radio Regulations",
+    titleJa: "ITU 無線通信規則",
+    category: "A",
+    publisher: "ITU",
+    currentEdition: "2020 Edition",
+    editionDate: "2020-01-01",
+    legalBasis: "SOLAS IV / 電波法",
+    updateCycle: "約4年 (WRC後)",
+    appliesTo: { radioEquipment: ["gmdss_a1", "gmdss_a2", "gmdss_a3", "gmdss_a4"] },
+  },
+  {
+    id: "RADIO_OPERATION_RULES",
+    title: "無線局運用規則集",
+    titleJa: "無線局運用規則集",
+    category: "C",
+    publisher: "電波振興会",
+    currentEdition: "2024年版",
+    editionDate: "2024-04-01",
+    legalBasis: "電波法",
+    updateCycle: "年次",
+    appliesTo: { flagState: "JPN", radioEquipment: ["gmdss_a1", "gmdss_a2", "gmdss_a3", "gmdss_a4"] },
+  },
+  {
+    id: "AIS_OPERATING_GUIDELINES",
+    title: "AIS Operating Guidelines",
+    titleJa: "AIS 運用ガイドライン",
+    category: "B",
+    publisher: "IMO",
+    currentEdition: "SN.1/Circ.334",
+    editionDate: "2019-12-01",
+    legalBasis: "SOLAS V/19.2",
+    updateCycle: "不定期",
+    appliesTo: { radioEquipment: ["ais"] },
+  },
+  {
+    id: "VDR_GUIDELINES",
+    title: "VDR Performance Standards & Guidelines",
+    titleJa: "VDR 性能基準・ガイドライン",
+    category: "B",
+    publisher: "IMO",
+    currentEdition: "MSC.333(90)",
+    editionDate: "2012-05-01",
+    legalBasis: "SOLAS V/20",
+    updateCycle: "不定期",
+    appliesTo: { radioEquipment: ["vdr"] },
+  },
 ];
 
 /**
@@ -477,6 +540,7 @@ export function getRequiredPublications(ship: {
   navigation_area: string[];
   flag_state: string;
   classification_society: string;
+  radio_equipment?: string[];
 }): PublicationRef[] {
   return PUBLICATIONS.filter((pub) => {
     const a = pub.appliesTo;
@@ -486,6 +550,7 @@ export function getRequiredPublications(ship: {
     if (a.navigation && !a.navigation.some((n) => ship.navigation_area.includes(n))) return false;
     if (a.flagState && ship.flag_state !== a.flagState) return false;
     if (a.classSociety && ship.classification_society !== a.classSociety) return false;
+    if (a.radioEquipment && !(ship.radio_equipment ?? []).some(r => a.radioEquipment!.includes(r))) return false;
     return true;
   });
 }

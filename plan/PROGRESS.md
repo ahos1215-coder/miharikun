@@ -280,7 +280,7 @@
 - [x] matching.py: _passes_exclusion_check() で cross-contamination 防止 ✅
 - [x] ship_compliance.py: convention_id が "UNKNOWN" になるバグ修正 (rule["id"] を使用) ✅
 - [x] 全70テスト通過 + TSC エラーゼロ ✅
-- [ ] **ユーザー作業**: 00008_feedback.sql を Supabase ダッシュボードで実行
+- [x] **ユーザー作業**: 00008_feedback.sql を Supabase ダッシュボードで実行 ✅
 
 ### Vibe OS 導入 + Maritime Command Center（2026-03-31）
 - [x] plan/PERSONAS.md 新規作成 (4ロール自動憑依システム) ✅
@@ -306,13 +306,25 @@
 - [x] publication-stats.tsx: 4カードサマリー + カウントアップアニメーション ✅
 - [x] TypeScript型: Publication, ShipPublication + ラベル定義 ✅
 - [x] テスト: 51テスト全通過 (全体121テスト) + TSC + next build 全パス ✅
-- [ ] **ユーザー作業**: 00009_publications.sql を Supabase ダッシュボードで実行
+- [x] **ユーザー作業**: 00009_publications.sql を Supabase ダッシュボードで実行 ✅
+
+### 法定図書自動マッピング完全版（2026-03-31）
+- [x] 00010_radio_equipment.sql: ship_profiles に radio_equipment (GMDSS/AIS/VDR等) 追加 ✅
+- [x] 無線設備関連書籍5件追加 (GMDSS Manual/ITU/無線局運用規則/AIS/VDR) ✅
+- [x] 船舶登録・編集フォームに無線設備チェックボックス追加 ✅
+- [x] seed_publications.py: 67書籍マスターデータの初期投入スクリプト ✅
+- [x] check_publication_updates.py: 週次版数チェッカー (5発行元フレームワーク) ✅
+- [x] GHA: seed-publications.yml (手動) + check-publications.yml (週次月曜) ✅
+- [x] ステータス可視化: Green(最新)/Amber(要確認)/Red(要更新) ダッシュボード表示 ✅
+- [x] 全121テスト通過 + TSC + next build 全パス ✅
+- [ ] **ユーザー作業**: 00010_radio_equipment.sql を Supabase ダッシュボードで実行
+- [ ] **ユーザー作業**: GHA で seed-publications を手動実行（書籍マスターデータ投入）
 
 ### 残タスク
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定
 - [ ] RESEND_API_KEY を Vercel env に設定
 - [ ] 00008_feedback.sql を Supabase ダッシュボードで実行
-- [ ] 00009_publications.sql を Supabase ダッシュボードで実行
+- [x] 00009_publications.sql を Supabase ダッシュボードで実行 ✅
 - [ ] フロントエンド単体テスト (Jest/Vitest)
 - [ ] Gemini プロンプトの DSPy 最適化 (本番フィードバック蓄積後)
 - [ ] LlamaIndex RAG (条約原文のインデキシング、将来)

@@ -5,6 +5,7 @@ import {
   SHIP_TYPE_LABELS,
   CLASSIFICATION_LABELS,
   NAV_AREA_LABELS,
+  RADIO_EQUIPMENT_LABELS,
   ShipType,
   ClassificationSociety,
   NavigationArea,
@@ -19,6 +20,7 @@ const inputClass =
 const shipTypes = Object.keys(SHIP_TYPE_LABELS) as ShipType[];
 const classificationSocieties = Object.keys(CLASSIFICATION_LABELS) as ClassificationSociety[];
 const navAreas = Object.keys(NAV_AREA_LABELS) as NavigationArea[];
+const radioEquipmentOptions = Object.keys(RADIO_EQUIPMENT_LABELS);
 
 export default function ShipNewPage() {
   const router = useRouter();
@@ -36,6 +38,11 @@ export default function ShipNewPage() {
   const [navigationArea, setNavigationArea] = useState<NavigationArea[]>([]);
   const [routes, setRoutes] = useState("");
   const [imoNumber, setImoNumber] = useState("");
+  const [radioEquipment, setRadioEquipment] = useState<string[]>([]);
+
+  function handleRadioChange(eq: string, checked: boolean) {
+    setRadioEquipment(prev => checked ? [...prev, eq] : prev.filter(e => e !== eq));
+  }
 
   function handleNavAreaChange(area: NavigationArea, checked: boolean) {
     setNavigationArea((prev) =>
@@ -81,6 +88,7 @@ export default function ShipNewPage() {
           ? routes.split(",").map((r) => r.trim()).filter(Boolean)
           : null,
         imo_number: imoNumber || null,
+        radio_equipment: radioEquipment,
       });
 
     if (insertError) {
@@ -303,6 +311,30 @@ export default function ShipNewPage() {
                 placeholder="例: 東京-シンガポール, 横浜-ロサンゼルス"
                 className={inputClass}
               />
+            </div>
+          </fieldset>
+
+          {/* --- 無線設備 --- */}
+          <fieldset className="space-y-4">
+            <legend className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+              無線設備
+            </legend>
+            <div className="border-t border-zinc-100 dark:border-zinc-800" />
+            <div>
+              <span className="block text-sm font-medium">搭載設備（複数選択可）</span>
+              <div className="mt-2 space-y-2">
+                {radioEquipmentOptions.map((eq) => (
+                  <label key={eq} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={radioEquipment.includes(eq)}
+                      onChange={(e) => handleRadioChange(eq, e.target.checked)}
+                      className="accent-blue-600 h-4 w-4"
+                    />
+                    {RADIO_EQUIPMENT_LABELS[eq]}
+                  </label>
+                ))}
+              </div>
             </div>
           </fieldset>
 
