@@ -10,6 +10,11 @@ import {
   GraduationCap,
   FileCheck,
   ClipboardList,
+  Ship,
+  Anchor,
+  Shield,
+  BookOpen,
+  CalendarClock,
 } from "lucide-react";
 import type {
   ShipProfile,
@@ -20,6 +25,8 @@ import type {
 } from "@/lib/types";
 import { SHIP_TYPE_LABELS } from "@/lib/types";
 import { PotentialMatchCard } from "./PotentialMatchCard";
+
+/* ──────────────────── helpers ──────────────────── */
 
 function severityBadge(severity: Severity) {
   switch (severity) {
@@ -32,14 +39,13 @@ function severityBadge(severity: Severity) {
   }
 }
 
-function applicabilityLabel(isApplicable: boolean | null) {
-  if (isApplicable === true) {
-    return <Badge variant="success">該当</Badge>;
-  }
-  if (isApplicable === false) {
-    return <Badge variant="info">非該当</Badge>;
-  }
-  return <Badge variant="action">判定中</Badge>;
+function sourceBadge(source: string | undefined) {
+  if (!source) return null;
+  const s = source.toLowerCase();
+  if (s === "nk" || s.includes("classnk")) return <Badge variant="nk">NK</Badge>;
+  if (s === "mlit" || s.includes("国土交通")) return <Badge variant="mlit">MLIT</Badge>;
+  if (s === "egov" || s.includes("e-gov")) return <Badge variant="egov">e-Gov</Badge>;
+  return null;
 }
 
 function formatDate(dateStr: string | null) {
@@ -51,7 +57,102 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-// --- Action item detection from reason text ---
+/* ──────────────── responsibility badges ──────────────── */
+
+type Responsibility = "ship" | "company";
+
+const SHIP_KEYWORDS = [
+  "訓練", "操練", "点検", "掲示", "周知", "乗組員",
+  "ドリル", "記録", "船上", "乗組",
+];
+const COMPANY_KEYWORDS = [
+  "SMS", "証書", "機材", "図面", "改訂", "調達",
+  "船級", "survey", "Survey", "検査受検", "設備工事",
+];
+
+function inferResponsibilities(text: string): Responsibility[] {
+  const result: Responsibility[] = [];
+  if (SHIP_KEYWORDS.some((kw) => text.includes(kw))) result.push("ship");
+  if (COMPANY_KEYWORDS.some((kw) => text.includes(kw))) result.push("company");
+  return result;
+}
+
+function responsibilityBadges(responsibilities: Responsibility[]) {
+  return responsibilities.map((r) =>
+    r === "ship" ? (
+      <span
+        key="ship"
+        className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+      >
+        <Anchor size={10} />
+        船側対応
+      </span>
+    ) : (
+      <span
+        key="company"
+        className="inline-flex items-center gap-0.5 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+      >
+        <Shield size={10} />
+        会社側対応
+      </span>
+    )
+  );
+}
+
+/* ──────────────── SMS chapter inference ──────────────── */
+
+interface SmsChapter {
+  chapter: string;
+  title: string;
+}
+
+const SMS_CHAPTER_MAP: { patterns: RegExp; chapter: SmsChapter }[] = [
+  {
+    patterns: /方針|安全.*環境.*方針|ISM.*目的/,
+    chapter: { chapter: "第2章", title: "安全及び環境保護の方針" },
+  },
+  {
+    patterns: /責任.*権限|指定者|DPA/i,
+    chapter: { chapter: "第3章", title: "会社の責任及び権限" },
+  },
+  {
+    patterns: /訓練|資格|manning|配乗|教育/i,
+    chapter: { chapter: "第6章", title: "資源及び人員" },
+  },
+  {
+    patterns: /閉囲区画|立入|作業手順|荷役|係留|船上作業/,
+    chapter: { chapter: "第7章", title: "船上作業の計画の策定" },
+  },
+  {
+    patterns: /緊急|非常|火災|退船|遭難|捜索救助|浸水/,
+    chapter: { chapter: "第8章", title: "緊急事態への準備" },
+  },
+  {
+    patterns: /不適合|事故|インシデント|報告.*分析/,
+    chapter: { chapter: "第9章", title: "不適合、事故及び危険発生の報告及び分析" },
+  },
+  {
+    patterns: /保守|整備|点検|メンテナンス|予防保全/,
+    chapter: { chapter: "第10章", title: "船舶及び設備の保守整備" },
+  },
+  {
+    patterns: /文書|記録|書類|管理.*体制/,
+    chapter: { chapter: "第11章", title: "文書管理" },
+  },
+  {
+    patterns: /内部監査|検証|レビュー/,
+    chapter: { chapter: "第12章", title: "会社による検証、レビュー及び評価" },
+  },
+];
+
+function inferSmsChapter(text: string): SmsChapter | null {
+  for (const { patterns, chapter } of SMS_CHAPTER_MAP) {
+    if (patterns.test(text)) return chapter;
+  }
+  return null;
+}
+
+/* ──────────────── action item detection ──────────────── */
 
 interface ActionItem {
   label: string;
@@ -100,6 +201,14 @@ const ACTION_PATTERNS: { pattern: RegExp; item: ActionItem }[] = [
       colorClass: "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300",
     },
   },
+  {
+    pattern: /点検.*記録|点検記録|定期点検/,
+    item: {
+      label: "点検記録",
+      icon: <BookOpen size={12} />,
+      colorClass: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+    },
+  },
 ];
 
 function extractActionItems(reason: string | null): ActionItem[] {
@@ -113,7 +222,7 @@ function extractActionItems(reason: string | null): ActionItem[] {
   return items;
 }
 
-// --- National law extraction from reason text ---
+/* ──────────────── national law extraction ──────────────── */
 
 const NATIONAL_LAW_PATTERNS = [
   /船舶救命設備規則/,
@@ -144,7 +253,53 @@ function extractNationalLaws(reason: string | null): string[] {
   return [...new Set(laws)];
 }
 
-/** Staggered animation delay for ship cards */
+/* ──────────────── category tab definitions ──────────────── */
+
+interface CategoryTab {
+  key: string;
+  label: string;
+  keywords: RegExp | null;
+}
+
+const CATEGORY_TABS: CategoryTab[] = [
+  { key: "all", label: "全て", keywords: null },
+  {
+    key: "solas",
+    label: "SOLAS / 安全",
+    keywords: /SOLAS|安全|救命|消防|防火|航海|操舵|無線|復原性|構造/i,
+  },
+  {
+    key: "marpol",
+    label: "MARPOL / 環境",
+    keywords: /MARPOL|環境|排出|汚染|バラスト|硫黄|NOx|SOx|GHG|CII|EEDI|EEXI|温室/i,
+  },
+  {
+    key: "stcw",
+    label: "STCW / 船員",
+    keywords: /STCW|MLC|船員|乗組員|資格|manning|配乗|労働|当直|訓練/i,
+  },
+  {
+    key: "national",
+    label: "国内法 / 旗国",
+    keywords: /国内法|旗国|船舶安全法|海防法|船員法|港則|海上交通|船舶職員|JG|MLIT|e-Gov|国土交通/i,
+  },
+];
+
+type MatchWithReg = UserMatch & { regulation?: Regulation };
+
+function matchesTab(m: MatchWithReg, tab: CategoryTab): boolean {
+  if (!tab.keywords) return true;
+  const searchText = [
+    m.regulation?.title ?? "",
+    m.regulation?.summary_ja ?? "",
+    m.regulation?.category ?? "",
+    m.reason ?? "",
+  ].join(" ");
+  return tab.keywords.test(searchText);
+}
+
+/* ──────────────── animation helper ──────────────── */
+
 function shipCardDelay(index: number): string {
   if (index >= 5) return "motion-preset-slide-up";
   const delays = [
@@ -157,13 +312,20 @@ function shipCardDelay(index: number): string {
   return delays[index];
 }
 
+/* ══════════════════════════════════════════════════════════
+   Page Component
+   ══════════════════════════════════════════════════════════ */
+
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ show?: string; tab?: string }>;
 }) {
   const params = await searchParams;
-  const filterApplicable = params.filter === "applicable";
+  const showAll = params.show === "all";
+  const activeTabKey = params.tab ?? "all";
+  const activeTab = CATEGORY_TABS.find((t) => t.key === activeTabKey) ?? CATEGORY_TABS[0];
+
   const supabase = await createClient();
 
   const {
@@ -185,10 +347,9 @@ export default async function DashboardPage({
   // Fetch matches for all user's ships
   const shipIds = shipList.map((s) => s.id);
 
-  let matchesByShip: Record<string, (UserMatch & { regulation?: Regulation })[]> = {};
+  let matchesByShip: Record<string, MatchWithReg[]> = {};
 
   if (shipIds.length > 0) {
-    // user_matches を取得
     const { data: matches } = await supabase
       .from("user_matches")
       .select("*")
@@ -197,7 +358,6 @@ export default async function DashboardPage({
 
     const allMatches = (matches ?? []) as UserMatch[];
 
-    // regulation_id を収集して regulations を別クエリで取得
     const regIds = [...new Set(allMatches.map((m) => m.regulation_id))];
     let regsMap: Record<string, Regulation> = {};
 
@@ -212,7 +372,6 @@ export default async function DashboardPage({
       }
     }
 
-    // matches に regulation を結合してグルーピング
     for (const m of allMatches) {
       const entry = { ...m, regulation: regsMap[m.regulation_id] };
       if (!matchesByShip[m.ship_profile_id]) {
@@ -224,10 +383,14 @@ export default async function DashboardPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">ダッシュボード</h1>
+      <h1 className="text-2xl font-bold mb-1">ダッシュボード</h1>
+      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
+        自船に該当する規制の一覧
+      </p>
 
       {shipList.length === 0 ? (
         <div className="rounded-xl border border-zinc-200 p-6 shadow-sm dark:border-zinc-800 text-center motion-preset-fade">
+          <Ship size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
           <p className="text-zinc-500 mb-4">船舶が登録されていません</p>
           <Link
             href="/ships/new"
@@ -238,35 +401,33 @@ export default async function DashboardPage({
         </div>
       ) : (
         <>
-          <div className="flex gap-2 mb-4">
-            <Link
-              href="/dashboard"
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200",
-                !filterApplicable
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              )}
-            >
-              全て表示
-            </Link>
-            <Link
-              href="/dashboard?filter=applicable"
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200",
-                filterApplicable
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              )}
-            >
-              該当のみ
-            </Link>
-          </div>
+          {/* Category tabs */}
+          <nav className="flex gap-1 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
+            {CATEGORY_TABS.map((tab) => {
+              const isActive = tab.key === activeTab.key;
+              const href = tab.key === "all"
+                ? showAll ? "/dashboard?show=all" : "/dashboard"
+                : showAll ? `/dashboard?show=all&tab=${tab.key}` : `/dashboard?tab=${tab.key}`;
+              return (
+                <Link
+                  key={tab.key}
+                  href={href}
+                  className={cn(
+                    "whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "border border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
 
           <div className="flex flex-col gap-6">
             {shipList.map((ship, shipIndex) => {
-              const allMatches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
-                // 該当 > 判定中 > 非該当 の順、同じなら掲載日の新しい順
+              const allShipMatches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
                 const order = (v: boolean | null) => v === true ? 0 : v === null ? 1 : 2;
                 const orderDiff = order(a.is_applicable) - order(b.is_applicable);
                 if (orderDiff !== 0) return orderDiff;
@@ -274,24 +435,38 @@ export default async function DashboardPage({
                 const dateB = b.regulation?.published_at ?? "";
                 return dateB.localeCompare(dateA);
               });
-              const applicableCount = allMatches.filter((m) => m.is_applicable === true).length;
-              const matches = filterApplicable
-                ? allMatches.filter((m) => m.is_applicable === true)
-                : allMatches;
+
+              // Split into applicable vs potential
+              const applicableMatches = allShipMatches.filter((m) => m.is_applicable === true);
+              const potentialMatches = allShipMatches.filter(
+                (m) => m.is_applicable === null && m.match_method === "potential_match"
+              );
+
+              // Default: only applicable. show=all: everything
+              const baseMatches = showAll ? allShipMatches : applicableMatches;
+
+              // Apply category tab filter
+              const filteredMatches = baseMatches.filter((m) => matchesTab(m, activeTab));
+
+              const applicableCount = applicableMatches.length;
+              const potentialCount = potentialMatches.length;
+
               return (
                 <div
                   key={ship.id}
                   className={cn(
-                    "rounded-xl border border-zinc-200 p-6 shadow-sm hover:shadow-md transition-shadow dark:border-zinc-800",
+                    "rounded-xl border border-zinc-200 p-5 shadow-sm hover:shadow-md transition-shadow dark:border-zinc-800",
                     shipCardDelay(shipIndex)
                   )}
                 >
-                  <div className="mb-3 flex items-start justify-between">
+                  {/* Ship header */}
+                  <div className="mb-4 flex items-start justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold">
+                      <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <Ship size={18} className="text-zinc-400" />
                         {ship.ship_name}
                       </h2>
-                      <p className="text-sm text-zinc-500">
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
                         {SHIP_TYPE_LABELS[ship.ship_type as ShipType] ??
                           ship.ship_type}{" "}
                         / {ship.gross_tonnage.toLocaleString()} GT
@@ -299,79 +474,135 @@ export default async function DashboardPage({
                     </div>
                     <Link
                       href={`/ships/${ship.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
                     >
                       <Pencil size={12} />
                       編集
                     </Link>
                   </div>
 
-                  {allMatches.length > 0 && (
-                    <p className="text-xs text-zinc-500 mb-2">
-                      該当: {allMatches.filter((m) => m.is_applicable === true).length}件
-                      {" / "}判定中: {allMatches.filter((m) => m.is_applicable === null).length}件
-                      {" / "}非該当: {allMatches.filter((m) => m.is_applicable === false).length}件
-                    </p>
-                  )}
+                  {/* Summary counts */}
+                  <div className="flex gap-3 mb-3 text-xs">
+                    <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+                      <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                      該当 {applicableCount}件
+                    </span>
+                    {potentialCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+                        確認待ち {potentialCount}件
+                      </span>
+                    )}
+                    {showAll && (
+                      <span className="text-zinc-400">
+                        全 {allShipMatches.length}件
+                      </span>
+                    )}
+                  </div>
 
-                  {matches.length === 0 ? (
-                    <p className="text-sm text-zinc-400">
-                      マッチした規制はまだありません
+                  {/* Regulation cards */}
+                  {filteredMatches.length === 0 ? (
+                    <p className="text-sm text-zinc-400 dark:text-zinc-500">
+                      {activeTab.key !== "all"
+                        ? "このカテゴリに該当する規制はありません"
+                        : "マッチした規制はまだありません"}
                     </p>
                   ) : (
-                    <ul className="flex flex-col gap-2">
-                      {matches.map((m) => (
-                        <li
-                          key={m.id}
-                          className={cn(
-                            "rounded-lg border border-zinc-100 p-3 dark:border-zinc-800 text-sm transition-colors",
-                            m.is_applicable === true && "border-l-4 border-l-green-500",
-                            m.is_applicable === false && "opacity-60"
-                          )}
-                        >
-                          <div className="flex flex-wrap items-center gap-2 mb-1">
-                            {applicabilityLabel(m.is_applicable)}
-                            {m.regulation &&
-                              severityBadge(m.regulation.severity)}
-                            {m.confidence !== null && (
-                              <span className="text-xs text-zinc-400">
-                                確度 {Math.round(m.confidence * 100)}%
-                                {m.regulation?.published_at && ` | ${formatDate(m.regulation.published_at)}`}
+                    <ul className="flex flex-col gap-3">
+                      {filteredMatches.map((m) => {
+                        const combinedText = [
+                          m.regulation?.title ?? "",
+                          m.regulation?.summary_ja ?? "",
+                          m.reason ?? "",
+                        ].join(" ");
+                        const responsibilities = m.is_applicable === true
+                          ? inferResponsibilities(combinedText)
+                          : [];
+                        const smsChapter = m.is_applicable === true
+                          ? inferSmsChapter(combinedText)
+                          : null;
+                        const actions = m.is_applicable === true
+                          ? extractActionItems(m.reason)
+                          : [];
+                        const nationalLaws = m.is_applicable === true
+                          ? extractNationalLaws(m.reason)
+                          : [];
+
+                        return (
+                          <li
+                            key={m.id}
+                            className={cn(
+                              "rounded-lg border p-4 text-sm transition-colors",
+                              m.is_applicable === true
+                                ? "border-l-4 border-l-green-500 border-zinc-100 dark:border-zinc-800 dark:border-l-green-500"
+                                : m.is_applicable === null
+                                  ? "border-amber-200 bg-amber-50/30 dark:border-amber-800/50 dark:bg-amber-950/10"
+                                  : "border-zinc-100 dark:border-zinc-800 opacity-60"
+                            )}
+                          >
+                            {/* Row 1: Badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              {m.regulation && severityBadge(m.regulation.severity)}
+                              {sourceBadge(m.regulation?.source)}
+                              {responsibilityBadges(responsibilities)}
+                            </div>
+
+                            {/* Row 2: Title */}
+                            {m.regulation ? (
+                              <Link
+                                href={`/news/${m.regulation.id}`}
+                                className="font-medium hover:underline leading-snug block mb-1"
+                              >
+                                {m.regulation.title}
+                              </Link>
+                            ) : (
+                              <span className="text-zinc-400 block mb-1">
+                                (規制情報なし)
                               </span>
                             )}
-                            {m.confidence === null && m.regulation?.published_at && (
-                              <span className="text-xs text-zinc-400">
-                                {formatDate(m.regulation.published_at)}
-                              </span>
+
+                            {/* Row 3: Summary */}
+                            {m.regulation?.summary_ja && (
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-2">
+                                {m.regulation.summary_ja}
+                              </p>
                             )}
-                          </div>
-                          {m.regulation ? (
-                            <Link
-                              href={`/news/${m.regulation.id}`}
-                              className="hover:underline"
-                            >
-                              {m.regulation.title}
-                            </Link>
-                          ) : (
-                            <span className="text-zinc-400">
-                              (規制情報なし)
-                            </span>
-                          )}
-                          {m.reason && (
-                            <p className="text-xs text-zinc-500 mt-1">
-                              {m.reason.startsWith("AI 判定失敗")
-                                ? "AI による判定を再試行中です。しばらくお待ちください。"
-                                : m.reason}
-                            </p>
-                          )}
-                          {/* Task 1: Action items for applicable matches */}
-                          {m.is_applicable === true && (() => {
-                            const actions = extractActionItems(m.reason);
-                            if (actions.length === 0) return null;
-                            return (
-                              <div className="mt-2">
+
+                            {/* Row 4: Metadata line */}
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500 mb-1">
+                              {m.regulation?.effective_date && (
+                                <span className="inline-flex items-center gap-1">
+                                  <CalendarClock size={11} />
+                                  適用日: {formatDate(m.regulation.effective_date)}
+                                </span>
+                              )}
+                              {m.confidence !== null && (
+                                <span>確度 {Math.round(m.confidence * 100)}%</span>
+                              )}
+                              {m.regulation?.published_at && (
+                                <span>{formatDate(m.regulation.published_at)} 掲載</span>
+                              )}
+                            </div>
+
+                            {/* Row 5: SMS chapter */}
+                            {smsChapter && (
+                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                                参考: SMS {smsChapter.chapter} {smsChapter.title}
+                              </p>
+                            )}
+
+                            {/* Row 6: National laws */}
+                            {nationalLaws.length > 0 && (
+                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                                関連国内法: {nationalLaws.join("、")}
+                              </p>
+                            )}
+
+                            {/* Row 7: Action items */}
+                            {actions.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                                 <p className="text-[10px] font-medium text-zinc-400 mb-1">
-                                  対応が必要な項目
+                                  対応:
                                 </p>
                                 <div className="flex flex-wrap gap-1">
                                   {actions.map((action) => (
@@ -388,41 +619,98 @@ export default async function DashboardPage({
                                   ))}
                                 </div>
                               </div>
-                            );
-                          })()}
-                          {/* Task 3: National laws for applicable matches */}
-                          {m.is_applicable === true && (() => {
-                            const laws = extractNationalLaws(m.reason);
-                            if (laws.length === 0) return null;
-                            return (
-                              <p className="text-[11px] text-zinc-400 mt-1">
-                                関連国内法: {laws.join("、")}
+                            )}
+
+                            {/* Row 8: AI reason (collapsed for applicable) */}
+                            {m.reason && m.is_applicable !== true && (
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                {m.reason.startsWith("AI 判定失敗")
+                                  ? "AI による判定を再試行中です。しばらくお待ちください。"
+                                  : m.reason}
                               </p>
-                            );
-                          })()}
-                          {/* Task 2: Potential match confirmation UI */}
-                          {m.is_applicable === null && m.match_method === "potential_match" && (
-                            <PotentialMatchCard
-                              matchId={m.id}
-                              reason={m.reason}
-                            />
-                          )}
-                        </li>
-                      ))}
+                            )}
+
+                            {/* Potential match confirmation UI */}
+                            {m.is_applicable === null && m.match_method === "potential_match" && (
+                              <PotentialMatchCard
+                                matchId={m.id}
+                                reason={m.reason}
+                              />
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
+                  )}
+
+                  {/* Potential matches section (only in default applicable-only view) */}
+                  {!showAll && potentialMatches.length > 0 && activeTab.key === "all" && (
+                    <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                      <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
+                        確認待ちのマッチング ({potentialCount}件)
+                      </p>
+                      <ul className="flex flex-col gap-2">
+                        {potentialMatches.slice(0, 3).map((m) => (
+                          <li
+                            key={m.id}
+                            className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm dark:border-amber-800/50 dark:bg-amber-950/20"
+                          >
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                              <Badge variant="action">確認待ち</Badge>
+                              {m.regulation && severityBadge(m.regulation.severity)}
+                            </div>
+                            {m.regulation ? (
+                              <Link
+                                href={`/news/${m.regulation.id}`}
+                                className="hover:underline block text-sm"
+                              >
+                                {m.regulation.title}
+                              </Link>
+                            ) : (
+                              <span className="text-zinc-400">(規制情報なし)</span>
+                            )}
+                            <PotentialMatchCard matchId={m.id} reason={m.reason} />
+                          </li>
+                        ))}
+                      </ul>
+                      {potentialMatches.length > 3 && (
+                        <Link
+                          href="/dashboard?show=all"
+                          className="text-xs text-amber-600 hover:underline mt-2 inline-block dark:text-amber-400"
+                        >
+                          他 {potentialMatches.length - 3}件の確認待ちを表示
+                        </Link>
+                      )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-6">
+          {/* Footer links */}
+          <div className="mt-6 flex items-center justify-between">
             <Link
               href="/ships/new"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
             >
               + 船舶を追加する
             </Link>
+            {!showAll ? (
+              <Link
+                href="/dashboard?show=all"
+                className="text-xs text-zinc-400 hover:text-zinc-600 hover:underline dark:hover:text-zinc-300"
+              >
+                全てのマッチング結果を見る
+              </Link>
+            ) : (
+              <Link
+                href="/dashboard"
+                className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+              >
+                該当のみ表示に戻る
+              </Link>
+            )}
           </div>
         </>
       )}

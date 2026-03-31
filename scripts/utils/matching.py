@@ -376,6 +376,25 @@ def _build_matching_prompt(
 - 0.40〜0.64: 関係する可能性はあるが情報不足（needs_review になる）
 - 0.0〜0.39: ほぼ無関係または対象外
 
+## 対応事項の分類（必須）
+規制への対応が必要な場合、以下の2カテゴリに分けて具体的な対応事項を列挙してください:
+
+"onboard_actions": 船上で実施する対応（訓練実施、点検記録、ポスター掲示、乗組員周知、操練等）
+"shore_actions": 陸上（管理会社側）で実施する対応（SMS改訂、機材調達、図面承認、証書書換、船級検査手配等）
+
+## SMS章番号の推論（SMSに関連する場合のみ）
+ISMコードに基づくSMS（安全管理マニュアル）の改訂が必要な場合、関連するSMS章番号を特定してください:
+- 第6章: 資源及び人員（訓練・資格関連）
+- 第7章: 船上作業の計画の策定（作業手順・閉囲区画立入等）
+- 第8章: 緊急事態への準備（非常訓練・退船等）
+- 第9章: 不適合の報告と分析
+- 第10章: 船舶及び設備の保守整備
+- 第11章: 文書管理
+"sms_chapters": ["7"] のように番号のリストで返してください。
+
+## 強制適用日
+"effective_date": 規制の強制適用日（Entry into Force）がわかる場合は "YYYY-MM-DD" 形式で。不明なら null。
+
 ## 出力フォーマット（必須）
 以下の JSON 形式で出力してください。コードブロック (```json ... ```) に包んでください。
 過去の学習知識のみで判断せず、上記の規制情報テキストを根拠にしてください。
@@ -385,6 +404,10 @@ def _build_matching_prompt(
   "is_applicable": <true | false>,
   "confidence": <0.0〜1.0 の数値>,
   "reason": "<適用/非適用の理由を日本語で 100 字以内。例: GT 500 以上の国際航行船舶に適用（本船 GT 2,800）>",
+  "onboard_actions": ["<船上対応1>", "<船上対応2>"],
+  "shore_actions": ["<陸上対応1>", "<陸上対応2>"],
+  "sms_chapters": ["<章番号>"],
+  "effective_date": "<YYYY-MM-DD or null>",
   "citations": [
     {{
       "text": "<根拠となる規制文の抜粋>",
@@ -499,6 +522,10 @@ def ai_match(
             "is_applicable": None,
             "confidence": 0.0,
             "reason": "GEMINI_API_KEY が未設定のため判定不能",
+            "onboard_actions": [],
+            "shore_actions": [],
+            "sms_chapters": [],
+            "effective_date": None,
             "citations": [],
         }
 
@@ -535,6 +562,10 @@ def ai_match(
                     "is_applicable": is_applicable,
                     "confidence": confidence,
                     "reason": reason,
+                    "onboard_actions": parsed.get("onboard_actions", []),
+                    "shore_actions": parsed.get("shore_actions", []),
+                    "sms_chapters": parsed.get("sms_chapters", []),
+                    "effective_date": parsed.get("effective_date"),
                     "citations": citations,
                 }
 
@@ -558,6 +589,10 @@ def ai_match(
         "is_applicable": None,
         "confidence": 0.0,
         "reason": f"AI 判定失敗: {last_error[:100]}",
+        "onboard_actions": [],
+        "shore_actions": [],
+        "sms_chapters": [],
+        "effective_date": None,
         "citations": [],
     }
 
@@ -667,6 +702,10 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
         "actions": [],
         "national_laws": [],
         "certificates": [],
+        "onboard_actions": ai_result.get("onboard_actions", []),
+        "shore_actions": ai_result.get("shore_actions", []),
+        "sms_chapters": ai_result.get("sms_chapters", []),
+        "effective_date": ai_result.get("effective_date"),
         "citations": ai_result.get("citations") or [],
         "needs_review": needs_review,
     }

@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
-  Award,
+  ArrowUpDown,
+  Flag,
   HelpCircle,
   Leaf,
   List,
@@ -19,7 +20,8 @@ const PAGE_SIZE = 10;
 
 // --- Category tab definitions ---
 
-type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "class";
+type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "domestic";
+type SortKey = "newest" | "effective";
 
 interface TabDef {
   key: TabKey;
@@ -31,36 +33,41 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: "all", label: "全て", param: "", icon: <List size={16} />, keywords: [] },
-  { key: "main", label: "主要", param: "main", icon: <Star size={16} />, keywords: [] },
+  { key: "main", label: "主要 / My Ship", param: "main", icon: <Star size={16} />, keywords: [] },
   {
     key: "safety",
-    label: "安全",
+    label: "SOLAS / 安全",
     param: "safety",
     icon: <Shield size={16} />,
-    keywords: ["SOLAS", "ISM", "ISPS", "MSC", "安全", "救命", "防火", "構造", "航行"],
+    keywords: ["SOLAS", "ISM", "ISPS", "MSC", "安全", "救命", "防火", "構造", "航行", "閉囲"],
   },
   {
     key: "environment",
-    label: "環境",
+    label: "MARPOL / 環境",
     param: "environment",
     icon: <Leaf size={16} />,
-    keywords: ["MARPOL", "MEPC", "環境", "油濁", "大気", "バラスト", "CII", "EEXI", "リサイクル"],
+    keywords: ["MARPOL", "MEPC", "環境", "油濁", "大気", "バラスト", "CII", "EEXI", "リサイクル", "排出"],
   },
   {
     key: "crew",
-    label: "船員",
+    label: "STCW / 船員",
     param: "crew",
     icon: <Users size={16} />,
-    keywords: ["MLC", "STCW", "船員", "労働", "訓練", "資格"],
+    keywords: ["STCW", "MLC", "船員", "労働", "訓練", "資格", "manning"],
   },
   {
-    key: "class",
-    label: "船級",
-    param: "class",
-    icon: <Award size={16} />,
-    keywords: ["NK", "ClassNK", "旗国", "船級", "class"],
+    key: "domestic",
+    label: "国内法 / 旗国",
+    param: "domestic",
+    icon: <Flag size={16} />,
+    keywords: ["船舶安全法", "海防法", "船員法", "NK", "ClassNK", "旗国", "船級", "テクニカル"],
   },
 ];
+
+// --- Action tag keywords ---
+
+const SHIP_SIDE_KEYWORDS = ["訓練", "操練", "点検", "掲示"];
+const COMPANY_SIDE_KEYWORDS = ["SMS", "証書", "機材", "図面"];
 
 // --- Helper functions ---
 
@@ -90,14 +97,14 @@ function confidenceLabel(confidence: number | null) {
   if (confidence >= 0.8) return null;
   if (confidence >= 0.5) {
     return (
-      <Badge variant="action" className="ml-2">
+      <Badge variant="action" className="ml-1">
         <AlertTriangle size={12} className="mr-1" />
         要確認
       </Badge>
     );
   }
   return (
-    <Badge variant="critical" className="ml-2">
+    <Badge variant="critical" className="ml-1">
       <HelpCircle size={12} className="mr-1" />
       AI不確実
     </Badge>
@@ -113,6 +120,15 @@ function isWithin24Hours(dateStr: string | null): boolean {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "日付不明";
+  return new Date(dateStr).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+function formatEffectiveDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
   return new Date(dateStr).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "2-digit",
@@ -138,10 +154,32 @@ function buildKeywordFilter(keywords: string[]): string {
   const conditions: string[] = [];
   for (const kw of keywords) {
     conditions.push(`title.ilike.%${kw}%`);
+    conditions.push(`headline.ilike.%${kw}%`);
     conditions.push(`summary_ja.ilike.%${kw}%`);
     conditions.push(`category.ilike.%${kw}%`);
   }
   return conditions.join(",");
+}
+
+/** Determine the display title: headline first, then title, then fallback */
+function getDisplayTitle(reg: Regulation): { text: string; isPlaceholder: boolean } {
+  const isPdfFilename = (s: string) => /\.pdf$/i.test(s.trim());
+
+  if (reg.headline && reg.headline.trim() && !isPdfFilename(reg.headline)) {
+    return { text: reg.headline, isPlaceholder: false };
+  }
+  if (reg.title && reg.title.trim() && !isPdfFilename(reg.title)) {
+    return { text: reg.title, isPlaceholder: false };
+  }
+  return { text: "（タイトル生成中）", isPlaceholder: true };
+}
+
+/** Infer action tags from headline + summary text */
+function getActionTags(reg: Regulation): { shipSide: boolean; companySide: boolean } {
+  const text = [reg.headline ?? "", reg.summary_ja ?? "", reg.title ?? ""].join(" ");
+  const shipSide = SHIP_SIDE_KEYWORDS.some((kw) => text.includes(kw));
+  const companySide = COMPANY_SIDE_KEYWORDS.some((kw) => text.includes(kw));
+  return { shipSide, companySide };
 }
 
 // --- Main page component ---
@@ -149,7 +187,13 @@ function buildKeywordFilter(keywords: string[]): string {
 export default async function NewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; page?: string; q?: string; tab?: string }>;
+  searchParams: Promise<{
+    source?: string;
+    page?: string;
+    q?: string;
+    tab?: string;
+    sort?: string;
+  }>;
 }) {
   const params = await searchParams;
   const sourceFilter = params.source?.toUpperCase();
@@ -157,10 +201,11 @@ export default async function NewsPage({
   const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const offset = (currentPage - 1) * PAGE_SIZE;
   const activeTab = (params.tab as TabKey) || "all";
+  const activeSort: SortKey = params.sort === "effective" ? "effective" : "newest";
 
   const supabase = await createClient();
 
-  // --- Auth check for 主要 tab ---
+  // --- Auth check for main tab ---
   let userId: string | null = null;
   let matchedRegulationIds: string[] | null = null;
   let authError = false;
@@ -169,7 +214,6 @@ export default async function NewsPage({
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       userId = user.id;
-      // Get user's ship profiles
       const { data: ships } = await supabase
         .from("ship_profiles")
         .select("id")
@@ -177,7 +221,6 @@ export default async function NewsPage({
 
       if (ships && ships.length > 0) {
         const shipIds = ships.map((s: { id: string }) => s.id);
-        // Get matched regulation IDs
         const { data: matches } = await supabase
           .from("user_matches")
           .select("regulation_id")
@@ -224,11 +267,19 @@ export default async function NewsPage({
   }
 
   // --- Build query ---
+  const selectFields = "id,source,source_id,title,headline,category,severity,confidence,published_at,effective_date,summary_ja";
+
   let query = supabase
     .from("regulations")
-    .select("id,source,source_id,title,category,severity,confidence,published_at,summary_ja", { count: "exact" })
-    .order("published_at", { ascending: false })
+    .select(selectFields, { count: "exact" })
     .range(offset, offset + PAGE_SIZE - 1);
+
+  // Sort order
+  if (activeSort === "effective") {
+    query = query.order("effective_date", { ascending: true, nullsFirst: false });
+  } else {
+    query = query.order("published_at", { ascending: false });
+  }
 
   // Source filter
   if (sourceFilter) {
@@ -237,7 +288,7 @@ export default async function NewsPage({
 
   // Search query
   if (searchQuery) {
-    query = query.ilike("title", `%${searchQuery}%`);
+    query = query.or(`title.ilike.%${searchQuery}%,headline.ilike.%${searchQuery}%,summary_ja.ilike.%${searchQuery}%`);
   }
 
   // Category tab filter
@@ -247,10 +298,8 @@ export default async function NewsPage({
     if (matchedRegulationIds && matchedRegulationIds.length > 0) {
       query = query.in("id", matchedRegulationIds);
     } else if (!authError) {
-      // User is logged in but has no matches — show empty
       query = query.in("id", ["__no_match__"]);
     }
-    // If authError, we skip filtering — the UI will show a login message instead
   } else if (tabDef && tabDef.keywords.length > 0) {
     query = query.or(buildKeywordFilter(tabDef.keywords));
   }
@@ -260,7 +309,7 @@ export default async function NewsPage({
   let totalFiltered = 0;
 
   if (activeTab === "main" && authError) {
-    // Don't query — show login message
+    // Don't query -- show login message
   } else {
     const { data: regulations, count: filteredCount } = await query;
     items = (regulations ?? []) as Regulation[];
@@ -286,17 +335,33 @@ export default async function NewsPage({
 
   // --- URL builders ---
 
-  function buildUrl(overrides: { page?: number; source?: string; tab?: string; q?: string; clearSource?: boolean; clearTab?: boolean }) {
+  function buildUrl(overrides: {
+    page?: number;
+    source?: string;
+    tab?: string;
+    q?: string;
+    sort?: string;
+    clearSource?: boolean;
+    clearTab?: boolean;
+  }) {
     const p = new URLSearchParams();
-    const tab = overrides.clearTab ? undefined : (overrides.tab ?? (activeTab !== "all" ? activeTab : undefined));
-    const source = overrides.clearSource ? undefined : (overrides.source !== undefined ? overrides.source : (sourceFilter ? sourceFilter.toLowerCase() : undefined));
+    const tab = overrides.clearTab
+      ? undefined
+      : (overrides.tab ?? (activeTab !== "all" ? activeTab : undefined));
+    const source = overrides.clearSource
+      ? undefined
+      : (overrides.source !== undefined
+          ? overrides.source
+          : (sourceFilter ? sourceFilter.toLowerCase() : undefined));
     const q = overrides.q !== undefined ? overrides.q : searchQuery;
     const page = overrides.page ?? undefined;
+    const sort = overrides.sort !== undefined ? overrides.sort : (activeSort !== "newest" ? activeSort : undefined);
 
     if (tab) p.set("tab", tab);
     if (source) p.set("source", source);
     if (q) p.set("q", q);
     if (page && page > 1) p.set("page", String(page));
+    if (sort && sort !== "newest") p.set("sort", sort);
 
     const qs = p.toString();
     return `/news${qs ? `?${qs}` : ""}`;
@@ -314,6 +379,10 @@ export default async function NewsPage({
     return buildUrl({ tab: tab === "all" ? "" : tab, clearTab: tab === "all", page: 1 });
   }
 
+  function sortUrl(sort: SortKey) {
+    return buildUrl({ sort, page: 1 });
+  }
+
   function clearSearchUrl() {
     return buildUrl({ q: "" });
   }
@@ -329,6 +398,9 @@ export default async function NewsPage({
         )}
         {sourceFilter && (
           <input type="hidden" name="source" value={sourceFilter.toLowerCase()} />
+        )}
+        {activeSort !== "newest" && (
+          <input type="hidden" name="sort" value={activeSort} />
         )}
         <div className="relative flex-1">
           <Search
@@ -362,7 +434,7 @@ export default async function NewsPage({
         </div>
       )}
 
-      {/* Category tabs — horizontal scrollable */}
+      {/* Category tabs -- horizontal scrollable */}
       <div className="mb-4 -mx-4 px-4 overflow-x-auto scrollbar-hide">
         <nav className="flex gap-1 min-w-max" role="tablist">
           {TABS.map((tab) => {
@@ -388,44 +460,74 @@ export default async function NewsPage({
         </nav>
       </div>
 
-      {/* Source filter — secondary */}
-      <div className="flex gap-2 mb-6 text-sm">
-        <Link
-          href={sourceUrl()}
-          className={cn(
-            "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
-            !sourceFilter
-              ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 shadow-sm"
-              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
-          )}
-        >
-          全て ({totalCount ?? 0})
-        </Link>
-        <Link
-          href={sourceUrl("nk")}
-          className={cn(
-            "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
-            sourceFilter === "NK"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
-          )}
-        >
-          NK ({nkCount ?? 0})
-        </Link>
-        <Link
-          href={sourceUrl("mlit")}
-          className={cn(
-            "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
-            sourceFilter === "MLIT"
-              ? "bg-indigo-600 text-white shadow-sm"
-              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
-          )}
-        >
-          国交省 ({mlitCount ?? 0})
-        </Link>
+      {/* Source filter + Sort dropdown row */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        {/* Source filter -- secondary */}
+        <div className="flex gap-2 text-sm">
+          <Link
+            href={sourceUrl()}
+            className={cn(
+              "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+              !sourceFilter
+                ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 shadow-sm"
+                : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
+            )}
+          >
+            全て ({totalCount ?? 0})
+          </Link>
+          <Link
+            href={sourceUrl("nk")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+              sourceFilter === "NK"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
+            )}
+          >
+            NK ({nkCount ?? 0})
+          </Link>
+          <Link
+            href={sourceUrl("mlit")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+              sourceFilter === "MLIT"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900",
+            )}
+          >
+            国交省 ({mlitCount ?? 0})
+          </Link>
+        </div>
+
+        {/* Sort dropdown */}
+        <div className="flex items-center gap-1.5 text-sm shrink-0">
+          <ArrowUpDown size={14} className="text-zinc-400" />
+          <Link
+            href={sortUrl("newest")}
+            className={cn(
+              "rounded-md px-2.5 py-1 transition-colors",
+              activeSort === "newest"
+                ? "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+            )}
+          >
+            新着順
+          </Link>
+          <Link
+            href={sortUrl("effective")}
+            className={cn(
+              "rounded-md px-2.5 py-1 transition-colors",
+              activeSort === "effective"
+                ? "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+            )}
+          >
+            適用日が近い順
+          </Link>
+        </div>
       </div>
 
-      {/* Main tab — auth error message */}
+      {/* Main tab -- auth error message */}
       {activeTab === "main" && authError && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center dark:border-blue-900 dark:bg-blue-950/30 motion-preset-fade">
           <Star size={32} className="mx-auto mb-3 text-blue-400" />
@@ -441,7 +543,7 @@ export default async function NewsPage({
         </div>
       )}
 
-      {/* Main tab — logged in but no matches */}
+      {/* Main tab -- logged in but no matches */}
       {activeTab === "main" && !authError && items.length === 0 && (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900 motion-preset-fade">
           <Star size={32} className="mx-auto mb-3 text-zinc-400" />
@@ -471,6 +573,9 @@ export default async function NewsPage({
             {items.map((reg, index) => {
               const isNew = isWithin24Hours(reg.published_at);
               const isApplicable = allMatchedIds.has(reg.id);
+              const displayTitle = getDisplayTitle(reg);
+              const effectiveDateStr = formatEffectiveDate(reg.effective_date);
+              const actionTags = getActionTags(reg);
 
               return (
                 <li key={reg.id} className={itemAnimationClass(index)}>
@@ -478,43 +583,67 @@ export default async function NewsPage({
                     href={`/news/${reg.id}`}
                     className="block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200 dark:border-zinc-800 dark:bg-zinc-950"
                   >
-                    {/* Top row: source + severity + date */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
+                    {/* Top row: source + severity + action tags + effective date */}
+                    <div className="flex items-center justify-between mb-2.5 gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {sourceBadge(reg.source)}
                         {severityBadge(reg.severity)}
                         {confidenceLabel(reg.confidence)}
+                        {actionTags.shipSide && (
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-bold text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40">
+                            【船側】
+                          </span>
+                        )}
+                        {actionTags.companySide && (
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-bold text-purple-700 bg-purple-100 dark:text-purple-300 dark:bg-purple-900/40">
+                            【会社側】
+                          </span>
+                        )}
                       </div>
-                      <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 ml-2">
-                        {formatDate(reg.published_at)}
-                      </span>
+                      {effectiveDateStr && (
+                        <span className="shrink-0 inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                          適用日: {effectiveDateStr}
+                        </span>
+                      )}
                     </div>
 
-                    {/* Title */}
-                    <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1 leading-snug">
-                      {reg.title}
+                    {/* Title (headline first) */}
+                    <h3
+                      className={cn(
+                        "text-base font-semibold leading-snug mb-1.5",
+                        displayTitle.isPlaceholder
+                          ? "text-zinc-400 dark:text-zinc-600"
+                          : "text-zinc-900 dark:text-zinc-100",
+                      )}
+                    >
+                      {displayTitle.text}
                     </h3>
 
                     {/* Summary */}
                     {reg.summary_ja && (
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-2">
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 mb-2.5">
                         {reg.summary_ja}
                       </p>
                     )}
 
-                    {/* Bottom row: category + badges */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {reg.category && (
-                        <span className="text-xs text-zinc-500 dark:text-zinc-500">
-                          {reg.category}
-                        </span>
-                      )}
-                      {userId && isApplicable && (
-                        <Badge variant="success">該当</Badge>
-                      )}
-                      {isNew && (
-                        <Badge variant="new">NEW</Badge>
-                      )}
+                    {/* Bottom row: category + badges + published date */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {reg.category && (
+                          <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                            {reg.category}
+                          </span>
+                        )}
+                        {userId && isApplicable && (
+                          <Badge variant="success">該当</Badge>
+                        )}
+                        {isNew && (
+                          <Badge variant="new">NEW</Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
+                        {formatDate(reg.published_at)} 掲載
+                      </span>
                     </div>
                   </Link>
                 </li>

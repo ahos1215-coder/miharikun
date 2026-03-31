@@ -70,6 +70,48 @@ ACTION_TYPES: dict[str, dict[str, str]] = {
 
 
 # ---------------------------------------------------------------------------
+# ISM Code SMS (Safety Management System) 章番号マッピング
+# 規制がSMSのどのセクションに関連するかを推論するために使用
+# ---------------------------------------------------------------------------
+
+SMS_CHAPTER_MAP: dict[str, dict] = {
+    "1": {"title": "一般", "keywords": ["方針", "安全管理方針", "目標"]},
+    "2": {"title": "安全及び環境保護に関する方針", "keywords": ["安全方針", "環境方針"]},
+    "3": {"title": "会社の責任と権限", "keywords": ["責任", "権限", "指定者", "DPA"]},
+    "4": {"title": "管理責任者の指定", "keywords": ["管理責任者", "DPA", "designated person"]},
+    "5": {"title": "船長の責任と権限", "keywords": ["船長", "master", "override"]},
+    "6": {"title": "資源及び人員", "keywords": ["資格", "訓練", "能力", "manning", "STCW"]},
+    "7": {"title": "船上作業の計画の策定", "keywords": ["作業手順", "操作", "荷役", "係船", "閉囲区画", "立入", "enclosed space", "作業計画"]},
+    "8": {"title": "緊急事態への準備", "keywords": ["緊急", "非常", "emergency", "火災", "浸水", "abandon", "退船", "救助"]},
+    "9": {"title": "不適合、事故及び危険な状態の報告及び分析", "keywords": ["不適合", "事故", "インシデント", "是正", "CAR", "near miss"]},
+    "10": {"title": "船舶及び設備の保守整備", "keywords": ["保守", "整備", "maintenance", "検査", "点検", "survey"]},
+    "11": {"title": "文書管理", "keywords": ["文書", "記録", "文書管理", "document"]},
+    "12": {"title": "会社による検証、見直し及び評価", "keywords": ["内部監査", "audit", "見直し", "review", "評価"]},
+}
+
+
+# ---------------------------------------------------------------------------
+# 船側/会社側アクション分類
+# ---------------------------------------------------------------------------
+
+ONBOARD_ACTIONS: dict[str, dict[str, str]] = {
+    "crew_training": {"label": "乗組員訓練", "side": "onboard", "description": "訓練実施・記録"},
+    "onboard_drill": {"label": "船上ドリル", "side": "onboard", "description": "非常訓練・操練の実施"},
+    "inspection_record": {"label": "点検記録", "side": "onboard", "description": "点検チェックリスト・記録簿の更新"},
+    "poster_display": {"label": "掲示・周知", "side": "onboard", "description": "ポスター掲示・乗組員への周知"},
+    "logbook_entry": {"label": "航海日誌記入", "side": "onboard", "description": "航海日誌・作業記録の追記"},
+}
+
+SHORESIDE_ACTIONS: dict[str, dict[str, str]] = {
+    "sms_revision": {"label": "SMS改訂", "side": "shore", "description": "安全管理マニュアルの改訂"},
+    "equipment_procurement": {"label": "機材調達", "side": "shore", "description": "設備・部品の調達・手配"},
+    "drawing_approval": {"label": "図面承認", "side": "shore", "description": "改造図面の船級承認"},
+    "certificate_update": {"label": "証書更新", "side": "shore", "description": "船舶証書の書き換え・追記"},
+    "class_survey": {"label": "船級検査", "side": "shore", "description": "船級協会の臨時検査手配"},
+}
+
+
+# ---------------------------------------------------------------------------
 # 条約ルール一覧 (30+ rules)
 # ---------------------------------------------------------------------------
 
@@ -111,6 +153,8 @@ CONVENTION_RULES: list[dict] = [
             {"type": "equipment_modification", "detail": "構造・復原性に関する改修"},
             {"type": "certificate_update", "detail": "船舶安全証書（構造）の更新"},
             {"type": "documentation", "detail": "復原性計算書の更新"},
+            {"type": "drawing_approval", "detail": "改造図面の船級承認"},
+            {"type": "class_survey", "detail": "船級協会の臨時検査手配"},
         ],
         "certificates": ["Safety Construction Certificate", "安全構造証書"],
     },
@@ -149,6 +193,8 @@ CONVENTION_RULES: list[dict] = [
             {"type": "certificate_update", "detail": "船舶安全証書（設備）の更新"},
             {"type": "crew_training", "detail": "消火訓練・避難訓練の実施"},
             {"type": "sms_revision", "detail": "防火手順のSMS反映"},
+            {"type": "onboard_drill", "detail": "消火操練・避難操練の実施"},
+            {"type": "inspection_record", "detail": "消火設備点検チェックリストの更新"},
         ],
         "certificates": ["Safety Equipment Certificate", "安全設備証書"],
     },
@@ -186,6 +232,9 @@ CONVENTION_RULES: list[dict] = [
             {"type": "certificate_update", "detail": "船舶安全証書（設備）の更新"},
             {"type": "crew_training", "detail": "退船・救命操練の実施"},
             {"type": "psc_preparation", "detail": "救命設備の整備状態確認"},
+            {"type": "onboard_drill", "detail": "退船操練・救命艇降下操練の実施"},
+            {"type": "inspection_record", "detail": "救命設備週次/月次点検記録の更新"},
+            {"type": "equipment_procurement", "detail": "救命設備の調達・手配"},
         ],
         "certificates": ["Safety Equipment Certificate", "安全設備証書"],
     },
@@ -258,6 +307,8 @@ CONVENTION_RULES: list[dict] = [
             {"type": "crew_training", "detail": "ECDIS操作訓練・BRM訓練"},
             {"type": "documentation", "detail": "航海計画手順の見直し"},
             {"type": "psc_preparation", "detail": "航海計器の整備・テスト記録"},
+            {"type": "logbook_entry", "detail": "航海日誌への航海計器テスト記録"},
+            {"type": "inspection_record", "detail": "航海計器の定期点検記録"},
         ],
         "certificates": ["Safety Equipment Certificate", "安全設備証書"],
     },
@@ -370,6 +421,9 @@ CONVENTION_RULES: list[dict] = [
             {"type": "certificate_update", "detail": "DOC/SMC の更新"},
             {"type": "crew_training", "detail": "ISM関連教育・内部監査"},
             {"type": "documentation", "detail": "内部監査記録・マネジメントレビュー記録"},
+            {"type": "poster_display", "detail": "安全管理方針の掲示・乗組員への周知"},
+            {"type": "inspection_record", "detail": "安全点検チェックリストの記録"},
+            {"type": "logbook_entry", "detail": "不適合・是正措置の記録"},
         ],
         "certificates": ["DOC", "SMC"],
     },
@@ -405,6 +459,8 @@ CONVENTION_RULES: list[dict] = [
             {"type": "documentation", "detail": "ESP検査記録の整備"},
             {"type": "equipment_modification", "detail": "板厚計測に基づく鋼板交換"},
             {"type": "certificate_update", "detail": "船級証書の更新"},
+            {"type": "class_survey", "detail": "船級協会の定期・臨時検査手配"},
+            {"type": "inspection_record", "detail": "板厚計測・腐食状況の記録"},
         ],
         "certificates": ["Class Certificate", "船級証書"],
     },
@@ -446,6 +502,8 @@ CONVENTION_RULES: list[dict] = [
             {"type": "crew_training", "detail": "船舶保安訓練・演習"},
             {"type": "documentation", "detail": "保安記録の整備"},
             {"type": "psc_preparation", "detail": "ISPS関連書類・訓練記録の確認"},
+            {"type": "onboard_drill", "detail": "船舶保安操練の実施"},
+            {"type": "logbook_entry", "detail": "保安レベル変更・保安事象の記録"},
         ],
         "certificates": ["ISSC"],
     },
@@ -531,6 +589,9 @@ CONVENTION_RULES: list[dict] = [
             {"type": "documentation", "detail": "SOPEP・油記録簿の整備"},
             {"type": "crew_training", "detail": "油流出対応訓練"},
             {"type": "psc_preparation", "detail": "IOPP関連設備・書類の確認"},
+            {"type": "logbook_entry", "detail": "油記録簿（Oil Record Book）の記入"},
+            {"type": "onboard_drill", "detail": "油流出緊急対応操練"},
+            {"type": "inspection_record", "detail": "油水分離器・ODMの定期点検記録"},
         ],
         "certificates": ["IOPP Certificate", "IOPP証書"],
     },
