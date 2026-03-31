@@ -297,9 +297,22 @@
 - [x] layout.tsx: CommandPalette + Sonner dark theme 統合 ✅
 - [x] TSC --noEmit エラーゼロ + next build 成功 ✅
 
+### 船内備付書籍管理システム（2026-03-31）
+- [x] publication_requirements.py: 67書籍 × 4カテゴリの自動判定ロジック ✅
+- [x] 00009_publications.sql: publications + ship_publications テーブル + RLS ✅
+- [x] /api/publications: GET(一覧) + PUT(版数更新) APIルート ✅
+- [x] /ships/[id]/publications: Glassmorphism UI + コンプライアンスゲージ ✅
+- [x] glass-publication-card.tsx: ステータス別 glow + インライン版数編集 ✅
+- [x] publication-stats.tsx: 4カードサマリー + カウントアップアニメーション ✅
+- [x] TypeScript型: Publication, ShipPublication + ラベル定義 ✅
+- [x] テスト: 51テスト全通過 (全体121テスト) + TSC + next build 全パス ✅
+- [ ] **ユーザー作業**: 00009_publications.sql を Supabase ダッシュボードで実行
+
 ### 残タスク
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定
 - [ ] RESEND_API_KEY を Vercel env に設定
+- [ ] 00008_feedback.sql を Supabase ダッシュボードで実行
+- [ ] 00009_publications.sql を Supabase ダッシュボードで実行
 - [ ] フロントエンド単体テスト (Jest/Vitest)
 - [ ] Gemini プロンプトの DSPy 最適化 (本番フィードバック蓄積後)
 - [ ] LlamaIndex RAG (条約原文のインデキシング、将来)
@@ -392,3 +405,8 @@
 - 2026-03-31 — [Role C/Opus] CommandPalette (Cmd+K, 9コマンド) + globals.css (glow/glass/gauge/skeleton)
 - 2026-03-31 — [Role C/Opus] framer-motion 導入, Badge ダークファースト化, Sonner dark theme
 - 2026-03-31 — [Role D/Opus] Doc-Sync: PROGRESS.md + HANDOFF.md 更新, TSC + next build 全パス
+- 2026-03-31 — [Agent A/Role A] publication_requirements.py: 67書籍の自動判定ロジック (4カテゴリ)
+- 2026-03-31 — [Agent B/Role B] 00009_publications.sql: publications + ship_publications + RLS + API route
+- 2026-03-31 — [Agent C/Role C] /ships/[id]/publications: Glassmorphism UI + インライン版数編集
+- 2026-03-31 — [Agent A/Role A] test_publication_requirements.py: 51テスト全通過
+- 2026-03-31 — [Role D/Opus] 統合チェック: 121テスト全通過 + TSC + next build (18ルート) 全パス

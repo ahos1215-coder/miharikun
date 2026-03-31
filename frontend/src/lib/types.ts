@@ -149,3 +149,56 @@ export const NOTIFY_SEVERITY_LABELS: Record<NotifySeverity, string> = {
   critical: "重要のみ",
   action_required: "緊急のみ",
 };
+
+// --- Ship Publications ---
+
+export type PublicationCategory = "A" | "B" | "C" | "D";
+export type PublicationStatus = "current" | "outdated" | "missing" | "unknown" | "not_required";
+export type PublicationPriority = "mandatory" | "recommended";
+
+export interface Publication {
+  id: string;
+  title: string;
+  title_ja: string | null;
+  category: PublicationCategory;
+  publisher: string | null;
+  current_edition: string | null;
+  current_edition_date: string | null;
+  previous_edition: string | null;
+  isbn: string | null;
+  legal_basis: string | null;
+  applicable_conventions: string[] | null;
+  update_cycle: string | null;
+  purchase_url: string | null;
+  notes: string | null;
+}
+
+export interface ShipPublication {
+  id: string;
+  ship_profile_id: string;
+  publication_id: string;
+  status: PublicationStatus;
+  owned_edition: string | null;
+  owned_edition_date: string | null;
+  needs_update: boolean;
+  priority: PublicationPriority;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  publication?: Publication;
+}
+
+export const PUBLICATION_CATEGORY_LABELS: Record<PublicationCategory, string> = {
+  A: "条約・国際規則",
+  B: "航海用刊行物",
+  C: "旗国・船級規則",
+  D: "船上マニュアル",
+};
+
+export const PUBLICATION_STATUS_LABELS: Record<PublicationStatus, string> = {
+  current: "最新版",
+  outdated: "要更新",
+  missing: "未所持",
+  unknown: "未確認",
+  not_required: "不要",
+};
