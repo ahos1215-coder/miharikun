@@ -45,11 +45,9 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.dirname(__file__))
 
 from utils.supabase_client import SupabaseClient  # type: ignore
-from utils.gemini_client import classify_pdf  # type: ignore
-from utils.gdrive_client import upload_json  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
-from utils.pdf_preprocess import preprocess_pdf, check_pdf_url  # type: ignore
-from utils.stealth_fetcher import stealth_get, stealth_download_bytes  # type: ignore
+from utils.pdf_preprocess import check_pdf_url  # type: ignore
+from utils.stealth_fetcher import stealth_get  # type: ignore
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -85,14 +83,6 @@ DEFAULT_CRAWL_DEPTH = 3
 USER_AGENT = "MaritimeRegsMonitor/0.1 (+https://github.com/ahos1215-coder)"
 
 SOURCE_PREFIX = "MLIT"
-
-# Gemini 分類プロンプト
-GEMINI_PROMPT = """
-あなたは海事規制の専門家です。添付の PDF ドキュメントを解析し、以下の JSON 形式で分類結果を返してください。
-過去の学習知識は使わず、添付 PDF のテキストのみから判断してください。
-
-分類対象: 国土交通省（MLIT）海事局発行の海事関連文書
-"""
 
 # ---------------------------------------------------------------------------
 # robots.txt チェッカー
@@ -199,7 +189,7 @@ def upsert_crawl_state(
     }
     try:
         resp = requests.post(
-            f"{client.url}/rest/v1/mlit_crawl_state",
+            f"{client.url}/rest/v1/mlit_crawl_state?on_conflict=url",
             json=record,
             headers={
                 **client._headers,
@@ -326,131 +316,55 @@ def process_pdf(
     dry_run: bool,
 ) -> bool:
     """
-    PDF を処理して Supabase に保存する。
+    新規 PDF を検出し、pending_queue に登録する。
+    Gemini 分類は process-queue ジョブに委任（API コスト最適化）。
 
     Returns:
-        処理に成功した場合は True
+        登録に成功した場合は True
     """
     # 既知 PDF はスキップ
     if pdf_url in known_pdf_urls:
         logger.debug("既知 PDF をスキップ: %s", pdf_url)
         return False
 
-    logger.info("PDF 処理中: %s", pdf_url)
+    logger.info("新規 PDF 検出: %s", pdf_url)
 
-    # HEAD チェック
+    # HEAD チェック（アクセス可能か確認のみ）
     head_check = check_pdf_url(pdf_url)
     if not head_check["accessible"]:
         logger.warning("PDF にアクセスできません: %s", pdf_url)
         return False
 
     if dry_run:
-        logger.info("[dry-run] PDF 処理をスキップ: %s", pdf_url)
+        logger.info("[dry-run] PDF キューイングをスキップ: %s", pdf_url)
         return False
 
-    # PDF ダウンロード（stealth_download_bytes を使用）
-    try:
-        pdf_bytes = stealth_download_bytes(pdf_url, timeout=30)
-    except (requests.exceptions.RequestException, Exception) as e:
-        logger.warning("PDF ダウンロードエラー: %s — %s", pdf_url, e)
-        client.queue_pending(
-            source="MLIT",
-            source_id=source_id,
-            pdf_url=pdf_url,
-            reason="download_error",
-            error_detail=str(e),
-        )
-        return False
-
-    # 前処理チェック
-    preprocess_result = preprocess_pdf(pdf_url, pdf_bytes)
-    if preprocess_result["status"] == "skipped":
-        logger.warning(
-            "PDF をスキップ: %s — %s", pdf_url, preprocess_result["skip_reason"]
-        )
-        client.queue_pending(
-            source="MLIT",
-            source_id=source_id,
-            pdf_url=pdf_url,
-            reason="pdf_skipped",
-            error_detail=preprocess_result.get("skip_reason", ""),
-        )
-        return False
-
-    # Gemini 分類
-    classification: Optional[dict] = None
-    try:
-        classification = classify_pdf(
-            pdf_bytes=pdf_bytes,
-            prompt=GEMINI_PROMPT,
-            source_id=source_id,
-        )
-        logger.info(
-            "Gemini 分類完了: カテゴリ=%s, 信頼度=%s",
-            classification.get("category"),
-            classification.get("confidence"),
-        )
-    except Exception as e:
-        logger.error("Gemini 分類エラー: %s — %s", pdf_url, e)
-        client.queue_pending(
-            source="MLIT",
-            source_id=source_id,
-            pdf_url=pdf_url,
-            reason="gemini_error",
-            error_detail=str(e),
-        )
-
-    # Supabase に保存
+    # regulations テーブルに仮レコードを挿入（タイトルはファイル名、分類は後で）
     now_iso = datetime.now(timezone.utc).isoformat()
-
-    # タイトル: Gemini が取得できれば使用、なければ PDF ファイル名
     pdf_filename = pdf_url.split("/")[-1]
-    title = (
-        classification.get("title", pdf_filename)
-        if classification and classification.get("status") == "ok"
-        else pdf_filename
-    )
 
     record: dict = {
         "source_id": source_id,
         "source": "MLIT",
-        "title": title,
+        "title": pdf_filename,
         "url": page_url,
         "pdf_url": pdf_url,
         "scraped_at": now_iso,
+        "severity": "informational",
     }
-    if classification and classification.get("status") == "ok":
-        record.update({
-            "category": classification.get("category"),
-            "severity": classification.get("severity"),
-            "summary_ja": classification.get("summary"),
-            "confidence": classification.get("confidence"),
-            "citations": classification.get("citations"),
-            "applicable_ship_types": classification.get("applicable_vessel_types"),
-            "effective_date": classification.get("effective_date"),
-            "raw_gemini_response": classification,
-        })
-    if preprocess_result.get("warning"):
-        record["processing_notes"] = preprocess_result["warning"]
+    client.upsert_regulation(record)
 
-    success = client.upsert_regulation(record)
-    if success:
-        logger.info("Supabase 保存完了: %s", source_id)
+    # pending_queue に登録 → process-queue ジョブが Gemini 分類を実行
+    client.queue_pending(
+        source="MLIT",
+        source_id=source_id,
+        pdf_url=pdf_url,
+        reason="awaiting_classification",
+        error_detail="クロールで検出。Gemini 分類は process-queue で実行予定。",
+    )
+    logger.info("pending_queue に登録: %s → process-queue で分類予定", source_id)
 
-        # Google Drive に保存
-        if classification and classification.get("status") == "ok":
-            try:
-                upload_json(
-                    data=record,
-                    filename=f"{source_id}.json",
-                )
-            except Exception as e:
-                logger.warning("Google Drive 保存エラー: %s", e)
-
-        return True
-    else:
-        logger.error("Supabase 保存失敗: %s", source_id)
-        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
