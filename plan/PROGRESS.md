@@ -317,8 +317,8 @@
 - [x] GHA: seed-publications.yml (手動) + check-publications.yml (週次月曜) ✅
 - [x] ステータス可視化: Green(最新)/Amber(要確認)/Red(要更新) ダッシュボード表示 ✅
 - [x] 全121テスト通過 + TSC + next build 全パス ✅
-- [ ] **ユーザー作業**: 00010_radio_equipment.sql を Supabase ダッシュボードで実行
-- [ ] **ユーザー作業**: GHA で seed-publications を手動実行（書籍マスターデータ投入）
+- [x] **ユーザー作業**: 00010_radio_equipment.sql を Supabase ダッシュボードで実行 ✅
+- [x] **ユーザー作業**: GHA で seed-publications を手動実行（67書籍投入完了）✅
 
 ### 残タスク
 - [ ] LINE_NOTIFY_TOKEN を GitHub Secrets に設定
@@ -422,3 +422,8 @@
 - 2026-03-31 — [Agent C/Role C] /ships/[id]/publications: Glassmorphism UI + インライン版数編集
 - 2026-03-31 — [Agent A/Role A] test_publication_requirements.py: 51テスト全通過
 - 2026-03-31 — [Role D/Opus] 統合チェック: 121テスト全通過 + TSC + next build (18ルート) 全パス
+- 2026-03-31 — [Role C/Opus] ダッシュボード書籍サマリー + ニュース書籍タブ + 導線追加
+- 2026-03-31 — [Agent A/Role A] 00010_radio_equipment.sql + 無線設備書籍5件 + フォームUI更新
+- 2026-03-31 — [Agent B/Role B] seed_publications.py + check_publication_updates.py + GHA 2ワークフロー
+- 2026-03-31 — [Agent C/Role C] G/A/R ステータス可視化 (発光ドット + 行ハイライト + サマリーカウント)
+- 2026-03-31 — [Role D/Opus] 全ドキュメント最終同期: HANDOFF.md + STRATEGIC_ROADMAP_v6.md + PROGRESS.md
