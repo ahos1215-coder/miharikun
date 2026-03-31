@@ -300,7 +300,7 @@ def determine_compliance(ship: dict) -> list[dict]:
     results: list[dict] = []
 
     for rule in CONVENTION_RULES:
-        rule_id: str = rule.get("convention_id", "UNKNOWN")
+        rule_id: str = rule.get("id", rule.get("convention_id", "UNKNOWN"))
         logger.debug(f"ルール評価中: {rule_id}")
 
         # --- 各条件を評価 ---

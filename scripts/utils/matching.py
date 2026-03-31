@@ -45,6 +45,11 @@ except ImportError:
     from ship_compliance import determine_compliance, get_applicable_keywords
 
 try:
+    from utils.maritime_knowledge import KEYWORD_EXCLUSIONS
+except ImportError:
+    from maritime_knowledge import KEYWORD_EXCLUSIONS
+
+try:
     from utils.validation import validate_matching
 except ImportError:
     from validation import validate_matching
@@ -241,10 +246,67 @@ def rule_based_filter(regulation: dict, ship: dict) -> str:
 # Stage 0: 条約ベースマッチング
 # ---------------------------------------------------------------------------
 
+def _passes_exclusion_check(conv_id: str, matched_keywords: list[str], reg_text: str) -> bool:
+    """
+    排他ルールを適用して、条約マッチが十分な証拠に基づくか検証する。
+
+    Args:
+        conv_id: 条約ルールの ID (例: "STCW", "SOLAS_CH_II1_STRUCTURE")
+        matched_keywords: マッチしたキーワードのリスト
+        reg_text: 規制のテキスト（小文字化済み）
+
+    Returns:
+        True — マッチは有効
+        False — 排他ルールにより不十分と判定
+    """
+    exclusion = KEYWORD_EXCLUSIONS.get(conv_id)
+    if exclusion is None:
+        # 排他ルールなし → 1個でもマッチすれば OK
+        return True
+
+    min_matches = exclusion.get("min_keyword_matches", 1)
+    required_any = exclusion.get("required_any", [])
+    insufficient = exclusion.get("single_keyword_insufficient", [])
+
+    # チェック 1: 最低マッチ数
+    if len(matched_keywords) < min_matches:
+        # ただし required_any のアンカーキーワードがあれば 1 個でも OK
+        has_anchor = any(
+            _keyword_in_text(anchor, reg_text) for anchor in required_any
+        )
+        if not has_anchor:
+            logger.debug(
+                f"[exclusion] {conv_id}: マッチ数 {len(matched_keywords)} < "
+                f"min {min_matches}、アンカーなし → 除外"
+            )
+            return False
+
+    # チェック 2: single_keyword_insufficient に該当するキーワードのみの場合
+    if insufficient and matched_keywords:
+        all_insufficient = all(
+            kw.lower() in [s.lower() for s in insufficient]
+            for kw in matched_keywords
+        )
+        if all_insufficient:
+            # アンカーキーワードが 1 つでもあれば救済
+            has_anchor = any(
+                _keyword_in_text(anchor, reg_text) for anchor in required_any
+            )
+            if not has_anchor:
+                logger.debug(
+                    f"[exclusion] {conv_id}: マッチしたキーワード "
+                    f"{matched_keywords} は全て insufficient リスト内 → 除外"
+                )
+                return False
+
+    return True
+
+
 def _convention_match(regulation: dict, compliance: list[dict]) -> dict | None:
     """
     規制のタイトル/サマリーと、船に適用される条約のキーワードを照合。
     マッチすれば条約ベースの判定結果を返す。マッチしなければ None。
+    排他ルール (KEYWORD_EXCLUSIONS) を適用して cross-contamination を防止。
     """
     reg_text = (
         f"{regulation.get('title', '')} "
@@ -256,10 +318,26 @@ def _convention_match(regulation: dict, compliance: list[dict]) -> dict | None:
     for conv in compliance:
         if conv["status"] == "not_applicable":
             continue
+
+        # このコンベンションでマッチしたキーワードを全て収集
+        conv_matched_kws: list[str] = []
         for kw in conv.get("keywords", []):
             if _keyword_in_text(kw, reg_text):
-                matched.append(conv)
-                break
+                conv_matched_kws.append(kw)
+
+        if not conv_matched_kws:
+            continue
+
+        # 排他ルールチェック
+        conv_id = conv.get("convention_id", "")
+        if not _passes_exclusion_check(conv_id, conv_matched_kws, reg_text):
+            logger.info(
+                f"[Stage0] {conv_id} は排他ルールにより除外 "
+                f"(マッチ: {conv_matched_kws})"
+            )
+            continue
+
+        matched.append(conv)
 
     if not matched:
         return None

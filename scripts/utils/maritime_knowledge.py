@@ -1838,6 +1838,68 @@ CONVENTION_RULES: list[dict] = [
 
 
 # ---------------------------------------------------------------------------
+# 条約間キーワード排他ルール — cross-contamination 防止
+# ---------------------------------------------------------------------------
+# 単一キーワードだけでは条約を判定しないルール。
+# min_keyword_matches: 最低何個のキーワードがマッチする必要があるか（AND寄りの判定）
+# required_any: これらのうち少なくとも1つが含まれていなければマッチしない（アンカーキーワード）
+# single_keyword_insufficient: これらのキーワード単独ではマッチと判定しない
+
+KEYWORD_EXCLUSIONS: dict[str, dict] = {
+    # "訓練" 単独では STCW とは判定しない — SOLAS 訓練操練と混同防止
+    "STCW": {
+        "min_keyword_matches": 2,
+        "required_any": ["STCW", "船員資格", "海技免状", "海技士", "資格証明",
+                         "当直基準", "CoC", "GoC", "Manila"],
+        "single_keyword_insufficient": ["訓練", "教育", "training", "休息時間",
+                                        "rest hours", "fatigue", "MSC"],
+    },
+    # "設備" "機器" 単独では SOLAS 構造とは判定しない
+    "SOLAS_CH_II1_STRUCTURE": {
+        "min_keyword_matches": 2,
+        "required_any": ["SOLAS", "SOLAS II-1", "Chapter II-1", "構造", "復原性",
+                         "区画", "stability", "subdivision", "CSR", "GBS"],
+        "single_keyword_insufficient": ["設備", "機器", "MSC"],
+    },
+    # "消火" 単独は OK だが "設備" 単独では SOLAS 防火とは判定しない
+    "SOLAS_CH_II2_FIRE": {
+        "min_keyword_matches": 2,
+        "required_any": ["SOLAS", "SOLAS II-2", "Chapter II-2", "防火", "消火",
+                         "fire", "FSS Code", "FTP Code"],
+        "single_keyword_insufficient": ["設備", "機器", "MSC"],
+    },
+    # "労働" 単独では MLC とは判定しない — 一般的な労働ニュースと混同防止
+    "MLC_2006": {
+        "min_keyword_matches": 2,
+        "required_any": ["MLC", "海上労働", "Maritime Labour", "DMLC",
+                         "Maritime Labour Certificate", "海上労働証書"],
+        "single_keyword_insufficient": ["労働", "労働条件", "労働時間", "休息時間",
+                                        "食料", "medical", "健康"],
+    },
+    # "環境" 単独では MARPOL とは判定しない — 一般環境ニュースと混同防止
+    "MARPOL_I_OIL": {
+        "min_keyword_matches": 2,
+        "required_any": ["MARPOL", "MARPOL I", "Annex I", "油濁", "IOPP",
+                         "油排出", "SOPEP", "ORB"],
+        "single_keyword_insufficient": ["環境", "汚染", "排出", "MEPC"],
+    },
+    "MARPOL_VI_AIR": {
+        "min_keyword_matches": 2,
+        "required_any": ["MARPOL", "MARPOL VI", "Annex VI", "SOx", "NOx",
+                         "GHG", "EEDI", "EEXI", "CII", "硫黄", "DCS"],
+        "single_keyword_insufficient": ["環境", "排出", "MEPC", "温室"],
+    },
+    # "安全" 単独では ISM とは判定しない
+    "ISM_CODE": {
+        "min_keyword_matches": 2,
+        "required_any": ["ISM", "ISM Code", "安全管理", "SMS", "DOC",
+                         "SMC", "Safety Management"],
+        "single_keyword_insufficient": ["安全", "管理", "MSC"],
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # ユーティリティ関数
 # ---------------------------------------------------------------------------
 

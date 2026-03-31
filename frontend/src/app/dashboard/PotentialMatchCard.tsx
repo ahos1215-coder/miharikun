@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Loader2 } from "lucide-react";
 
 interface PotentialMatchCardProps {
   matchId: string;
@@ -9,12 +11,40 @@ interface PotentialMatchCardProps {
 }
 
 export function PotentialMatchCard({ matchId, reason }: PotentialMatchCardProps) {
-  const handleConfirm = (applicable: boolean) => {
-    toast.info("この機能は準備中です", {
-      description: applicable
-        ? "「該当」として記録する機能を実装予定です"
-        : "「非該当」として記録する機能を実装予定です",
-    });
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async (confirmed: boolean) => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/confirm-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, confirmed }),
+      });
+
+      if (!res.ok) {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "リクエストに失敗しました");
+      }
+
+      if (confirmed) {
+        toast.success("判定を確定しました", {
+          description: "該当する規制として記録されました",
+        });
+      } else {
+        toast.success("非該当として記録しました", {
+          description: "この規制は非該当として記録されました",
+        });
+      }
+
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "エラーが発生しました";
+      toast.error("更新に失敗しました", { description: message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,16 +58,20 @@ export function PotentialMatchCard({ matchId, reason }: PotentialMatchCardProps)
       <div className="flex gap-2">
         <button
           type="button"
+          disabled={loading}
           onClick={() => handleConfirm(true)}
-          className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 transition-colors"
+          className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
+          {loading && <Loader2 size={12} className="animate-spin" />}
           はい、該当します
         </button>
         <button
           type="button"
+          disabled={loading}
           onClick={() => handleConfirm(false)}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition-colors dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          className="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
         >
+          {loading && <Loader2 size={12} className="animate-spin" />}
           いいえ、該当しません
         </button>
       </div>

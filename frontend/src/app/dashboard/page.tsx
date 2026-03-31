@@ -14,7 +14,8 @@ import {
   Anchor,
   Shield,
   BookOpen,
-  CalendarClock,
+  CheckCircle,
+  ArrowUpDown,
 } from "lucide-react";
 import type {
   ShipProfile,
@@ -25,6 +26,8 @@ import type {
 } from "@/lib/types";
 import { SHIP_TYPE_LABELS } from "@/lib/types";
 import { PotentialMatchCard } from "./PotentialMatchCard";
+import { FeedbackButtons } from "@/components/feedback-buttons";
+import { DeadlineBadge } from "@/components/deadline-badge";
 
 /* ──────────────────── helpers ──────────────────── */
 
@@ -319,12 +322,13 @@ function shipCardDelay(index: number): string {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string; tab?: string }>;
+  searchParams: Promise<{ show?: string; tab?: string; sort?: string }>;
 }) {
   const params = await searchParams;
   const showAll = params.show === "all";
   const activeTabKey = params.tab ?? "all";
   const activeTab = CATEGORY_TABS.find((t) => t.key === activeTabKey) ?? CATEGORY_TABS[0];
+  const sortByDeadline = params.sort === "deadline";
 
   const supabase = await createClient();
 
@@ -402,12 +406,15 @@ export default async function DashboardPage({
       ) : (
         <>
           {/* Category tabs */}
-          <nav className="flex gap-1 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
+          <nav className="flex gap-1 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
             {CATEGORY_TABS.map((tab) => {
               const isActive = tab.key === activeTab.key;
-              const href = tab.key === "all"
-                ? showAll ? "/dashboard?show=all" : "/dashboard"
-                : showAll ? `/dashboard?show=all&tab=${tab.key}` : `/dashboard?tab=${tab.key}`;
+              const p = new URLSearchParams();
+              if (showAll) p.set("show", "all");
+              if (tab.key !== "all") p.set("tab", tab.key);
+              if (sortByDeadline) p.set("sort", "deadline");
+              const qs = p.toString();
+              const href = `/dashboard${qs ? `?${qs}` : ""}`;
               return (
                 <Link
                   key={tab.key}
@@ -425,12 +432,58 @@ export default async function DashboardPage({
             })}
           </nav>
 
+          {/* Sort links */}
+          <div className="flex items-center gap-1.5 text-sm mb-6">
+            <ArrowUpDown size={14} className="text-zinc-400" />
+            <Link
+              href={(() => {
+                const p = new URLSearchParams();
+                if (showAll) p.set("show", "all");
+                if (activeTabKey !== "all") p.set("tab", activeTabKey);
+                const qs = p.toString();
+                return `/dashboard${qs ? `?${qs}` : ""}`;
+              })()}
+              className={cn(
+                "rounded-md px-2.5 py-1 transition-colors",
+                !sortByDeadline
+                  ? "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+              )}
+            >
+              掲載日順
+            </Link>
+            <Link
+              href={(() => {
+                const p = new URLSearchParams();
+                if (showAll) p.set("show", "all");
+                if (activeTabKey !== "all") p.set("tab", activeTabKey);
+                p.set("sort", "deadline");
+                return `/dashboard?${p.toString()}`;
+              })()}
+              className={cn(
+                "rounded-md px-2.5 py-1 transition-colors",
+                sortByDeadline
+                  ? "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+              )}
+            >
+              適用日順
+            </Link>
+          </div>
+
           <div className="flex flex-col gap-6">
             {shipList.map((ship, shipIndex) => {
               const allShipMatches = (matchesByShip[ship.id] ?? []).sort((a, b) => {
                 const order = (v: boolean | null) => v === true ? 0 : v === null ? 1 : 2;
                 const orderDiff = order(a.is_applicable) - order(b.is_applicable);
                 if (orderDiff !== 0) return orderDiff;
+                if (sortByDeadline) {
+                  const edA = a.regulation?.effective_date ?? "";
+                  const edB = b.regulation?.effective_date ?? "";
+                  if (edA && !edB) return -1;
+                  if (!edA && edB) return 1;
+                  if (edA && edB) return edA.localeCompare(edB);
+                }
                 const dateA = a.regulation?.published_at ?? "";
                 const dateB = b.regulation?.published_at ?? "";
                 return dateB.localeCompare(dateA);
@@ -544,6 +597,12 @@ export default async function DashboardPage({
                             <div className="flex flex-wrap items-center gap-1.5 mb-2">
                               {m.regulation && severityBadge(m.regulation.severity)}
                               {sourceBadge(m.regulation?.source)}
+                              {m.match_method === "user_confirmed" && (
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  <CheckCircle size={10} />
+                                  ユーザー確認済み
+                                </span>
+                              )}
                               {responsibilityBadges(responsibilities)}
                             </div>
 
@@ -570,12 +629,7 @@ export default async function DashboardPage({
 
                             {/* Row 4: Metadata line */}
                             <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500 mb-1">
-                              {m.regulation?.effective_date && (
-                                <span className="inline-flex items-center gap-1">
-                                  <CalendarClock size={11} />
-                                  適用日: {formatDate(m.regulation.effective_date)}
-                                </span>
-                              )}
+                              <DeadlineBadge effectiveDate={m.regulation?.effective_date ?? null} />
                               {m.confidence !== null && (
                                 <span>確度 {Math.round(m.confidence * 100)}%</span>
                               )}
@@ -628,6 +682,18 @@ export default async function DashboardPage({
                                   ? "AI による判定を再試行中です。しばらくお待ちください。"
                                   : m.reason}
                               </p>
+                            )}
+
+                            {/* Row 9: Feedback buttons (convention_based / ai_matching only) */}
+                            {m.is_applicable === true &&
+                              (m.match_method === "convention_based" ||
+                                m.match_method === "ai_matching") && (
+                              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                                <FeedbackButtons
+                                  matchId={m.id}
+                                  currentApplicable={m.is_applicable}
+                                />
+                              </div>
                             )}
 
                             {/* Potential match confirmation UI */}

@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Regulation, Severity } from "@/lib/types";
+import { DeadlineBadge } from "@/components/deadline-badge";
 
 const PAGE_SIZE = 10;
 
@@ -127,14 +128,6 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-function formatEffectiveDate(dateStr: string | null): string | null {
-  if (!dateStr) return null;
-  return new Date(dateStr).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-}
 
 /** Staggered animation class for first 5 items */
 function itemAnimationClass(index: number): string {
@@ -574,7 +567,6 @@ export default async function NewsPage({
               const isNew = isWithin24Hours(reg.published_at);
               const isApplicable = allMatchedIds.has(reg.id);
               const displayTitle = getDisplayTitle(reg);
-              const effectiveDateStr = formatEffectiveDate(reg.effective_date);
               const actionTags = getActionTags(reg);
 
               return (
@@ -600,11 +592,7 @@ export default async function NewsPage({
                           </span>
                         )}
                       </div>
-                      {effectiveDateStr && (
-                        <span className="shrink-0 inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
-                          適用日: {effectiveDateStr}
-                        </span>
-                      )}
+                      <DeadlineBadge effectiveDate={reg.effective_date} className="shrink-0" />
                     </div>
 
                     {/* Title (headline first) */}
