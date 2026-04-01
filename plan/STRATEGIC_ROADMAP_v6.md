@@ -8,14 +8,17 @@
 
 ## 2. 戦略的 3 フェーズ
 
-### フェーズ 1: 集約と鮮度維持 (Data Foundation) ✅ ほぼ完了
-- [x] NK/MLIT/e-Gov スクレイパー (4ソース、15 GHA ワークフロー)
-- [x] 453件の規制データ収集済み
+### フェーズ 1: 集約と鮮度維持 (Data Foundation) ✅ 完了
+- [x] NK/MLIT/e-Gov スクレイパー (4ソース + 関東運輸局テスト、19 GHA ワークフロー)
+- [x] 規制データ収集 → ノイズ蒸留: 453件→44件 (除去率90%)
+- [x] ノイズフィルタ v2.4: ホワイトリスト31語 + 単独除外265語 + AND条件86ペア
+- [x] 国交省スクレイピング再設計: BFS→シードURL方式 + `<main>`ハッシュ + Discovery Mode
+- [x] RSSフィルタ厳格化: filters.py SSoT、除外を包含より先に実行
 - [x] 67書籍マスターデータ (publications テーブル投入済み)
-- [x] 書籍 applicability_rules JSON 化
-- [x] publications/ パッケージ分割 (2,369行→7ファイル)
-- [ ] 版数監視の本実装 (海文堂 + JHA + IMO) ← 実装中
-- [ ] 水路刊行物の2026年版をDBに反映
+- [x] 書籍 applicability_rules JSON 化 + publications/ パッケージ分割
+- [x] 版数監視: 海文堂 + JHA + IMO の3ソース実装済み
+- [x] gemini_config.py によるGemini設定統一
+- [x] Gemini アクション抽出 (extract_actions.py) → アクションなし=hidden
 
 ### フェーズ 2: 船舶スペックによる抽出 (Matching Engine) ✅ 完了
 - [x] 43条約ルール + 871キーワード
@@ -47,7 +50,12 @@
 - [x] 書籍 G/A/R ステータス可視化
 - [x] 書籍マスターデータ DB 投入 (seed_publications 実行済み)
 - [x] 書籍 applicability_rules JSON + publications/ パッケージ分割
-- [x] 週次版数チェッカー GHA (フレームワーク)
+- [x] 週次版数チェッカー: 海文堂 + JHA + IMO 実装済み (NK/UKHO/ILO stub)
+- [x] 国交省スクレイピング再設計 (シードURL方式 + Discovery Mode)
+- [x] ノイズフィルタ v2.4 (filters.py SSoT, 351パターン)
+- [x] Gemini アクション抽出 (extract_actions.py)
+- [x] Vercel miharikun2.vercel.app 再デプロイ
+- [x] 副船長プロトコル + 効率優先思考 (CLAUDE.md)
 - [x] extract-rules.yml: 規制→applicability_rules 抽出バッチ
 - [x] Cmd+K コマンドパレット
 - [x] PWA オフライン対応 + Service Worker

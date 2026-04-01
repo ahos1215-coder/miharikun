@@ -37,7 +37,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | デプロイ | Vercel 自動デプロイ (git push → 自動ビルド) |
 | DB | Supabase (PostgreSQL + Auth + RLS) |
 | AI | Google Gemini 2.5 Flash API (**Tier 1 Pay-as-you-go**) |
-| バッチ | GitHub Actions (17 ワークフロー) |
+| バッチ | GitHub Actions (19 ワークフロー) |
 | リポジトリ | Public (GHA 無制限のため) |
 | コード規模 | 約 15,018 行 |
 
@@ -85,7 +85,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 
 ---
 
-## 5. GitHub Actions ワークフロー (全 17)
+## 5. GitHub Actions ワークフロー (全 19)
 
 | ファイル | スケジュール | 内容 |
 |---------|------------|------|
@@ -103,7 +103,9 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | `check-publications.yml` | 週次 月曜 JST 11:00 | 書籍版数更新チェッカー (5発行元) |
 | `ci.yml` | PR / push | CI (TypeScript + pytest + ESLint) |
 | `scrape-kanto.yml` | 週次 火曜 JST 12:00 | 関東運輸局テスト監視 |
-| `cleanup-noise.yml` | 手動 | ノイズデータ一括清掃 |
+| `cleanup-noise.yml` | 手動 | ノイズデータ一括清掃 (filters.py v2.4) |
+| `extract-actions.yml` | 手動 | Gemini でアクション抽出 (最終蒸留) |
+| `export-mlit.yml` | 手動 | MLIT記事エクスポート (監査用) |
 | `security-scan.yml` | 週次 / PR | TruffleHog + npm/pip audit |
 | `notify-on-failure.yml` | — | 再利用可能失敗通知 (called by others) |
 
@@ -216,31 +218,56 @@ ship_profiles (5項目 + radio_equipment)
 
 ---
 
-## 10. 既知の問題
+## 10. ノイズフィルタリングシステム (filters.py v2.4)
+
+### アーキテクチャ
+```
+RSS 入口 → filters.py (should_exclude_rss) → 除外を包含より先に実行
+DB 事後清掃 → filters.py (is_noise) → cleanup_noise.py
+アクション抽出 → extract_actions.py → アクションなし=hidden
+```
+
+### フィルタ v2.4 スペック
+- **ホワイトリスト**: 31語（EEXI/CII/船員法改正/フルハーネス/義務化 等）
+- **単独除外**: 265語（旅客船/造船/港湾/行政/GHG/MaaS/観光/内航商慣習/事務手続き等）
+- **AND条件除外**: 86ペア
+- **合計**: 351パターン
+
+### 蒸留実績
+- 元データ: 453件 → 蒸留後: 44件（MLIT）+ 34件（NK）= 78件
+- 除去率: 90%
+
+### 主要ファイル
+- `scripts/utils/filters.py` — ノイズフィルタ定義の SSoT
+- `scripts/cleanup_noise.py` — DB事後清掃
+- `scripts/extract_actions.py` — Gemini でアクション抽出
+
+---
+
+## 11. 既知の問題
 
 - **LINE_NOTIFY_TOKEN 未設定**: LINE 通知機能は実装済みだが Token 未設定のため動作しない
 - **RESEND_API_KEY 未設定**: 週次サマリーメール機能は実装済みだが API キー未設定のため動作しない
 - **フロントエンド単体テスト未導入**: Jest/Vitest のセットアップがまだ
-- **Version Tracker**: 5発行元のスクレイパーは未実装（フレームワークのみ）
+- **Version Tracker**: 海文堂/JHA/IMO の3ソースは実装済み。NK/UKHO/ILO は stub
 
 ---
 
-## 11. 次のアクション
+## 12. 次のアクション
 
 ### ユーザー作業 (手動)
 - [ ] `LINE_NOTIFY_TOKEN` を GitHub Secrets に設定
 - [ ] `RESEND_API_KEY` を Vercel env に設定
 
 ### 開発タスク (短期)
-- [ ] Version Tracker スクレイパー実装 (IMO Publishing / 海上保安庁 水路部)
 - [ ] フロントエンド単体テスト導入 (Jest/Vitest)
-- [ ] 最新エンジンでの全件再マッチング（Gemini API）
+- [ ] MLITクローラー（シードURL方式）のテスト実行
+- [ ] COLREG 2026 Edition / IMSBC 2025 Edition のDB反映
 
 ### 中期タスク
-- [ ] DSPy プロンプト最適化（誤判定フィードバック50件蓄積後）
 - [ ] 通知頻度の調整 (即時/日次/週次の切り分け)
-- [ ] テキストベースの低帯域最適化
 - [ ] ビジネスモデル実装（Free/Pro ティア）
+- [ ] DSPy プロンプト最適化（誤判定フィードバック50件蓄積後）
 
 詳細: `plan/STRATEGIC_ROADMAP_v6.md` (v7 方針)
 

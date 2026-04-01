@@ -18,6 +18,8 @@
 | Phase 3: Fleet + 拡張 + コンプライアンスエンジン | — | ⏳ 作業中 | 2026-04-01 |
 | マッチングエンジン刷新 (v3→4段階) | — | ✅ 完了 | 2026-04-01 |
 | コードベース整理 (publications分割等) | — | ✅ 完了 | 2026-04-01 |
+| 国交省スクレイピング再設計 | — | ✅ 完了 | 2026-04-01 |
+| ノイズフィルタ v2.4 + アクション抽出 | — | ⏳ 実行中 | 2026-04-01 |
 
 ---
 
@@ -454,4 +456,13 @@
 - 2026-04-01 — [User] 00011_publications_v2.sql を Supabase で実行 ✅
 - 2026-04-01 — [Role D/Opus] seed-publications 再実行成功: 67書籍 (新ID + applicability_rules + 2026年版)
 - 2026-04-01 — [Role D/Opus] 全ドキュメント v7 方針更新: STRATEGIC_ROADMAP_v6.md→v7, HANDOFF.md, PROGRESS.md, CLAUDE.md
-- 2026-03-31 — [Role B/Opus] MLITクローラーBFS→シードURL方式全面書き換え: mlit_seed_urls.py (シード6件+ノイズフィルタ), scrape_mlit_crawl.py (全面書換), cleanup_noise.py (ノイズ清掃), scrape-mlit-crawl.yml (タイムアウト15分化+Gemini vars削除)
+- 2026-03-31 — [Role B/Opus] MLITクローラーBFS→シードURL方式全面書き換え
+- 2026-04-01 — [Role D/Opus] Vercel miharikun2 プロジェクト再作成、URL統一
+- 2026-04-01 — [Role B/Opus] 版数監視3ソース実装: 海文堂 + JHA + IMO (stub→実スクレイパー)
+- 2026-04-01 — [Role D/Opus] 国交省スクレイピング再設計: シードURL方式 + <main>ハッシュ + Discovery Mode
+- 2026-04-01 — [Role B/Opus] RSSフィルタ厳格化: 除外を包含より先に実行 + filters.py SSoT化
+- 2026-04-01 — [Role B/Opus] 関東運輸局テスト監視: scrape_kanto_bureau.py + scrape-kanto.yml
+- 2026-04-01 — [Role D/Opus] ノイズ清掃: 453件→44件 (除去率90%)。フィルタv2.0→v2.1→v2.2→v2.3→v2.4
+- 2026-04-01 — [Role D/Opus] filters.py v2.4: ホワイトリスト31語 + 単独除外265語 + AND条件86ペア = 351パターン
+- 2026-04-01 — [Role B/Opus] extract_actions.py: 44件にGeminiでアクション抽出 → アクションなし=hidden
+- 2026-04-01 — [Role D/Opus] ドキュメント全面更新: PROGRESS + HANDOFF + ROADMAP
