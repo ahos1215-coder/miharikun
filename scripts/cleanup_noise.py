@@ -1,8 +1,17 @@
 """
 既存ノイズデータの一括清掃
 ===========================
-旅客船事故関連など、マッチング精度を下げるノイズレコードを
-regulations テーブルから削除するワンショットスクリプト。
+「航海士が読んでも、設備を変える必要も、マニュアルを改訂する必要も、
+免状の手続きが変わることもない情報」を regulations テーブルから削除する。
+
+ノイズの定義:
+  - 旅客船・遊覧船の事故対策検討会
+  - 造船・舶用工業の産業政策
+  - 港湾施設・インフラ整備
+  - 審議会・検討会・議事録
+  - 統計・調査報告
+  - 一般啓発・広報（海の日等）
+  - 漁船・プレジャーボート専用の規制
 
 使い方:
   python cleanup_noise.py --dry-run   # 削除対象の確認のみ
@@ -37,17 +46,96 @@ logger = logging.getLogger("cleanup_noise")
 # ノイズパターン（タイトルまたは要約に含まれる文字列）
 # ---------------------------------------------------------------------------
 
-NOISE_PATTERNS: list[str] = [
-    "旅客船の安全",
+# ---------------------------------------------------------------------------
+# ノイズ判定: 「アクション性テスト」
+# 以下のいずれかを行う必要があるか？
+#   1. 設備の換装  2. 書類の更新  3. 免状の手続き  4. SMSの変更
+# いずれにも該当しない → ノイズ
+# ---------------------------------------------------------------------------
+
+# タイトルまたは要約に含まれればノイズと判定（単独条件）
+NOISE_KEYWORDS_SINGLE: list[str] = [
+    # 旅客船・遊覧船の事故対策
     "旅客船安全対策",
     "知床遊覧船",
     "遊覧船事故",
     "小型旅客船の安全",
-    "検討委員会",
+    "観光船事故",
+    # 造船・舶用工業・産業政策
     "造船業の再生",
     "造船・舶用工業",
+    "舶用工業の振興",
+    "造船所の生産性",
+    "造船業の経営",
+    "環境対応船の建造",
     "海事産業の現状",
+    "海事産業の基盤強化",
+    # 港湾施設・インフラ
+    "港湾建設",
+    "岸壁整備",
+    "しゅんせつ",
+    "防波堤",
+    "港湾施設の耐震",
+    "ターミナル設計",
+    "水素ステーション",
+    "アンモニア燃料供給",
+    "陸上電力供給",
+    "バンカリング施設",
+    # 審議会・検討会・議事録・行政手続き
+    "審議会開催",
+    "検討委員会",
+    "検討会の開催",
+    "委員会議事",
+    "議事録",
+    "パブリックコメント募集結果",
+    "意見募集の結果",
+    "人事異動",
+    "組織改編",
+    # 統計・調査・レポート
+    "海事レポート",
+    "船員数統計",
+    "海運統計",
+    "交通統計",
+    "海事産業調査",
+    "実態調査の結果",
+    # 一般啓発・広報
+    "海の日",
+    "海事教育",
+    "海事アワード",
+    "海事週間",
     "海事観光",
+    "海洋教育",
+    "海の恩恵",
+    # 他業種（漁船・プレジャーボート等）
+    "プレジャーボート",
+    "遊漁船",
+    "漁船の登録",
+    "小型船舶操縦免許",
+    "ボート免許",
+    "モーターボート競走",
+    "帆船模型",
+    # 予算・入札
+    "予算概算要求",
+    "入札公告",
+    "補助金交付",
+    "決算報告",
+]
+
+# AND条件: 2つのキーワードが両方含まれる場合にノイズ
+NOISE_KEYWORD_PAIRS: list[tuple[str, str]] = [
+    ("旅客船", "検討会"),
+    ("旅客船", "対策"),
+    ("旅客船", "委員会"),
+    ("旅客船", "中間とりまとめ"),
+    ("旅客船", "方向性"),
+    ("知床", "事故"),
+    ("観光船", "安全対策"),
+    ("造船", "振興"),
+    ("造船", "支援"),
+    ("港湾", "グリーン化"),
+    ("港湾", "脱炭素"),
+    ("カーボンニュートラル", "ビジョン"),
+    ("カーボンニュートラル", "長期"),
 ]
 
 
@@ -55,48 +143,80 @@ NOISE_PATTERNS: list[str] = [
 # ノイズレコード検索
 # ---------------------------------------------------------------------------
 
+def is_noise(title: str, summary: str) -> tuple[bool, str]:
+    """
+    タイトルと要約からノイズかどうかを判定。
+
+    Returns:
+        (is_noise: bool, reason: str)
+    """
+    combined = f"{title} {summary}".lower()
+
+    # 単独キーワード除外
+    for kw in NOISE_KEYWORDS_SINGLE:
+        if kw.lower() in combined:
+            return True, f"単独キーワード: {kw}"
+
+    # AND条件除外
+    for kw1, kw2 in NOISE_KEYWORD_PAIRS:
+        if kw1.lower() in combined and kw2.lower() in combined:
+            return True, f"AND条件: {kw1} + {kw2}"
+
+    return False, ""
+
+
 def find_noise_records(client: SupabaseClient) -> list[dict]:
     """
-    source='MLIT' かつ タイトルに NOISE_PATTERNS を含むレコードを全取得。
-    Supabase REST API の or フィルタを使用。
+    全ソースの regulations から、ノイズ判定されるレコードを全取得。
+    全件取得してローカルで判定（Supabase の or フィルタの複雑さを回避）。
     """
     if not client._configured:
         logger.warning("Supabase 未設定: ノイズレコードを検索できません。")
         return []
 
-    all_noise: list[dict] = []
+    # 全件取得（ページネーション付き）
+    all_records: list[dict] = []
+    offset = 0
+    page_size = 1000
 
-    for pattern in NOISE_PATTERNS:
+    while True:
         try:
             resp = requests.get(
                 f"{client.url}/rest/v1/regulations",
                 params={
-                    "source": "eq.MLIT",
-                    "title": f"like.*{pattern}*",
-                    "select": "id,source_id,title,url,pdf_url",
-                    "limit": "1000",
+                    "select": "id,source_id,source,title,summary_ja,url,pdf_url",
+                    "limit": str(page_size),
+                    "offset": str(offset),
                 },
                 headers=client._headers,
                 timeout=30,
             )
             resp.raise_for_status()
             records = resp.json()
-            if records:
-                all_noise.extend(records)
-                logger.info("パターン '%s' — %d 件ヒット", pattern, len(records))
+            if not records:
+                break
+            all_records.extend(records)
+            offset += page_size
+            if len(records) < page_size:
+                break
         except Exception as e:
-            logger.error("検索エラー (パターン='%s'): %s", pattern, e)
+            logger.error("全件取得エラー (offset=%d): %s", offset, e)
+            break
 
-    # 重複排除（id ベース）
-    seen_ids: set[str] = set()
-    unique_noise: list[dict] = []
-    for record in all_noise:
-        record_id = str(record.get("id", ""))
-        if record_id and record_id not in seen_ids:
-            seen_ids.add(record_id)
-            unique_noise.append(record)
+    logger.info("全規制レコード取得: %d 件", len(all_records))
 
-    return unique_noise
+    # ローカルでノイズ判定
+    noise_records: list[dict] = []
+    for record in all_records:
+        title = record.get("title") or ""
+        summary = record.get("summary_ja") or ""
+        noise, reason = is_noise(title, summary)
+        if noise:
+            record["_noise_reason"] = reason
+            noise_records.append(record)
+            logger.debug("ノイズ: [%s] %s — %s", record.get("source", "?"), title[:60], reason)
+
+    return noise_records
 
 
 # ---------------------------------------------------------------------------
@@ -180,14 +300,31 @@ def main() -> None:
     client = SupabaseClient()
 
     # ノイズレコード検索
-    logger.info("ノイズレコード検索開始（%d パターン）", len(NOISE_PATTERNS))
+    total_keywords = len(NOISE_KEYWORDS_SINGLE) + len(NOISE_KEYWORD_PAIRS)
+    logger.info("ノイズレコード検索開始（単独%d + AND%d = %d パターン）",
+                len(NOISE_KEYWORDS_SINGLE), len(NOISE_KEYWORD_PAIRS), total_keywords)
     noise_records = find_noise_records(client)
 
     if not noise_records:
         logger.info("ノイズレコードは見つかりませんでした。")
         return
 
+    # ソース別カウント
+    source_counts: dict[str, int] = {}
+    for r in noise_records:
+        src = r.get("source", "unknown")
+        source_counts[src] = source_counts.get(src, 0) + 1
+
     logger.info("ノイズレコード検出: %d 件", len(noise_records))
+    for src, cnt in sorted(source_counts.items()):
+        logger.info("  %s: %d 件", src, cnt)
+
+    # 削除対象のタイトル一覧（dry-run でも表示）
+    for r in noise_records:
+        logger.info("  [%s] %s — 理由: %s",
+                    r.get("source", "?"),
+                    (r.get("title") or "?")[:60],
+                    r.get("_noise_reason", "?"))
 
     # 削除
     deleted = delete_noise_records(client, noise_records, args.dry_run)
