@@ -75,6 +75,34 @@ MARITIME_KEYWORDS = [
     "海洋", "沿岸", "運輸局", "海事局",
 ]
 
+# ---------------------------------------------------------------------------
+# 除外キーワード（AND条件: 2つ以上同時に含む場合に除外）
+# Gemini推奨: 「旅客船」一律除外ではなく、コンテキストで除外
+# ---------------------------------------------------------------------------
+
+EXCLUDE_KEYWORD_PAIRS: list[tuple[str, str]] = [
+    ("旅客船", "検討会"),
+    ("旅客船", "対策"),
+    ("旅客船", "委員会"),
+    ("旅客船", "中間とりまとめ"),
+    ("知床", "事故"),
+    ("知床", "遊覧船"),
+    ("遊覧船", "事故"),
+    ("観光船", "事故"),
+]
+
+EXCLUDE_KEYWORDS_SINGLE: list[str] = [
+    "造船業の再生",
+    "舶用工業",
+    "産業振興",
+    "モーターボート競走",
+    "海事観光",
+    "入札公告",
+    "人事異動",
+    "組織改編",
+    "帆船模型",
+]
+
 SOURCE_PREFIX = "MLIT"
 USER_AGENT = "MaritimeRegsMonitor/0.1 (+https://github.com/ahos1215-coder)"
 
@@ -113,6 +141,27 @@ def is_maritime_related(title: str, summary: str, link: str = "") -> bool:
     for keyword in MARITIME_KEYWORDS:
         if keyword.lower() in text:
             return True
+    return False
+
+
+def should_exclude(title: str, summary: str) -> bool:
+    """
+    除外すべきかどうかを判定。
+    AND条件: 2つのキーワードが両方含まれる場合に除外
+    SINGLE: 1つのキーワードが含まれれば除外
+    """
+    combined = f"{title} {summary}".lower()
+
+    # AND条件除外
+    for kw1, kw2 in EXCLUDE_KEYWORD_PAIRS:
+        if kw1 in combined and kw2 in combined:
+            return True
+
+    # 単独除外
+    for kw in EXCLUDE_KEYWORDS_SINGLE:
+        if kw in combined:
+            return True
+
     return False
 
 
@@ -272,6 +321,7 @@ def fetch_rss_entries(
         海事関連エントリのリスト（各エントリは feedparser の dict）
     """
     all_entries: list[dict] = []
+    excluded_count = 0
 
     for url in rss_urls:
         logger.info("RSS フィード取得中: %s", url)
@@ -308,6 +358,11 @@ def fetch_rss_entries(
 
                 # 海事キーワードフィルタ（URL パスの kaiji も判定）
                 if is_maritime_related(title, summary, link):
+                    # 除外チェック
+                    if should_exclude(title, summary):
+                        logger.info("除外: %s", title[:50])
+                        excluded_count += 1
+                        continue
                     all_entries.append(entry)
                     logger.debug("海事エントリ検出: %s", title[:60])
 
@@ -315,7 +370,7 @@ def fetch_rss_entries(
             logger.error("RSS フィード取得エラー: %s — %s", url, e)
             continue
 
-    logger.info("海事関連エントリ合計: %d 件", len(all_entries))
+    logger.info("海事関連エントリ合計: %d 件（除外: %d 件）", len(all_entries), excluded_count)
     return all_entries
 
 

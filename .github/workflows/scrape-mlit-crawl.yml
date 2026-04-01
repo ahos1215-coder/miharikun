@@ -10,26 +10,17 @@ on:
         description: 'Dry run（DB 書き込みをスキップ）'
         type: boolean
         default: false
-      max_pages:
-        description: 'クロール最大ページ数'
-        type: string
-        default: '100'
-      depth:
-        description: 'クロール深さ（1-5）'
-        type: string
-        default: '3'
 
 jobs:
   crawl-mlit:
-    name: MLIT ウェブクロール
+    name: MLIT シードURL方式クロール
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
-      MLIT_CRAWL_DEPTH: ${{ github.event.inputs.depth || '3' }}
 
     steps:
       - name: リポジトリをチェックアウト
@@ -52,27 +43,13 @@ jobs:
         run: |
           cd scripts
 
-          # 引数を組み立て
           ARGS=""
 
-          # dry_run フラグ
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
 
-          # max_pages
-          MAX_PAGES="${{ github.event.inputs.max_pages }}"
-          if [ -n "$MAX_PAGES" ]; then
-            ARGS="$ARGS --max-pages $MAX_PAGES"
-          fi
-
-          # depth
-          DEPTH="${{ github.event.inputs.depth }}"
-          if [ -n "$DEPTH" ]; then
-            ARGS="$ARGS --depth $DEPTH"
-          fi
-
-          python scrape_mlit_crawl.py $ARGS
+          python scrape_mlit_crawl.py $ARGS --verbose
 
       - name: ログをアーティファクトとして保存
         if: always()

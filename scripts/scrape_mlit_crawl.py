@@ -1,53 +1,55 @@
 """
-国交省（MLIT）海事局 ウェブクロール — 第 2 層
-==============================================
-`mlit.go.jp/maritime/` 配下を BFS（幅優先探索）でクロールし、
-ページハッシュの差分から新規・更新コンテンツを検出する。
+国交省（MLIT）海事局 シードURL方式クローラー
+=============================================
+BFS を廃止し、重要インデックスページ（シードURL）を直接巡回する。
+Gemini 不要 — PDF 分類は pending_queue 経由で process-queue に委任。
 
 処理フロー:
-  1) 起点 URL から BFS でリンクをたどる（深さ・ページ数制限あり）
-  2) 各ページの SHA256 ハッシュを Supabase mlit_crawl_state と比較
-  3) 変更ページから PDF リンクを抽出
-  4) 新規 PDF を Gemini で分類 → Supabase に保存
-  5) クロール状態を mlit_crawl_state テーブルに更新
+  1) シードURL 6 ページを巡回
+  2) 各ページから POLICY_URL_PATTERNS にマッチするリンクを全抽出
+  3) NOISE_URL_PATTERNS / NOISE_TITLE_KEYWORDS で除外
+  4) 抽出した施策ページURL（推定40-60件）を巡回
+  5) 各ページの <main> 要素のテキストハッシュを計算
+  6) mlit_crawl_state の前回ハッシュと比較
+  7) 差分あり → 新規 PDF リンクを抽出 → pending_queue に登録
+  8) 差分なし → スキップ
+  9) 全ページの巡回状態を mlit_crawl_state に更新
+  10) 404 エラーのシードURL があれば LINE 通知
 
-安全機構:
-  - 1 回のクロールで 100+ 新規 URL を検出した場合 → 異常として LINE アラート＆中断
-  - リクエスト間隔: 3 秒（サーバー負荷軽減）
-  - robots.txt 遵守（urllib.robotparser）
-  - HTTP Content-Length / Last-Modified ヘッダーでスキップ判定
+Discovery Mode:
+  - mlit_crawl_state に存在しない maritime_fr* URL を発見 → ログに記録
 
 使い方:
   python scrape_mlit_crawl.py
   python scrape_mlit_crawl.py --dry-run
-  python scrape_mlit_crawl.py --max-pages 50 --depth 2
+  python scrape_mlit_crawl.py --dry-run --verbose
 """
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 import argparse
 import hashlib
 import logging
-import os
-import sys
 import time
-from collections import deque
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urljoin, urlparse
-from urllib.robotparser import RobotFileParser
 
 import requests
 from bs4 import BeautifulSoup
 
-# ---------------------------------------------------------------------------
-# パス設定（スクリプト直下から utils を import）
-# ---------------------------------------------------------------------------
-
-sys.path.insert(0, os.path.dirname(__file__))
-
 from utils.supabase_client import SupabaseClient  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
-from utils.pdf_preprocess import check_pdf_url  # type: ignore
-from utils.stealth_fetcher import stealth_get  # type: ignore
+from utils.mlit_seed_urls import (  # type: ignore
+    SEED_URLS,
+    POLICY_URL_PATTERNS,
+    NOISE_URL_PATTERNS,
+    NOISE_TITLE_KEYWORDS,
+    MAIN_CONTENT_SELECTORS,
+)
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -58,85 +60,228 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("scrape_mlit_crawl")
+logger = logging.getLogger("MLIT Crawl")
 
 # ---------------------------------------------------------------------------
-# 定数・設定
+# 定数
 # ---------------------------------------------------------------------------
 
-# クロール起点
-CRAWL_START_URL = "https://www.mlit.go.jp/maritime/"
-
-# URL フィルタ（この文字列を含む URL のみフォロー）
-MARITIME_URL_PATTERN = "/maritime/"
-
-# 異常検知：1 回のクロールで新規 URL がこの数を超えたら中断
-ANOMALY_NEW_URL_THRESHOLD = 100
-
-# リクエスト間隔（秒）
+USER_AGENT = "MaritimeRegsMonitor/0.2 (+https://github.com/ahos1215-coder)"
 REQUEST_INTERVAL_SEC = 3
-
-# デフォルト設定
-DEFAULT_MAX_PAGES = 100
-DEFAULT_CRAWL_DEPTH = 3
-
-USER_AGENT = "MaritimeRegsMonitor/0.1 (+https://github.com/ahos1215-coder)"
-
 SOURCE_PREFIX = "MLIT"
 
-# ---------------------------------------------------------------------------
-# robots.txt チェッカー
-# ---------------------------------------------------------------------------
-
-class RobotsChecker:
-    """robots.txt を尊重するためのヘルパークラス。"""
-
-    def __init__(self, user_agent: str = USER_AGENT):
-        self._cache: dict[str, RobotFileParser] = {}
-        self._user_agent = user_agent
-
-    def _get_robots_url(self, url: str) -> str:
-        parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.netloc}/robots.txt"
-
-    def is_allowed(self, url: str) -> bool:
-        """指定 URL のクロールが robots.txt で許可されているか確認する。"""
-        robots_url = self._get_robots_url(url)
-        if robots_url not in self._cache:
-            parser = RobotFileParser()
-            parser.set_url(robots_url)
-            try:
-                parser.read()
-                self._cache[robots_url] = parser
-                logger.debug("robots.txt 取得完了: %s", robots_url)
-            except Exception as e:
-                logger.warning("robots.txt 取得エラー: %s — %s", robots_url, e)
-                # 取得できない場合はクロール許可と扱う
-                return True
-        return self._cache[robots_url].can_fetch(self._user_agent, url)
+# シードURL の日本語ラベル（ログ用）
+SEED_LABELS: dict[str, str] = {
+    "maritime_mn4_000005": "運航労務監理",
+    "maritime_tk8_000003": "船舶の安全・環境",
+    "maritime_fr4_000030": "船員安全衛生",
+    "maritime_tk4_000016": "船員の現状",
+    "maritime_tk10_000017": "船員養成",
+    "maritime_fr1_000027": "法律",
+}
 
 
 # ---------------------------------------------------------------------------
-# ページハッシュ計算
+# ユーティリティ: ラベル取得
 # ---------------------------------------------------------------------------
 
-def compute_page_hash(content: str) -> str:
-    """ページコンテンツの SHA256 ハッシュを計算する。"""
-    return hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
+def _get_seed_label(url: str) -> str:
+    """シードURL から日本語ラベルを返す。"""
+    for key, label in SEED_LABELS.items():
+        if key in url:
+            return label
+    return url.split("/")[-1]
 
 
 # ---------------------------------------------------------------------------
-# Supabase — mlit_crawl_state テーブル操作（直接 REST API を使用）
+# コンテンツ抽出・ハッシュ
+# ---------------------------------------------------------------------------
+
+def extract_main_content(html: str) -> str:
+    """
+    <main> 要素のテキストを抽出。フォールバック対応。
+    main -> article -> div#content -> div#main -> div.container
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    for selector in MAIN_CONTENT_SELECTORS:
+        name = selector["name"]
+        attrs = dict(selector.get("attrs", {}))
+        # class_ を class に変換（BeautifulSoup の仕様）
+        if "class_" in attrs:
+            attrs["class"] = attrs.pop("class_")
+        element = soup.find(name, attrs=attrs if attrs else None)
+        if element:
+            for tag in element.find_all(["script", "style", "noscript"]):
+                tag.decompose()
+            return element.get_text(strip=True)
+
+    # 最終手段: body からヘッダー/フッターを除去
+    body = soup.find("body")
+    if body:
+        for tag in body.find_all(["header", "footer", "nav", "script", "style", "noscript"]):
+            tag.decompose()
+        return body.get_text(strip=True)
+
+    return ""
+
+
+def compute_content_hash(text: str) -> str:
+    """テキストの SHA256 ハッシュを返す。"""
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# URL フィルタリング
+# ---------------------------------------------------------------------------
+
+def is_policy_url(url: str) -> bool:
+    """POLICY_URL_PATTERNS にマッチするか判定。"""
+    parsed = urlparse(url)
+    return any(pat in parsed.path for pat in POLICY_URL_PATTERNS)
+
+
+def is_noise_url(url: str) -> bool:
+    """NOISE_URL_PATTERNS にマッチするか判定。"""
+    return any(pat in url for pat in NOISE_URL_PATTERNS)
+
+
+def is_noise_title(text: str) -> bool:
+    """NOISE_TITLE_KEYWORDS にマッチするか判定。"""
+    return any(kw in text for kw in NOISE_TITLE_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# リンク抽出
+# ---------------------------------------------------------------------------
+
+def extract_policy_links(html: str, base_url: str) -> list[dict[str, str]]:
+    """
+    HTML から施策ページリンクを抽出する。
+    POLICY_URL_PATTERNS にマッチし、NOISE パターンに該当しないもののみ返す。
+
+    Returns:
+        [{"url": str, "text": str}, ...]
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    base_domain = urlparse(base_url).netloc
+    links: dict[str, str] = {}  # url -> text（重複排除）
+
+    for a_tag in soup.find_all("a", href=True):
+        href: str = a_tag["href"]
+        text: str = a_tag.get_text(strip=True)
+
+        # フラグメント・JavaScript・mailto を除外
+        if href.startswith(("#", "javascript:", "mailto:")):
+            continue
+
+        absolute_url = urljoin(base_url, href).split("#")[0]
+        parsed = urlparse(absolute_url)
+
+        # 同一ドメインのみ
+        if parsed.netloc != base_domain:
+            continue
+
+        # 施策ページパターンにマッチするか
+        if not is_policy_url(absolute_url):
+            continue
+
+        # ノイズ URL を除外
+        if is_noise_url(absolute_url):
+            continue
+
+        # ノイズタイトルを除外
+        if is_noise_title(text):
+            continue
+
+        # PDF リンクはここでは除外（PDF は別途抽出する）
+        if href.lower().endswith(".pdf"):
+            continue
+
+        if absolute_url not in links:
+            links[absolute_url] = text
+
+    return [{"url": url, "text": text} for url, text in links.items()]
+
+
+def extract_pdf_links(html: str, base_url: str) -> list[dict[str, str]]:
+    """
+    ページ内の PDF リンクを抽出。
+    各 PDF の Content-Length と Last-Modified も HEAD リクエストで取得。
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    pdfs: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+
+    for a_tag in soup.find_all("a", href=True):
+        href: str = a_tag["href"]
+        if not href.lower().endswith(".pdf"):
+            continue
+
+        full_url = urljoin(base_url, href)
+        if full_url in seen_urls:
+            continue
+        seen_urls.add(full_url)
+
+        text = a_tag.get_text(strip=True)
+
+        # HEAD リクエストで Content-Length を確認
+        content_length = ""
+        last_modified = ""
+        try:
+            head = requests.head(
+                full_url,
+                timeout=10,
+                allow_redirects=True,
+                headers={"User-Agent": USER_AGENT},
+            )
+            content_length = head.headers.get("Content-Length", "")
+            last_modified = head.headers.get("Last-Modified", "")
+        except Exception:
+            pass
+
+        pdfs.append({
+            "url": full_url,
+            "text": text,
+            "content_length": content_length,
+            "last_modified": last_modified,
+        })
+
+    return pdfs
+
+
+# ---------------------------------------------------------------------------
+# シードURL ヘルスチェック
+# ---------------------------------------------------------------------------
+
+def check_seed_url_health(url: str) -> bool:
+    """シードURL が生きているか確認。404 なら LINE 通知。"""
+    try:
+        resp = requests.head(
+            url,
+            timeout=15,
+            allow_redirects=True,
+            headers={"User-Agent": USER_AGENT},
+        )
+        if resp.status_code == 404:
+            send_alert(
+                title="MLIT シードURL 404",
+                message=f"シードURL が 404 を返しました: {url}\nサイト構造が変更された可能性があります。",
+                severity="critical",
+            )
+            return False
+        return resp.status_code < 400
+    except Exception as e:
+        logger.warning("シードURL ヘルスチェック失敗: %s — %s", url, e)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Supabase — mlit_crawl_state テーブル操作
 # ---------------------------------------------------------------------------
 
 def get_crawl_state(client: SupabaseClient, url: str) -> Optional[dict]:
-    """
-    Supabase から指定 URL のクロール状態を取得する。
-    直接 REST API を叩く（SupabaseClient の汎用メソッドを使用）。
-
-    Returns:
-        クロール状態の dict（存在しない場合は None）
-    """
+    """指定 URL のクロール状態を取得する。"""
     if not client._configured:
         return None
 
@@ -155,25 +300,34 @@ def get_crawl_state(client: SupabaseClient, url: str) -> Optional[dict]:
         return None
 
 
+def get_all_crawl_state_urls(client: SupabaseClient) -> set[str]:
+    """mlit_crawl_state に登録済みの全 URL を取得する（Discovery 判定用）。"""
+    if not client._configured:
+        return set()
+
+    try:
+        resp = requests.get(
+            f"{client.url}/rest/v1/mlit_crawl_state",
+            params={"select": "url", "limit": "10000"},
+            headers=client._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return {r["url"] for r in data if r.get("url")}
+    except Exception as e:
+        logger.warning("クロール状態一覧取得エラー: %s", e)
+        return set()
+
+
 def upsert_crawl_state(
     client: SupabaseClient,
     url: str,
     page_hash: str,
+    pdf_links: list[dict[str, str]],
     content_length: int,
-    last_modified: str,
-    pdf_links: list[str],
 ) -> None:
-    """
-    Supabase の mlit_crawl_state テーブルを更新する（直接 REST API）。
-
-    Args:
-        client: Supabase クライアント
-        url: クロールした URL
-        page_hash: ページ内容の SHA256 ハッシュ
-        content_length: ページのバイト数
-        last_modified: Last-Modified ヘッダーの値
-        pdf_links: 検出された PDF リンクのリスト
-    """
+    """mlit_crawl_state テーブルを更新する。"""
     if not client._configured:
         logger.warning("Supabase 未設定: クロール状態を更新できません。")
         return
@@ -182,10 +336,9 @@ def upsert_crawl_state(
     record = {
         "url": url,
         "page_hash": page_hash,
-        "content_length": content_length,
-        "last_modified": last_modified,
-        "pdf_links": pdf_links,
+        "pdf_links": [p["url"] for p in pdf_links],
         "last_crawled_at": now_iso,
+        "content_length": content_length,
     }
     try:
         resp = requests.post(
@@ -204,71 +357,11 @@ def upsert_crawl_state(
 
 
 # ---------------------------------------------------------------------------
-# リンク抽出
-# ---------------------------------------------------------------------------
-
-def extract_links(base_url: str, html: str) -> list[str]:
-    """
-    HTML から絶対 URL リンクを抽出する。
-    MARITIME_URL_PATTERN を含む URL のみを返す。
-
-    Returns:
-        フィルタ済み絶対 URL のリスト（重複なし）
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    links: set[str] = set()
-    base_domain = urlparse(base_url).netloc
-
-    for a_tag in soup.find_all("a", href=True):
-        href: str = a_tag["href"]
-        # フラグメントや JavaScript リンクを除外
-        if href.startswith("#") or href.startswith("javascript:"):
-            continue
-
-        absolute_url = urljoin(base_url, href)
-        parsed = urlparse(absolute_url)
-
-        # 同一ドメインかつ /maritime/ パターンを含む URL のみ
-        if (
-            parsed.netloc == base_domain
-            and MARITIME_URL_PATTERN in parsed.path
-            and parsed.scheme in ("http", "https")
-        ):
-            # フラグメントを除去して正規化
-            clean_url = absolute_url.split("#")[0]
-            links.add(clean_url)
-
-    return list(links)
-
-
-def extract_pdf_links(base_url: str, html: str) -> list[str]:
-    """
-    HTML から PDF リンクを抽出する。
-
-    Returns:
-        PDF の絶対 URL リスト
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    pdf_links: list[str] = []
-
-    for a_tag in soup.find_all("a", href=True):
-        href: str = a_tag["href"]
-        if href.lower().endswith(".pdf") or "pdf" in href.lower():
-            absolute_url = urljoin(base_url, href)
-            pdf_links.append(absolute_url)
-
-    return pdf_links
-
-
-# ---------------------------------------------------------------------------
 # 既知 PDF URL 取得
 # ---------------------------------------------------------------------------
 
 def get_known_pdf_urls(client: SupabaseClient) -> set[str]:
-    """
-    Supabase から MLIT ソースの既知 PDF URL を取得する。
-    直接 REST API を叩く。
-    """
+    """Supabase から MLIT ソースの既知 PDF URL を取得する。"""
     if not client._configured:
         logger.warning("Supabase 未設定: 既知 PDF URL を取得できません。")
         return set()
@@ -295,325 +388,299 @@ def get_known_pdf_urls(client: SupabaseClient) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# PDF 処理
+# 新規 PDF 登録
 # ---------------------------------------------------------------------------
 
-def generate_source_id(counter: int) -> str:
-    """
-    source_id を生成する。
-    形式: MLIT-{YYYYMMDD}-{連番3桁}
-    """
-    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-    return f"{SOURCE_PREFIX}-{date_str}-{counter:03d}"
-
-
-def process_pdf(
-    pdf_url: str,
+def register_new_pdfs(
+    client: SupabaseClient,
     page_url: str,
-    client: SupabaseClient,
-    known_pdf_urls: set[str],
-    source_id: str,
+    new_pdfs: list[dict[str, str]],
+    source_counter: int,
     dry_run: bool,
-) -> bool:
+) -> int:
     """
-    新規 PDF を検出し、pending_queue に登録する。
-    Gemini 分類は process-queue ジョブに委任（API コスト最適化）。
+    新規 PDF を regulations + pending_queue に登録する。
 
     Returns:
-        登録に成功した場合は True
+        更新後の source_counter
     """
-    # 既知 PDF はスキップ
-    if pdf_url in known_pdf_urls:
-        logger.debug("既知 PDF をスキップ: %s", pdf_url)
-        return False
+    for pdf in new_pdfs:
+        source_counter += 1
+        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        source_id = f"{SOURCE_PREFIX}-{date_str}-{source_counter:03d}"
 
-    logger.info("新規 PDF 検出: %s", pdf_url)
+        # regulations に仮レコード
+        record = {
+            "source_id": source_id,
+            "source": "MLIT",
+            "title": pdf["text"] or pdf["url"].split("/")[-1],
+            "url": page_url,
+            "pdf_url": pdf["url"],
+            "scraped_at": datetime.now(timezone.utc).isoformat(),
+            "severity": "informational",
+        }
+        if not dry_run:
+            client.upsert_regulation(record)
 
-    # HEAD チェック（アクセス可能か確認のみ）
-    head_check = check_pdf_url(pdf_url)
-    if not head_check["accessible"]:
-        logger.warning("PDF にアクセスできません: %s", pdf_url)
-        return False
+        # pending_queue に登録
+        if not dry_run:
+            client.queue_pending(
+                source="MLIT",
+                source_id=source_id,
+                pdf_url=pdf["url"],
+                reason="awaiting_classification",
+                error_detail="シードURL方式で検出。Gemini分類は process-queue で実行予定。",
+            )
+        logger.info("新規PDF登録: %s -> %s", source_id, pdf["url"])
 
-    if dry_run:
-        logger.info("[dry-run] PDF キューイングをスキップ: %s", pdf_url)
-        return False
-
-    # regulations テーブルに仮レコードを挿入（タイトルはファイル名、分類は後で）
-    now_iso = datetime.now(timezone.utc).isoformat()
-    pdf_filename = pdf_url.split("/")[-1]
-
-    record: dict = {
-        "source_id": source_id,
-        "source": "MLIT",
-        "title": pdf_filename,
-        "url": page_url,
-        "pdf_url": pdf_url,
-        "scraped_at": now_iso,
-        "severity": "informational",
-    }
-    client.upsert_regulation(record)
-
-    # pending_queue に登録 → process-queue ジョブが Gemini 分類を実行
-    client.queue_pending(
-        source="MLIT",
-        source_id=source_id,
-        pdf_url=pdf_url,
-        reason="awaiting_classification",
-        error_detail="クロールで検出。Gemini 分類は process-queue で実行予定。",
-    )
-    logger.info("pending_queue に登録: %s → process-queue で分類予定", source_id)
-
-    return True
+    return source_counter
 
 
 # ---------------------------------------------------------------------------
-# BFS クロール
+# フェッチ
 # ---------------------------------------------------------------------------
 
-def crawl(
-    start_url: str,
-    client: SupabaseClient,
-    robots_checker: RobotsChecker,
-    max_pages: int,
-    max_depth: int,
-    dry_run: bool,
-) -> dict:
+def fetch_page(url: str) -> Optional[str]:
     """
-    BFS（幅優先探索）で maritime/ 配下をクロールする。
+    ページ HTML を取得する。エラー時は None を返す。
+    リクエスト間隔は呼び出し側で管理する。
+    """
+    try:
+        resp = requests.get(
+            url,
+            timeout=20,
+            headers={"User-Agent": USER_AGENT},
+        )
+        resp.raise_for_status()
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        return resp.text
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 0
+        if status == 404:
+            logger.warning("404 Not Found: %s", url)
+        else:
+            logger.warning("HTTP エラー %d: %s", status, url)
+        return None
+    except Exception as e:
+        logger.warning("ページ取得エラー: %s — %s", url, e)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# メイン巡回ロジック
+# ---------------------------------------------------------------------------
+
+def crawl_seeds(client: SupabaseClient, dry_run: bool, verbose: bool) -> dict:
+    """
+    シードURL 方式で巡回する。
 
     Returns:
-        クロール結果サマリー:
         {
-            "pages_crawled": int,
+            "seed_count": int,
+            "policy_pages": int,
             "pages_changed": int,
-            "pages_new": int,
-            "pdfs_processed": int,
-            "anomaly_detected": bool,
+            "new_pdfs": int,
+            "discoveries": int,
+            "seed_errors": list[str],
         }
     """
     stats = {
-        "pages_crawled": 0,
+        "seed_count": len(SEED_URLS),
+        "policy_pages": 0,
         "pages_changed": 0,
-        "pages_new": 0,
-        "pdfs_processed": 0,
-        "anomaly_detected": False,
+        "new_pdfs": 0,
+        "discoveries": 0,
+        "seed_errors": [],
     }
 
-    # BFS キュー: (url, depth)
-    queue: deque[tuple[str, int]] = deque()
-    queue.append((start_url, 0))
-
-    visited_urls: set[str] = {start_url}
-    new_url_count = 0
-
-    # Supabase から既知 PDF URL を取得
+    # 既知 URL セットを取得（Discovery 判定用）
+    known_crawl_urls = get_all_crawl_state_urls(client)
     known_pdf_urls = get_known_pdf_urls(client)
 
-    pdf_counter = 0  # Supabase 保存用カウンター
+    source_counter = 0
 
-    while queue and stats["pages_crawled"] < max_pages:
-        current_url, depth = queue.popleft()
+    # ---------------------------------------------------------------
+    # Phase 1: シードURL からポリシーリンクを収集
+    # ---------------------------------------------------------------
+    logger.info("シードURL巡回開始 (%d ページ)", len(SEED_URLS))
 
-        # robots.txt チェック
-        if not robots_checker.is_allowed(current_url):
-            logger.info("robots.txt によりスキップ: %s", current_url)
+    all_policy_links: dict[str, str] = {}  # url -> text（重複排除）
+
+    for idx, seed_url in enumerate(SEED_URLS, start=1):
+        label = _get_seed_label(seed_url)
+
+        # ヘルスチェック
+        if not check_seed_url_health(seed_url):
+            logger.error("[%d/%d] %s — シードURL 無効", idx, len(SEED_URLS), label)
+            stats["seed_errors"].append(seed_url)
             continue
+
+        time.sleep(REQUEST_INTERVAL_SEC)
+        html = fetch_page(seed_url)
+        if html is None:
+            logger.error("[%d/%d] %s — ページ取得失敗", idx, len(SEED_URLS), label)
+            stats["seed_errors"].append(seed_url)
+            continue
+
+        links = extract_policy_links(html, seed_url)
+        for link in links:
+            if link["url"] not in all_policy_links:
+                all_policy_links[link["url"]] = link["text"]
 
         logger.info(
-            "[%d/%d] クロール中 (深さ=%d): %s",
-            stats["pages_crawled"] + 1,
-            max_pages,
-            depth,
-            current_url,
+            "[%d/%d] %s -> %d 施策リンク検出",
+            idx, len(SEED_URLS), label, len(links),
         )
 
-        # ページ取得（stealth_get を使用）
-        try:
-            time.sleep(REQUEST_INTERVAL_SEC)
-            resp = stealth_get(current_url, timeout=15)
-            resp.raise_for_status()
+    # 重複除外後の施策ページ数
+    policy_urls = list(all_policy_links.keys())
+    stats["policy_pages"] = len(policy_urls)
 
-            html_content = resp.text
-            content_bytes = resp.content
-            last_modified = ""  # stealth_get の Response にはヘッダーがないため空文字
-            content_length = len(content_bytes)
+    logger.info(
+        "施策ページ巡回開始 (%d ページ, 重複除外済み)",
+        len(policy_urls),
+    )
 
-        except (requests.exceptions.RequestException, Exception) as e:
-            logger.warning("ページ取得エラー: %s — %s", current_url, e)
+    # ---------------------------------------------------------------
+    # Phase 2: 施策ページを巡回
+    # ---------------------------------------------------------------
+    for idx, page_url in enumerate(policy_urls, start=1):
+        page_name = page_url.split("/")[-1]
+        time.sleep(REQUEST_INTERVAL_SEC)
+
+        html = fetch_page(page_url)
+        if html is None:
+            logger.warning("[%d/%d] %s — 取得失敗", idx, len(policy_urls), page_name)
             continue
 
-        stats["pages_crawled"] += 1
+        # <main> 要素のハッシュを計算
+        main_text = extract_main_content(html)
+        content_hash = compute_content_hash(main_text)
 
-        # ハッシュ計算
-        page_hash = compute_page_hash(html_content)
+        # 前回のクロール状態と比較
+        existing = get_crawl_state(client, page_url)
+        is_new = existing is None
+        is_changed = not is_new and existing.get("page_hash") != content_hash
 
-        # 既存のクロール状態と比較
-        existing_state = get_crawl_state(client, current_url)
-        is_new_page = existing_state is None
-        is_changed = not is_new_page and existing_state.get("page_hash") != page_hash
+        # Discovery: mlit_crawl_state に未登録の URL を検出
+        if is_new and page_url not in known_crawl_urls:
+            stats["discoveries"] += 1
+            logger.info("[Discovery] 新規ポータル発見: %s", page_name)
 
-        if is_new_page:
-            stats["pages_new"] += 1
-            new_url_count += 1
-            logger.info("新規ページ検出: %s", current_url)
+        if is_changed:
+            # 変更あり — PDF リンクを抽出
+            pdf_links = extract_pdf_links(html, page_url)
 
-            # 異常検知チェック
-            if new_url_count >= ANOMALY_NEW_URL_THRESHOLD:
-                logger.error(
-                    "異常検知: 新規 URL が %d 件を超えました。クロールを中断します。",
-                    ANOMALY_NEW_URL_THRESHOLD,
+            # 既知 PDF を除外
+            new_pdfs = [p for p in pdf_links if p["url"] not in known_pdf_urls]
+
+            if new_pdfs:
+                stats["new_pdfs"] += len(new_pdfs)
+                source_counter = register_new_pdfs(
+                    client, page_url, new_pdfs, source_counter, dry_run,
                 )
-                stats["anomaly_detected"] = True
-                try:
-                    send_alert(
-                        title="MLIT クロール異常",
-                        message=(
-                            f"新規 URL が {new_url_count} 件検出されました。"
-                            "サイト構造の大幅な変更の可能性があります。クロールを中断しました。"
-                        ),
-                        severity="critical",
-                    )
-                except Exception:
-                    pass
-                break
+                # 二重登録防止
+                for p in new_pdfs:
+                    known_pdf_urls.add(p["url"])
 
-        elif is_changed:
             stats["pages_changed"] += 1
-            logger.info("ページ変更検出: %s", current_url)
-        else:
-            logger.debug("変更なし: %s", current_url)
+            logger.info(
+                "[%d/%d] %s -> 変更あり! 新規PDF %d件",
+                idx, len(policy_urls), page_name, len(new_pdfs),
+            )
+        elif is_new:
+            # 新規ページ — PDF も抽出
+            pdf_links = extract_pdf_links(html, page_url)
+            new_pdfs = [p for p in pdf_links if p["url"] not in known_pdf_urls]
 
-        # PDF リンク抽出（新規または変更ページのみ）
-        pdf_links: list[str] = []
-        if is_new_page or is_changed:
-            pdf_links = extract_pdf_links(current_url, html_content)
-            if pdf_links:
+            if new_pdfs:
+                stats["new_pdfs"] += len(new_pdfs)
+                source_counter = register_new_pdfs(
+                    client, page_url, new_pdfs, source_counter, dry_run,
+                )
+                for p in new_pdfs:
+                    known_pdf_urls.add(p["url"])
+
+            stats["pages_changed"] += 1
+            if verbose:
                 logger.info(
-                    "%d 件の PDF リンクを検出: %s", len(pdf_links), current_url
+                    "[%d/%d] %s -> 新規ページ! PDF %d件",
+                    idx, len(policy_urls), page_name, len(new_pdfs),
                 )
-
-            # 各 PDF を処理
-            for pdf_url in pdf_links:
-                pdf_counter += 1
-                source_id = generate_source_id(pdf_counter)
-                success = process_pdf(
-                    pdf_url=pdf_url,
-                    page_url=current_url,
-                    client=client,
-                    known_pdf_urls=known_pdf_urls,
-                    source_id=source_id,
-                    dry_run=dry_run,
-                )
-                if success:
-                    stats["pdfs_processed"] += 1
-                    known_pdf_urls.add(pdf_url)  # 二重処理防止
+        else:
+            if verbose:
+                logger.info("[%d/%d] %s -> 変更なし", idx, len(policy_urls), page_name)
 
         # クロール状態を更新
         if not dry_run:
+            all_pdf_links = extract_pdf_links(html, page_url) if (is_new or is_changed) else []
             upsert_crawl_state(
                 client=client,
-                url=current_url,
-                page_hash=page_hash,
-                content_length=content_length,
-                last_modified=last_modified,
-                pdf_links=pdf_links,
+                url=page_url,
+                page_hash=content_hash,
+                pdf_links=all_pdf_links if (is_new or is_changed) else [],
+                content_length=len(html),
             )
-
-        # 次の深さの URL をキューに追加
-        if depth < max_depth:
-            child_links = extract_links(current_url, html_content)
-            for child_url in child_links:
-                if child_url not in visited_urls:
-                    visited_urls.add(child_url)
-                    queue.append((child_url, depth + 1))
 
     return stats
 
 
 # ---------------------------------------------------------------------------
-# メイン処理
+# メイン
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="国交省（MLIT）海事局 ウェブクロール — 第 2 層"
+        description="国交省（MLIT）海事局 シードURL方式クローラー"
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="DB 書き込みをスキップ（クロールのみ実行）",
+        help="DB 書き込みをスキップ（巡回のみ実行）",
     )
     parser.add_argument(
-        "--max-pages",
-        type=int,
-        default=DEFAULT_MAX_PAGES,
-        metavar="N",
-        help=f"クロール最大ページ数（デフォルト: {DEFAULT_MAX_PAGES}）",
-    )
-    parser.add_argument(
-        "--depth",
-        type=int,
-        default=DEFAULT_CRAWL_DEPTH,
-        metavar="N",
-        help=f"クロール深さ（デフォルト: {DEFAULT_CRAWL_DEPTH}）",
+        "--verbose",
+        action="store_true",
+        help="詳細ログを出力する",
     )
     args = parser.parse_args()
 
-    # 環境変数からクロール設定を上書き可能
-    env_depth = os.getenv("MLIT_CRAWL_DEPTH")
-    if env_depth and env_depth.isdigit():
-        effective_depth = int(env_depth)
-        logger.info("クロール深さを環境変数から設定: %d", effective_depth)
-    else:
-        effective_depth = args.depth
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     if args.dry_run:
         logger.info("=== DRY RUN モード ===")
-
-    logger.info(
-        "MLIT クロール開始 (max_pages=%d, depth=%d)",
-        args.max_pages,
-        effective_depth,
-    )
-
-    # robots.txt チェッカー初期化
-    robots_checker = RobotsChecker(user_agent=USER_AGENT)
 
     # Supabase クライアント初期化
     client = SupabaseClient()
 
     try:
-        stats = crawl(
-            start_url=CRAWL_START_URL,
+        stats = crawl_seeds(
             client=client,
-            robots_checker=robots_checker,
-            max_pages=args.max_pages,
-            max_depth=effective_depth,
             dry_run=args.dry_run,
+            verbose=args.verbose,
         )
 
+        # サマリー出力
+        logger.info("=== 巡回完了 ===")
+        logger.info("  シードURL: %d, 施策ページ: %d", stats["seed_count"], stats["policy_pages"])
         logger.info(
-            "クロール完了: ページ=%d (新規=%d, 変更=%d), PDF=%d件処理",
-            stats["pages_crawled"],
-            stats["pages_new"],
-            stats["pages_changed"],
-            stats["pdfs_processed"],
+            "  変更あり: %d, 新規PDF: %d, 新規ポータル: %d",
+            stats["pages_changed"], stats["new_pdfs"], stats["discoveries"],
         )
 
-        if stats["anomaly_detected"]:
-            logger.warning("異常を検知したため、クロールを途中で中断しました。")
-            sys.exit(1)
+        if stats["seed_errors"]:
+            logger.warning("  シードURL エラー: %s", ", ".join(stats["seed_errors"]))
 
-        # サマリー通知
-        if (stats["pages_new"] > 0 or stats["pdfs_processed"] > 0) and not args.dry_run:
+        # LINE 通知（新規 PDF がある場合のみ）
+        if stats["new_pdfs"] > 0 and not args.dry_run:
             try:
                 send_alert(
                     title="MLIT クロール完了",
                     message=(
-                        f"新規ページ: {stats['pages_new']} 件、"
-                        f"変更ページ: {stats['pages_changed']} 件、"
-                        f"PDF 処理: {stats['pdfs_processed']} 件"
+                        f"施策ページ: {stats['policy_pages']} 件巡回、"
+                        f"変更: {stats['pages_changed']} 件、"
+                        f"新規PDF: {stats['new_pdfs']} 件"
                     ),
                     severity="info",
                 )
@@ -623,10 +690,7 @@ def main() -> None:
     except Exception as e:
         logger.error("予期しないエラー: %s", e, exc_info=True)
         try:
-            send_scraper_error(
-                scraper_name="scrape_mlit_crawl",
-                error=e,
-            )
+            send_scraper_error(scraper_name="scrape_mlit_crawl", error=e)
         except Exception:
             pass
         sys.exit(1)
