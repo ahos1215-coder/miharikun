@@ -21,6 +21,21 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import requests
 
+try:
+    from utils.gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        GEMINI_API_BASE as _CFG_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MIN_REQUEST_INTERVAL,
+    )
+except ImportError:
+    from gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        GEMINI_API_BASE as _CFG_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MIN_REQUEST_INTERVAL,
+    )
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -32,14 +47,14 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 # ---------------------------------------------------------------------------
-# Supabase / Gemini 設定
+# Supabase / Gemini 設定（gemini_config から統一取得）
 # ---------------------------------------------------------------------------
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_API_KEY = _CFG_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
+GEMINI_API_BASE = _CFG_API_BASE
 MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "0.5"))
 
 _last_call: float = 0.0

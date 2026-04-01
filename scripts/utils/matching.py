@@ -41,6 +41,29 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import requests
 
 try:
+    from utils.gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        DEFAULT_FALLBACK_MODEL,
+        GEMINI_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MAX_RETRIES,
+        BASE_WAIT,
+        MAX_WAIT,
+        MATCHING_TEMPERATURE,
+    )
+except ImportError:
+    from gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        DEFAULT_FALLBACK_MODEL,
+        GEMINI_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MAX_RETRIES,
+        BASE_WAIT,
+        MAX_WAIT,
+        MATCHING_TEMPERATURE,
+    )
+
+try:
     from utils.ship_compliance import determine_compliance, get_applicable_keywords
 except ImportError:
     from ship_compliance import determine_compliance, get_applicable_keywords
@@ -65,19 +88,6 @@ if not logger.handlers:
     handler.setFormatter(logging.Formatter("[Matching] %(levelname)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
-
-
-# ---------------------------------------------------------------------------
-# 定数
-# ---------------------------------------------------------------------------
-
-_DEFAULT_PRIMARY_MODEL = "gemini-2.5-flash"
-_DEFAULT_FALLBACK_MODEL = "gemini-2.0-flash"
-_GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-_MAX_RETRIES = 4
-_BASE_WAIT = 1.0
-_MAX_WAIT = 16.0
-_TEMPERATURE = 0.1
 
 # confidence < この閾値の場合は "needs_review" フラグを立てる（フロント側で「要確認」表示）
 _REVIEW_THRESHOLD = 0.7
@@ -539,7 +549,7 @@ def _call_gemini_text(model: str, api_key: str, prompt: str) -> tuple[bool, str]
     テキストのみの Gemini API 呼び出し（PDF なし）。
     Returns: (success: bool, text_or_error: str)
     """
-    url = f"{_GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [
             {
@@ -547,7 +557,7 @@ def _call_gemini_text(model: str, api_key: str, prompt: str) -> tuple[bool, str]
             }
         ],
         "generationConfig": {
-            "temperature": _TEMPERATURE,
+            "temperature": MATCHING_TEMPERATURE,
         },
     }
 
@@ -850,7 +860,7 @@ def ai_match(
         }
         失敗時は is_applicable=None, confidence=0.0 を返す。
     """
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = _CFG_API_KEY or os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         logger.warning("[AI] GEMINI_API_KEY が未設定です")
         return {
@@ -864,8 +874,8 @@ def ai_match(
             "citations": [],
         }
 
-    primary_model = os.environ.get("GEMINI_MODEL", _DEFAULT_PRIMARY_MODEL)
-    fallback_model = os.environ.get("GEMINI_FALLBACK_MODEL", _DEFAULT_FALLBACK_MODEL)
+    primary_model = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
+    fallback_model = os.environ.get("GEMINI_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL)
 
     prompt = _build_matching_prompt(regulation, ship, compliance=compliance)
     source_label = f"{regulation.get('source', '?')}/{regulation.get('source_id', '?')}"
@@ -874,7 +884,7 @@ def ai_match(
         logger.info(f"[AI] {model_label} モデル {model_name!r} で判定開始 regulation={source_label}")
 
         last_error: str = ""
-        for attempt in range(_MAX_RETRIES):
+        for attempt in range(MAX_RETRIES):
             success, result = _call_gemini_text(model_name, api_key, prompt)
 
             if success:
@@ -916,9 +926,9 @@ def ai_match(
                 logger.warning(f"[AI] リトライ不可エラー model={model_name!r}: {last_error[:100]}")
                 break
 
-            wait = min(_BASE_WAIT * (2 ** attempt), _MAX_WAIT)
+            wait = min(BASE_WAIT * (2 ** attempt), MAX_WAIT)
             logger.warning(
-                f"[AI] リトライ {attempt + 1}/{_MAX_RETRIES} "
+                f"[AI] リトライ {attempt + 1}/{MAX_RETRIES} "
                 f"model={model_name!r} wait={wait:.1f}s"
             )
             time.sleep(wait)

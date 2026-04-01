@@ -13,21 +13,35 @@ from typing import Optional
 
 import requests
 
+try:
+    from utils.gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        DEFAULT_FALLBACK_MODEL,
+        GEMINI_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MAX_RETRIES,
+        BASE_WAIT,
+        MAX_WAIT,
+        CLASSIFICATION_TEMPERATURE,
+        MIN_REQUEST_INTERVAL,
+    )
+except ImportError:
+    from gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        DEFAULT_FALLBACK_MODEL,
+        GEMINI_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MAX_RETRIES,
+        BASE_WAIT,
+        MAX_WAIT,
+        CLASSIFICATION_TEMPERATURE,
+        MIN_REQUEST_INTERVAL,
+    )
 
-# ---------- 定数 ----------
 
-_DEFAULT_PRIMARY_MODEL = "gemini-2.5-flash"
-_DEFAULT_FALLBACK_MODEL = "gemini-2.0-flash"
-_MAX_RETRIES = 6
-_BASE_WAIT = 1.0
-_MAX_WAIT = 32.0
-_TEMPERATURE = 0.1
+# ---------- 定数（gemini_config から統一取得） ----------
 
-_GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-
-# レートリミッター: API 呼び出し間の最小間隔（秒）
-# 有料プラン (Tier 1) では 0.5 秒で十分。無料枠では 4 秒推奨。
-_GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "0.5"))
+_GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "0.5")) or MIN_REQUEST_INTERVAL
 _last_call_timestamp: float = 0.0
 
 
@@ -47,7 +61,7 @@ def _rate_limit_wait() -> None:
             time.sleep(remaining)
     _last_call_timestamp = time.time()
 
-def _exponential_backoff(attempt: int, base: float = _BASE_WAIT, max_wait: float = _MAX_WAIT) -> float:
+def _exponential_backoff(attempt: int, base: float = BASE_WAIT, max_wait: float = MAX_WAIT) -> float:
     """
     指数バックオフの待機秒数を計算する。
     attempt は 0 始まり。
@@ -98,7 +112,7 @@ def _call_gemini_api(
     # PDF を base64 エンコード
     pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-    url = f"{_GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [
             {
@@ -116,7 +130,7 @@ def _call_gemini_api(
             }
         ],
         "generationConfig": {
-            "temperature": _TEMPERATURE,
+            "temperature": CLASSIFICATION_TEMPERATURE,
         },
     }
 
@@ -168,13 +182,13 @@ def classify_pdf(pdf_bytes: bytes, prompt: str, source_id: str = "") -> dict:
         - citations: list[dict]
         失敗時は {"status": "pending", "error": str} を返す。
     """
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = _CFG_API_KEY or os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         print(f"[Gemini] GEMINI_API_KEY が未設定です source_id={source_id!r}")
         return {"status": "pending", "error": "GEMINI_API_KEY が未設定"}
 
-    primary_model = os.environ.get("GEMINI_MODEL", _DEFAULT_PRIMARY_MODEL)
-    fallback_model = os.environ.get("GEMINI_FALLBACK_MODEL", _DEFAULT_FALLBACK_MODEL)
+    primary_model = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
+    fallback_model = os.environ.get("GEMINI_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL)
 
     # プロンプトに confidence/citations 出力を強制するシステム指示を追加
     augmented_prompt = _augment_prompt(prompt)
@@ -183,7 +197,7 @@ def classify_pdf(pdf_bytes: bytes, prompt: str, source_id: str = "") -> dict:
         print(f"[Gemini] {model_label} モデル {model_name!r} で処理開始 source_id={source_id!r}")
 
         last_error: str = ""
-        for attempt in range(_MAX_RETRIES):
+        for attempt in range(MAX_RETRIES):
             success, result = _call_gemini_api(model_name, api_key, pdf_bytes, augmented_prompt)
 
             if success:
@@ -209,7 +223,7 @@ def classify_pdf(pdf_bytes: bytes, prompt: str, source_id: str = "") -> dict:
 
             wait = _exponential_backoff(attempt)
             print(
-                f"[Gemini] リトライ {attempt + 1}/{_MAX_RETRIES} "
+                f"[Gemini] リトライ {attempt + 1}/{MAX_RETRIES} "
                 f"model={model_name!r} wait={wait:.1f}s error={last_error[:80]}"
             )
             time.sleep(wait)

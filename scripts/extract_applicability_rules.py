@@ -27,6 +27,25 @@ from typing import Optional
 
 import requests
 
+try:
+    from utils.gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        GEMINI_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MAX_RETRIES as _CFG_MAX_RETRIES,
+        MIN_REQUEST_INTERVAL,
+        DEFAULT_TEMPERATURE,
+    )
+except ImportError:
+    from gemini_config import (
+        DEFAULT_PRIMARY_MODEL,
+        GEMINI_API_BASE,
+        GEMINI_API_KEY as _CFG_API_KEY,
+        MAX_RETRIES as _CFG_MAX_RETRIES,
+        MIN_REQUEST_INTERVAL,
+        DEFAULT_TEMPERATURE,
+    )
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -39,20 +58,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# 環境変数・定数
+# 環境変数・定数（gemini_config から統一取得）
 # ---------------------------------------------------------------------------
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_API_KEY = _CFG_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
 
 # レート制限: Tier 1 = 15 RPM → 最低 4 秒間隔
-GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "4.0"))
+GEMINI_MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "4.0")) or MIN_REQUEST_INTERVAL
 
-# 指数バックオフ設定
+# 指数バックオフ設定（このスクリプト固有: より保守的な設定）
 MAX_RETRIES = 5
 BASE_WAIT = 4.0
 MAX_WAIT = 64.0
@@ -320,7 +337,7 @@ def extract_rules(regulation: dict) -> Optional[dict]:
             }
         ],
         "generationConfig": {
-            "temperature": 0.1,
+            "temperature": DEFAULT_TEMPERATURE,
         },
     }
 

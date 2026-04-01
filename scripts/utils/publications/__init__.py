@@ -1,10 +1,10 @@
 """
-publication_requirements.py — 後方互換ラッパー
-==============================================
-実体は scripts/utils/publications/ パッケージに移動済み。
+publications パッケージ — 備付書籍自動判定エンジン
+=================================================
+判定ロジック(engine)とマスターデータ(data_category_*)を分離して管理。
 
-使い方（変更なし）:
-    from utils.publication_requirements import determine_required_publications
+使い方:
+    from utils.publications import determine_required_publications
 
     ship = {
         "ship_type": "bulk_carrier",
@@ -15,18 +15,15 @@ publication_requirements.py — 後方互換ラッパー
         "classification_society": "NK",
     }
     publications = determine_required_publications(ship)
-
-純粋データ＋ロジックファイル — API呼び出し・DB接続は一切なし。
 """
 
-from utils.publications import (
+from .engine import (
     determine_required_publications,
     get_mandatory_publications,
     get_publication_summary,
     get_publications_by_category,
 )
 
-# 後方互換: 直接インポートしているコードのために re-export
 __all__ = [
     "determine_required_publications",
     "get_mandatory_publications",
