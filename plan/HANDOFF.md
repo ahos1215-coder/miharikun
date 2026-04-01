@@ -7,7 +7,7 @@
 
 ## 1. 今どこにいるか
 
-**Phase 3 作業中・本番稼働中。「航海士個人のための情報の蒸留器」方針。** https://miharikun.vercel.app
+**Phase 3 作業中・本番稼働中。「航海士個人のための情報の蒸留器」方針。** https://miharikun2.vercel.app
 
 ```
 Phase 0: 基盤構築              ✅
@@ -33,7 +33,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 
 | 項目 | 値 |
 |------|-----|
-| Public URL | https://miharikun.vercel.app |
+| Public URL | https://miharikun2.vercel.app |
 | デプロイ | Vercel 自動デプロイ (git push → 自動ビルド) |
 | DB | Supabase (PostgreSQL + Auth + RLS) |
 | AI | Google Gemini 2.5 Flash API (**Tier 1 Pay-as-you-go**) |

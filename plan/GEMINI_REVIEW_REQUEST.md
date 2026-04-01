@@ -9,7 +9,7 @@
 ## A. プロジェクトの全体像と方向性の検証
 
 ### 現在地
-MIHARIKUN は「海事規制の自動収集・AI分類・パーソナライズ通知」サービスである。開発開始から 3 日で Phase 3 まで到達し、本番稼働中（https://miharikun.vercel.app）。
+MIHARIKUN は「海事規制の自動収集・AI分類・パーソナライズ通知」サービスである。開発開始から 3 日で Phase 3 まで到達し、本番稼働中（https://miharikun2.vercel.app）。
 
 ### 規模
 - 規制データ: 453件（ClassNK + 国交省 RSS/クロール + e-Gov パブコメ）

@@ -81,7 +81,7 @@
 - **工数**: 15分
 
 ### 12. notify_matches.py に URL ハードコード
-- `miharikun.vercel.app` が直接記述
+- `miharikun2.vercel.app` が直接記述
 - **対策**: `MIHARIKUN_BASE_URL` 環境変数に統一
 - **工数**: 15分
 

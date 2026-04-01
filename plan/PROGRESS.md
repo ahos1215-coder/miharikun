@@ -161,7 +161,7 @@
 - [x] LINE 通知 (`notify_matches.py` + run-matching.yml 連携) ✅ (eda97cb)
 - [x] Playwright E2E テスト (9テスト) ✅ (eda97cb)
 - [x] ニュースページネーション (10件ずつ) + フォント軽量化 ✅ (a521b8c)
-- [x] カスタムドメイン: https://miharikun.vercel.app ✅
+- [x] カスタムドメイン: https://miharikun2.vercel.app ✅
 - [x] Vercel 自動デプロイ (Git push → 自動ビルド) ✅
 
 #### フルアップグレード（2026-03-30）
@@ -390,7 +390,7 @@
 - 2026-03-29 22:50 — [Agent A/Sonnet] 入力バリデーション: GT範囲, 建造年, IMO7桁, 航行区域必須
 - 2026-03-29 22:50 — [Agent B/Sonnet] 週次サマリー (weekly_summary.py + weekly-summary.yml)
 - 2026-03-29 23:00 — [Lead/Opus] ニュースページネーション (10件) + Mono フォント削除 + OG メタタグ
-- 2026-03-29 23:05 — [Lead/Opus] カスタムドメイン: miharikun.vercel.app 設定
+- 2026-03-29 23:05 — [Lead/Opus] カスタムドメイン: miharikun2.vercel.app 設定
 - 2026-03-29 23:10 — [Agent/Sonnet] ニュース詳細: OGメタ, 色付き信頼度, リンク改善
 - 2026-03-29 23:10 — [Agent/Sonnet] ダッシュボード: 該当のみフィルタ + 件数表示
 - 2026-03-29 23:10 — [Agent/Sonnet] LINE 通知: notify_matches.py + ワークフロー連携
@@ -454,3 +454,4 @@
 - 2026-04-01 — [User] 00011_publications_v2.sql を Supabase で実行 ✅
 - 2026-04-01 — [Role D/Opus] seed-publications 再実行成功: 67書籍 (新ID + applicability_rules + 2026年版)
 - 2026-04-01 — [Role D/Opus] 全ドキュメント v7 方針更新: STRATEGIC_ROADMAP_v6.md→v7, HANDOFF.md, PROGRESS.md, CLAUDE.md
+- 2026-03-31 — [Role B/Opus] MLITクローラーBFS→シードURL方式全面書き換え: mlit_seed_urls.py (シード6件+ノイズフィルタ), scrape_mlit_crawl.py (全面書換), cleanup_noise.py (ノイズ清掃), scrape-mlit-crawl.yml (タイムアウト15分化+Gemini vars削除)

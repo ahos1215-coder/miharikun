@@ -223,7 +223,7 @@ def build_message(
         f"{title}\n"
         f"重要度: {severity}\n"
         f"確度: {confidence:.0f}%\n\n"
-        f"詳細: https://miharikun.vercel.app/news/{reg_id}"
+        f"詳細: {os.environ.get('MIHARIKUN_BASE_URL', 'https://miharikun2.vercel.app')}/news/{reg_id}"
     )
     return body
 

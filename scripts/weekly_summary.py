@@ -45,7 +45,7 @@ SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 # メール送信設定
 RESEND_API_URL: str = os.environ.get(
     "RESEND_API_URL",
-    "https://miharikun.vercel.app/api/send-summary",
+    "https://miharikun2.vercel.app/api/send-summary",
 )
 SUMMARY_API_KEY: str = os.environ.get("SUMMARY_API_KEY", "")
 # TODO: auth.users から取得する仕組みに置き換える
@@ -145,7 +145,7 @@ def fetch_recent_matches(since_iso: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 MIHARIKUN_BASE_URL: str = os.environ.get(
-    "MIHARIKUN_BASE_URL", "https://miharikun.vercel.app"
+    "MIHARIKUN_BASE_URL", "https://miharikun2.vercel.app"
 )
 
 

@@ -52,7 +52,7 @@
 - [x] Cmd+K コマンドパレット
 - [x] PWA オフライン対応 + Service Worker
 - [x] ユーザーフィードバック (thumbs up/down)
-- [x] Vercel デプロイ + カスタムドメイン (miharikun.vercel.app)
+- [x] Vercel デプロイ + カスタムドメイン (miharikun2.vercel.app)
 - [x] CI/CD (TSC + pytest + ESLint + Security Scan)
 - [x] gemini_config.py: Gemini 設定の一元管理
 
