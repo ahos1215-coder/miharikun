@@ -44,6 +44,7 @@ from utils.gdrive_client import upload_json  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
 from utils.pdf_preprocess import preprocess_pdf, check_pdf_url  # type: ignore
 from utils.stealth_fetcher import stealth_get, stealth_download_bytes  # type: ignore
+from utils.filters import MARITIME_KEYWORDS, should_exclude_rss  # type: ignore
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -64,43 +65,6 @@ logger = logging.getLogger("scrape_mlit_rss")
 DEFAULT_RSS_URLS = [
     # 国交省プレスリリース RDF（海事局記事を kaiji キーワードでフィルタ）
     "https://www.mlit.go.jp/pressrelease.rdf",
-]
-
-# 海事関連キーワード（フィルタリング用・20語以上）
-MARITIME_KEYWORDS = [
-    "船舶", "海事", "船員", "港湾", "安全", "環境", "条約",
-    "IMO", "SOLAS", "MARPOL", "検査", "証書",
-    "海上", "航行", "漁船", "旅客船", "貨物船",
-    "船級", "船籍", "STCW", "ISM", "ISPS", "MLC",
-    "海洋", "沿岸", "運輸局", "海事局",
-]
-
-# ---------------------------------------------------------------------------
-# 除外キーワード（AND条件: 2つ以上同時に含む場合に除外）
-# Gemini推奨: 「旅客船」一律除外ではなく、コンテキストで除外
-# ---------------------------------------------------------------------------
-
-EXCLUDE_KEYWORD_PAIRS: list[tuple[str, str]] = [
-    ("旅客船", "検討会"),
-    ("旅客船", "対策"),
-    ("旅客船", "委員会"),
-    ("旅客船", "中間とりまとめ"),
-    ("知床", "事故"),
-    ("知床", "遊覧船"),
-    ("遊覧船", "事故"),
-    ("観光船", "事故"),
-]
-
-EXCLUDE_KEYWORDS_SINGLE: list[str] = [
-    "造船業の再生",
-    "舶用工業",
-    "産業振興",
-    "モーターボート競走",
-    "海事観光",
-    "入札公告",
-    "人事異動",
-    "組織改編",
-    "帆船模型",
 ]
 
 SOURCE_PREFIX = "MLIT"
@@ -141,27 +105,6 @@ def is_maritime_related(title: str, summary: str, link: str = "") -> bool:
     for keyword in MARITIME_KEYWORDS:
         if keyword.lower() in text:
             return True
-    return False
-
-
-def should_exclude(title: str, summary: str) -> bool:
-    """
-    除外すべきかどうかを判定。
-    AND条件: 2つのキーワードが両方含まれる場合に除外
-    SINGLE: 1つのキーワードが含まれれば除外
-    """
-    combined = f"{title} {summary}".lower()
-
-    # AND条件除外
-    for kw1, kw2 in EXCLUDE_KEYWORD_PAIRS:
-        if kw1 in combined and kw2 in combined:
-            return True
-
-    # 単独除外
-    for kw in EXCLUDE_KEYWORDS_SINGLE:
-        if kw in combined:
-            return True
-
     return False
 
 
@@ -321,7 +264,7 @@ def fetch_rss_entries(
         海事関連エントリのリスト（各エントリは feedparser の dict）
     """
     all_entries: list[dict] = []
-    excluded_count = 0
+    stats: dict[str, int] = {"excluded": 0}
 
     for url in rss_urls:
         logger.info("RSS フィード取得中: %s", url)
@@ -356,13 +299,14 @@ def fetch_rss_entries(
                     if pub_date and pub_date < since:
                         continue
 
+                # 除外を先にチェック（効率的）
+                if should_exclude_rss(title, summary):
+                    logger.info("除外(入口): %s", title[:50])
+                    stats["excluded"] += 1
+                    continue
+
                 # 海事キーワードフィルタ（URL パスの kaiji も判定）
                 if is_maritime_related(title, summary, link):
-                    # 除外チェック
-                    if should_exclude(title, summary):
-                        logger.info("除外: %s", title[:50])
-                        excluded_count += 1
-                        continue
                     all_entries.append(entry)
                     logger.debug("海事エントリ検出: %s", title[:60])
 
@@ -370,7 +314,7 @@ def fetch_rss_entries(
             logger.error("RSS フィード取得エラー: %s — %s", url, e)
             continue
 
-    logger.info("海事関連エントリ合計: %d 件（除外: %d 件）", len(all_entries), excluded_count)
+    logger.info("海事関連エントリ合計: %d 件（除外: %d 件）", len(all_entries), stats["excluded"])
     return all_entries
 
 
