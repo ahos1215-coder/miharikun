@@ -466,3 +466,4 @@
 - 2026-04-01 — [Role D/Opus] filters.py v2.4: ホワイトリスト31語 + 単独除外265語 + AND条件86ペア = 351パターン
 - 2026-04-01 — [Role B/Opus] extract_actions.py: 44件にGeminiでアクション抽出 → アクションなし=hidden
 - 2026-04-01 — [Role D/Opus] ドキュメント全面更新: PROGRESS + HANDOFF + ROADMAP
+- 2026-04-01 — [Role B/Opus] 深層哨戒機能: 金脈キーワード19語 + シードURL 14件に拡充 + ノイズフィルタバイパス

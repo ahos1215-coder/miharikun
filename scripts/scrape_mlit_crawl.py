@@ -49,6 +49,7 @@ from utils.mlit_seed_urls import (  # type: ignore
     NOISE_URL_PATTERNS,
     NOISE_TITLE_KEYWORDS,
     MAIN_CONTENT_SELECTORS,
+    GOLD_MINE_KEYWORDS,
 )
 
 # ---------------------------------------------------------------------------
@@ -151,6 +152,16 @@ def is_noise_title(text: str) -> bool:
     return any(kw in text for kw in NOISE_TITLE_KEYWORDS)
 
 
+def is_gold_mine(text: str) -> bool:
+    """
+    金脈キーワード判定。
+    タイトルやリンクテキストに GOLD_MINE_KEYWORDS が含まれていれば True。
+    True の場合、ノイズフィルタをバイパスして強制抽出する。
+    """
+    text_lower = text.lower()
+    return any(kw.lower() in text_lower for kw in GOLD_MINE_KEYWORDS)
+
+
 # ---------------------------------------------------------------------------
 # リンク抽出
 # ---------------------------------------------------------------------------
@@ -186,13 +197,14 @@ def extract_policy_links(html: str, base_url: str) -> list[dict[str, str]]:
         if not is_policy_url(absolute_url):
             continue
 
-        # ノイズ URL を除外
-        if is_noise_url(absolute_url):
-            continue
-
-        # ノイズタイトルを除外
-        if is_noise_title(text):
-            continue
+        # 金脈キーワード判定: マッチすればノイズフィルタをバイパス
+        if not is_gold_mine(text):
+            # ノイズ URL を除外
+            if is_noise_url(absolute_url):
+                continue
+            # ノイズタイトルを除外
+            if is_noise_title(text):
+                continue
 
         # PDF リンクはここでは除外（PDF は別途抽出する）
         if href.lower().endswith(".pdf"):
@@ -409,27 +421,40 @@ def register_new_pdfs(
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
         source_id = f"{SOURCE_PREFIX}-{date_str}-{source_counter:03d}"
 
-        # regulations に仮レコード
+        # 金脈判定: タイトルに GOLD_MINE_KEYWORDS が含まれるか
+        pdf_title = pdf["text"] or pdf["url"].split("/")[-1]
+        gold_mine = is_gold_mine(pdf_title)
+
+        if gold_mine:
+            logger.info("  ★ 金脈検出（フィルタバイパス）: %s", pdf_title[:60])
+
+        # regulations に仮レコード（金脈は severity を action_required に昇格）
         record = {
             "source_id": source_id,
             "source": "MLIT",
-            "title": pdf["text"] or pdf["url"].split("/")[-1],
+            "title": pdf_title,
             "url": page_url,
             "pdf_url": pdf["url"],
             "scraped_at": datetime.now(timezone.utc).isoformat(),
-            "severity": "informational",
+            "severity": "action_required" if gold_mine else "informational",
         }
         if not dry_run:
             client.upsert_regulation(record)
 
-        # pending_queue に登録
+        # pending_queue に登録（金脈は priority=high で区別）
         if not dry_run:
+            reason = "gold_mine_bypass" if gold_mine else "awaiting_classification"
+            detail = (
+                f"金脈キーワード検出: ノイズフィルタをバイパス。process-queue で優先分類予定。"
+                if gold_mine
+                else "シードURL方式で検出。Gemini分類は process-queue で実行予定。"
+            )
             client.queue_pending(
                 source="MLIT",
                 source_id=source_id,
                 pdf_url=pdf["url"],
-                reason="awaiting_classification",
-                error_detail="シードURL方式で検出。Gemini分類は process-queue で実行予定。",
+                reason=reason,
+                error_detail=detail,
             )
         logger.info("新規PDF登録: %s -> %s", source_id, pdf["url"])
 
