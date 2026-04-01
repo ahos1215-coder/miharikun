@@ -37,7 +37,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | デプロイ | Vercel 自動デプロイ (git push → 自動ビルド) |
 | DB | Supabase (PostgreSQL + Auth + RLS) |
 | AI | Google Gemini 2.5 Flash API (**Tier 1 Pay-as-you-go**) |
-| バッチ | GitHub Actions (15 ワークフロー) |
+| バッチ | GitHub Actions (17 ワークフロー) |
 | リポジトリ | Public (GHA 無制限のため) |
 | コード規模 | 約 15,018 行 |
 
@@ -85,7 +85,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 
 ---
 
-## 5. GitHub Actions ワークフロー (全 15)
+## 5. GitHub Actions ワークフロー (全 17)
 
 | ファイル | スケジュール | 内容 |
 |---------|------------|------|
@@ -102,6 +102,8 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | `seed-publications.yml` | 手動 | 67書籍マスターデータ初期投入 (**実行済み**) |
 | `check-publications.yml` | 週次 月曜 JST 11:00 | 書籍版数更新チェッカー (5発行元) |
 | `ci.yml` | PR / push | CI (TypeScript + pytest + ESLint) |
+| `scrape-kanto.yml` | 週次 火曜 JST 12:00 | 関東運輸局テスト監視 |
+| `cleanup-noise.yml` | 手動 | ノイズデータ一括清掃 |
 | `security-scan.yml` | 週次 / PR | TruffleHog + npm/pip audit |
 | `notify-on-failure.yml` | — | 再利用可能失敗通知 (called by others) |
 

@@ -136,7 +136,7 @@
 #### デプロイ + E2E テスト（2026-03-29）
 
 - [x] login ページ Suspense boundary 追加（Vercel ビルドエラー修正） ✅ (5796a1f)
-- [x] Vercel デプロイ ✅ — https://frontend-nine-chi-56.vercel.app
+- [x] Vercel デプロイ ✅ — https://miharikun2.vercel.app
 - [x] 環境変数設定 (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY) ✅
 - [x] Supabase Auth Site URL + Redirect URL 設定 ✅
 - [x] E2E テスト: サインアップ → 確認メール → ログイン → 船舶登録 → ダッシュボード ✅
