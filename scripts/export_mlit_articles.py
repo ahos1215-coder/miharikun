@@ -24,7 +24,6 @@ def fetch_all(source: str = "MLIT") -> list[dict]:
             "select": "id,source_id,source,title,headline,summary_ja,category,severity,"
                       "published_at,effective_date,url,pdf_url,"
                       "applicable_ship_types,applicable_gt_min,applicable_gt_max,"
-                      "onboard_actions,shore_actions,sms_chapters,"
                       "citations,confidence,applicability_rules",
             "order": "published_at.desc.nullslast",
             "limit": "1000",
