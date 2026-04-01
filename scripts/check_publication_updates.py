@@ -4,7 +4,10 @@ check_publication_updates.py — 書籍最新版自動チェッカー
 各書籍の発行元サイトから最新版情報をフェッチし、publications テーブルの
 edition と比較して差分があれば更新する。
 
-初版ではスクレイピングは未実装。チェッカーのフレームワークのみ提供。
+実装済みチェッカー:
+  - IMO Just Published
+  - 日本水路協会 (JHA) ショップ検索
+  - 海文堂出版 (Kaibundo) 法規・条約カテゴリ
 
 使い方:
     python scripts/check_publication_updates.py          # 本番実行
@@ -18,9 +21,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import argparse
 import logging
+import re
+import time
+import urllib.parse
 from typing import Optional
 
 import requests
+from bs4 import BeautifulSoup
 
 from utils.line_notify import send_alert
 
@@ -37,36 +44,400 @@ if not logger.handlers:
 
 
 # ===========================================================================
-# Publisher ごとのチェッカー（将来スクレイピング実装用フレームワーク）
+# 共通ヘルパー
+# ===========================================================================
+
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ),
+}
+
+
+def reiwa_to_year(reiwa_year: int) -> int:
+    """和暦（令和）を西暦に変換。令和1年=2019"""
+    return 2018 + reiwa_year
+
+
+def _extract_japanese_date(text: str) -> Optional[str]:
+    """
+    日本語テキストから刊行日を推定して YYYY-MM-DD を返す。
+    例: "2026年2月刊" → "2026-02-01", "2025年3月下旬刊" → "2025-03-15"
+    """
+    # 西暦パターン: "2026年3月" or "2026年3月下旬"
+    m = re.search(r'(\d{4})年(\d{1,2})月', text)
+    if m:
+        year = int(m.group(1))
+        month = int(m.group(2))
+        return f"{year:04d}-{month:02d}-01"
+
+    # 令和パターン: "令和8年" → 2026
+    m = re.search(r'令和(\d{1,2})年', text)
+    if m:
+        year = reiwa_to_year(int(m.group(1)))
+        return f"{year:04d}-01-01"
+
+    return None
+
+
+# ===========================================================================
+# IMO Just Published チェッカー — publication_id マッピング
+# ===========================================================================
+
+# IMO タイトルに含まれるキーワード → DB の publication_id
+IMO_TITLE_MAP: dict[str, str] = {
+    "SOLAS": "SOLAS_CONSOLIDATED",
+    "MARPOL": "MARPOL_CONSOLIDATED",
+    "COLREG": "IMO_COLREG",
+    "STCW": "STCW_CONVENTION",
+    "ISM Code": "ISM_CODE",
+    "ISPS Code": "ISPS_CODE",
+    "IMDG Code": "IMDG_CODE",
+    "IMSBC Code": "IMSBC_CODE",
+    "IGF Code": "IGF_CODE",
+    "IGC Code": "IGC_CODE",
+    "IBC Code": "IBC_CODE",
+    "BCH Code": "BCH_CODE",
+    "LSA Code": "LSA_CODE",
+    "FSS Code": "FSS_CODE",
+    "FTP Code": "FTP_CODE",
+    "CSS Code": "CSS_CODE",
+    "IAMSAR": "IAMSAR_MANUAL",
+    "MLC": "MLC_2006",
+    "BWM Convention": "BWM_CONVENTION",
+    "Load Lines": "LOAD_LINES_CONVENTION",
+    "Grain Code": "GRAIN_CODE",
+    "Polar Code": "POLAR_CODE",
+    "GBS": "GBS_STANDARDS",
+}
+
+
+def _match_imo_publication_id(title: str) -> Optional[str]:
+    """IMO タイトルから DB の publication_id を推定"""
+    for keyword, pub_id in IMO_TITLE_MAP.items():
+        if keyword.lower() in title.lower():
+            return pub_id
+    return None
+
+
+# ===========================================================================
+# Publisher チェッカー実装
 # ===========================================================================
 
 def check_imo_publications() -> list[dict]:
     """
-    IMO Publishing の最新版をチェック。
-    Returns: [{"publication_id": "SOLAS_CONSOLIDATED", "latest_edition": "2025 Edition", "latest_date": "2025-01-01"}]
+    IMO の Just Published ページをスクレイプし、最新刊行物を返す。
+    URL: https://www.imo.org/en/publications/Pages/JustPublished.aspx
     """
-    # TODO: 将来 IMO Publishing のスクレイピングを実装
-    logger.info("[IMO] スクレイパー未実装 — スキップ")
-    return []
+    url = "https://www.imo.org/en/publications/Pages/JustPublished.aspx"
+    results: list[dict] = []
+
+    try:
+        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        logger.error(f"[IMO] ページ取得失敗: {e}")
+        return []
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    # IMO Just Published ページは書籍をリスト/カード形式で掲載
+    # 一般的なパターン: テーブル行または div 要素に書籍情報
+    items_found = 0
+
+    # パターン1: テーブル行から抽出
+    for row in soup.select("table tr"):
+        cells = row.find_all("td")
+        if len(cells) < 2:
+            continue
+        title_text = cells[0].get_text(strip=True)
+        if not title_text:
+            continue
+        items_found += 1
+
+        # Edition 情報を抽出 (例: "COLREG 2026 Edition")
+        edition_match = re.search(r'(\d{4})\s*Edition', title_text, re.IGNORECASE)
+        edition_str = edition_match.group(0) if edition_match else ""
+
+        # 日付を抽出（あれば）
+        date_str = None
+        for cell in cells:
+            cell_text = cell.get_text(strip=True)
+            # ISO 形式 or "24 March 2026" 等
+            dm = re.search(r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})', cell_text, re.IGNORECASE)
+            if dm:
+                from datetime import datetime
+                try:
+                    parsed = datetime.strptime(dm.group(0), "%d %B %Y")
+                    date_str = parsed.strftime("%Y-%m-%d")
+                except ValueError:
+                    pass
+
+        pub_id = _match_imo_publication_id(title_text)
+        if pub_id:
+            results.append({
+                "publication_id": pub_id,
+                "latest_edition": edition_str or title_text,
+                "latest_date": date_str,
+            })
+        else:
+            logger.info(f"[IMO] DB未登録の書籍を検出（スキップ）: {title_text}")
+
+    # パターン2: div/article ベースのレイアウト（テーブルが無い場合）
+    if items_found == 0:
+        for item in soup.select(".dfwp-item, .slm-layout-main .item, article, .publication-item"):
+            title_el = item.find(["h2", "h3", "h4", "a", "strong"])
+            if not title_el:
+                continue
+            title_text = title_el.get_text(strip=True)
+            if not title_text:
+                continue
+            items_found += 1
+
+            edition_match = re.search(r'(\d{4})\s*Edition', title_text, re.IGNORECASE)
+            edition_str = edition_match.group(0) if edition_match else ""
+
+            # 日付を本文から抽出
+            date_str = None
+            full_text = item.get_text(" ", strip=True)
+            dm = re.search(
+                r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})',
+                full_text, re.IGNORECASE,
+            )
+            if dm:
+                from datetime import datetime
+                try:
+                    parsed = datetime.strptime(dm.group(0), "%d %B %Y")
+                    date_str = parsed.strftime("%Y-%m-%d")
+                except ValueError:
+                    pass
+
+            pub_id = _match_imo_publication_id(title_text)
+            if pub_id:
+                results.append({
+                    "publication_id": pub_id,
+                    "latest_edition": edition_str or title_text,
+                    "latest_date": date_str,
+                })
+            else:
+                logger.info(f"[IMO] DB未登録の書籍を検出（スキップ）: {title_text}")
+
+    logger.info(f"[IMO] ページから {items_found} 件を検出、{len(results)} 件が DB マッチ")
+    return results
+
+
+# ---------------------------------------------------------------------------
+# JHA (日本水路協会) チェッカー
+# ---------------------------------------------------------------------------
+
+JHA_SEARCH_KEYWORDS: list[str] = ["潮汐表", "灯台表", "水路誌", "天測暦", "海図総目録"]
+
+# JHA タイトルキーワード → DB の publication_id
+JHA_TITLE_MAP: dict[str, str] = {
+    "潮汐表": "JHA_TIDE_TABLE",
+    "灯台表": "JHA_LIGHT_LIST",
+    "水路誌": "JHA_SAILING_DIRECTIONS",
+    "天測暦": "JHA_NAUTICAL_ALMANAC",
+    "海図総目録": "JHO_CHART_CATALOG",
+    "距離表": "JHA_DISTANCE_TABLE",
+}
+
+
+def _match_jha_publication_id(title: str) -> Optional[str]:
+    """JHA タイトルから DB の publication_id を推定"""
+    for keyword, pub_id in JHA_TITLE_MAP.items():
+        if keyword in title:
+            return pub_id
+    return None
 
 
 def check_jho_publications() -> list[dict]:
     """
-    海上保安庁 水路部（日本水路協会）の最新版をチェック。
-    Returns: [{"publication_id": "JHO_CHART_CATALOG", "latest_edition": "...", "latest_date": "..."}]
+    日本水路協会のショップ検索をスクレイプし、各カテゴリの最新版を返す。
+    URL: https://www.jha.or.jp/shop/index.php?main_page=advanced_search_result&keyword={keyword}&language=jp
     """
-    # TODO: 将来 日本水路協会サイトのスクレイピングを実装
-    logger.info("[JHO] スクレイパー未実装 — スキップ")
-    return []
+    results: list[dict] = []
+    seen_pub_ids: set[str] = set()
 
+    for keyword in JHA_SEARCH_KEYWORDS:
+        encoded_kw = urllib.parse.quote(keyword)
+        url = (
+            f"https://www.jha.or.jp/shop/index.php?"
+            f"main_page=advanced_search_result&keyword={encoded_kw}&language=jp"
+        )
+
+        try:
+            resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=30)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            logger.error(f"[JHA] '{keyword}' 検索失敗: {e}")
+            continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # JHA ショップの検索結果は商品リスト形式
+        items_found = 0
+        for item in soup.select(".productListing-data, .product-listing tr, .itemTitle, .product_name, li.product"):
+            title_el = item.find(["a", "h3", "h4", "strong"])
+            if not title_el:
+                # テーブル行の場合、最初のリンクを探す
+                title_el = item.find("a")
+            if not title_el:
+                continue
+
+            title_text = title_el.get_text(strip=True)
+            if not title_text or keyword not in title_text:
+                continue
+
+            items_found += 1
+            full_text = item.get_text(" ", strip=True)
+
+            # 和暦から年を抽出: "令和9年" → 2027
+            edition_str = title_text
+            reiwa_match = re.search(r'令和(\d{1,2})年', title_text)
+            if reiwa_match:
+                western_year = reiwa_to_year(int(reiwa_match.group(1)))
+                edition_str = f"{western_year}年版 ({title_text})"
+
+            # 西暦パターン
+            year_match = re.search(r'(\d{4})年版', title_text)
+            if year_match:
+                edition_str = title_text
+
+            # 刊行日を推定
+            date_str = _extract_japanese_date(full_text)
+
+            pub_id = _match_jha_publication_id(title_text)
+            if pub_id and pub_id not in seen_pub_ids:
+                seen_pub_ids.add(pub_id)
+                results.append({
+                    "publication_id": pub_id,
+                    "latest_edition": edition_str,
+                    "latest_date": date_str,
+                })
+            elif not pub_id:
+                logger.info(f"[JHA] DB未登録の書籍を検出（スキップ）: {title_text}")
+
+        logger.info(f"[JHA] '{keyword}' 検索: {items_found} 件ヒット")
+
+        # サーバー負荷軽減
+        time.sleep(3)
+
+    logger.info(f"[JHA] 合計 {len(results)} 件の更新情報を取得")
+    return results
+
+
+# ---------------------------------------------------------------------------
+# 海文堂出版 (Kaibundo) チェッカー
+# ---------------------------------------------------------------------------
+
+# 海文堂タイトルキーワード → DB の publication_id
+KAIBUNDO_TITLE_MAP: dict[str, str] = {
+    "図説 海上衝突予防法": "JPN_COLREG_COMMENTARY",
+    "図説　海上衝突予防法": "JPN_COLREG_COMMENTARY",
+    "海上衝突予防法": "JPN_COLREG_COMMENTARY",
+}
+
+
+def _match_kaibundo_publication_id(title: str) -> Optional[str]:
+    """海文堂タイトルから DB の publication_id を推定。マッチしない場合は None"""
+    for keyword, pub_id in KAIBUNDO_TITLE_MAP.items():
+        if keyword in title:
+            return pub_id
+    return None
+
+
+def check_kaibundo_publications() -> list[dict]:
+    """
+    海文堂出版の法規・条約カテゴリページをスクレイプし、書籍情報を返す。
+    URL: https://www.kaibundo.jp/category/kaiji/kaiji-houki/
+
+    DB の publications テーブルに存在しない書籍を検出した場合は、
+    ログに記録するだけで DB には書き込まない（手動で追加判断するため）。
+    """
+    url = "https://www.kaibundo.jp/category/kaiji/kaiji-houki/"
+    results: list[dict] = []
+
+    try:
+        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        logger.error(f"[海文堂] ページ取得失敗: {e}")
+        return []
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    # 海文堂は WordPress ベースの EC サイト — 商品カード/リストから抽出
+    items_found = 0
+    for item in soup.select(
+        "article, .product, .post, .entry, "
+        ".woocommerce-loop-product, li.product, "
+        ".product-item, .book-item"
+    ):
+        title_el = item.find(["h2", "h3", "h4", "a.woocommerce-LoopProduct-link"])
+        if not title_el:
+            title_el = item.find("a")
+        if not title_el:
+            continue
+
+        title_text = title_el.get_text(strip=True)
+        if not title_text:
+            continue
+
+        items_found += 1
+        full_text = item.get_text(" ", strip=True)
+
+        # 版情報を抽出: "第25版", "2026年版", "22訂版" 等
+        edition_str = title_text
+        ver_match = re.search(r'第\s*(\d+)\s*版', title_text)
+        rev_match = re.search(r'(\d+)\s*訂版', title_text)
+        year_match = re.search(r'(\d{4})年版', title_text)
+
+        if ver_match:
+            edition_str = f"第{ver_match.group(1)}版"
+        elif rev_match:
+            edition_str = f"{rev_match.group(1)}訂版"
+        elif year_match:
+            edition_str = f"{year_match.group(1)}年版"
+
+        # 刊行日を推定
+        date_str = _extract_japanese_date(full_text)
+
+        # 価格を抽出（ログ用）
+        price_match = re.search(r'[¥￥][\s,]*([0-9,]+)', full_text)
+        price_str = price_match.group(0) if price_match else "不明"
+
+        pub_id = _match_kaibundo_publication_id(title_text)
+        if pub_id:
+            results.append({
+                "publication_id": pub_id,
+                "latest_edition": edition_str,
+                "latest_date": date_str,
+            })
+            logger.info(f"[海文堂] DBマッチ: {title_text} → {pub_id} (価格: {price_str})")
+        else:
+            # DB に存在しない書籍はログ記録のみ
+            logger.info(
+                f"[海文堂] DB未登録の書籍を検出（手動追加要検討）: "
+                f"{title_text} / 版: {edition_str} / 刊行: {date_str or '不明'} / 価格: {price_str}"
+            )
+
+    logger.info(f"[海文堂] ページから {items_found} 件を検出、{len(results)} 件が DB マッチ")
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Stub チェッカー（未実装 — 既存スクレイパーがカバーまたは将来実装）
+# ---------------------------------------------------------------------------
 
 def check_nk_publications() -> list[dict]:
     """
     ClassNK の最新版をチェック。
-    Returns: [{"publication_id": "NK_TECHNICAL_INFO", "latest_edition": "...", "latest_date": "..."}]
+    既存の scrape_nk.py がカバーしているため stub 維持。
     """
-    # TODO: 将来 ClassNK サイトのスクレイピングを実装
-    logger.info("[ClassNK] スクレイパー未実装 — スキップ")
+    logger.info("[ClassNK] 既存 scrape_nk.py がカバー — スキップ")
     return []
 
 
@@ -98,6 +469,7 @@ CHECKERS: dict[str, callable] = {
     "IMO": check_imo_publications,
     "海上保安庁 水路部": check_jho_publications,
     "日本水路協会": check_jho_publications,
+    "海文堂": check_kaibundo_publications,
     "ClassNK": check_nk_publications,
     "NK": check_nk_publications,
     "UKHO": check_ukho_publications,

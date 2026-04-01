@@ -5,7 +5,7 @@
 **唯一最大の強み**: 膨大な規制情報の中から、自船にのみ関係ある情報を自動抽出・通知すること。
 
 設計書: `plan/MARITIME_PROJECT_BLUEPRINT_v4.md`
-**戦略方針**: `plan/STRATEGIC_ROADMAP_v6.md`（v5/v4 との矛盾時はこちらが最優先）
+**戦略方針**: `plan/STRATEGIC_ROADMAP_v6.md`（v7 方針 — v5/v4 との矛盾時はこちらが最優先）
 進捗: `plan/PROGRESS.md`（**新規セッション開始時に必ず最初に読むこと**）
 引継ぎ: `plan/HANDOFF.md`
 **ペルソナ**: `plan/PERSONAS.md`（Vibe OS — 4ロール自動憑依システム）
@@ -124,11 +124,11 @@
 ### ■ 改善バックログ
 技術的負債・最適化アイデアは `plan/IDEAS_FOR_OPTIMIZATION.md` に記録する。
 
-## 戦略方針（v6 で確定）
+## 戦略方針（v7 で確定）
+- **プロダクトの本質** — 「航海士個人のための情報の蒸留器」。船舶スペックで情報を蒸留し必要なものだけ届ける
 - **資格管理フックは廃止** — `/crew/certificates` は作らない、crew_profiles テーブルも不要
 - **Ship Specs 登録がコア機能** — マッチング精度に直結する船舶プロファイルを最優先
-- **マッチングエンジンに全力** — ルールベース（高速除外）→ 条約ベース（自動推論）→ Gemini AI（精密判定）の3段階
-- **ハイエンド UI** — Apple/Linear 級の洗練されたデザイン。Glassmorphism + Framer Motion + ダークモード基調
+- **マッチングエンジンに全力** — ルールベース（高速除外）→ 条約ベース（自動推論）→ applicability_rules評価（API消費ゼロ）→ Gemini AI（フォールバック）の4段階
 - **NK は ubuntu-latest** — UA 偽装で GHA 直接実行可能。Self-hosted Runner 不要
 
 ## やらないこと
@@ -137,3 +137,7 @@
 - secrets をコード・コミット・ログに含めない
 - node_modules/ をコミットしない
 - 資格管理・証明書期限リマインダーは作らない（v5 で廃止決定）
+- PSC 検査対策に特化した重厚なシミュレーション
+- B2B 機能全般（管理会社向けログ監視、完了報告ボタン、レポート出力）
+- 書籍内容の詳細な要約生成
+- IMO ニュースソース直接取得（ClassNK経由で十分）

@@ -15,7 +15,9 @@
 | Phase 1 R1: スクレイパー構築 | R1 | ✅ 完了 | 2026-03-29 |
 | Phase 1 R2: DB + 検証 + マッチング基盤 | R2 | ✅ 完了 | 2026-03-29 |
 | Phase 2: Ship Specs + マッチング + 超軽量 UI | — | ✅ 完了 | 2026-03-30 |
-| Phase 3: Fleet + 拡張 + コンプライアンスエンジン | — | ⏳ 作業中 | 2026-03-31 |
+| Phase 3: Fleet + 拡張 + コンプライアンスエンジン | — | ⏳ 作業中 | 2026-04-01 |
+| マッチングエンジン刷新 (v3→4段階) | — | ✅ 完了 | 2026-04-01 |
+| コードベース整理 (publications分割等) | — | ✅ 完了 | 2026-04-01 |
 
 ---
 
@@ -329,6 +331,22 @@
 - [ ] Gemini プロンプトの DSPy 最適化 (本番フィードバック蓄積後)
 - [ ] LlamaIndex RAG (条約原文のインデキシング、将来)
 
+### マッチングエンジン刷新（2026-04-01）
+- [x] matching.py v3: 4段階パイプライン (Stage1ルール→Stage0条約→Stage2ルール評価→Stage3 AIフォールバック) ✅
+- [x] Master Matching: applicability_rules JSON による API 消費ゼロ判定 ✅
+- [x] extract_applicability_rules.py + extract-rules.yml: 全453件の applicability_rules 抽出 ✅
+- [x] 全件再マッチング完了 (適用4件、非適用35件、エラー0、429ゼロ) ✅
+- [x] Golden Set 29テスト全通過 ✅
+- [x] 00012_regulations_applicability.sql マイグレーション ✅
+
+### コードベース整理（2026-04-01）
+- [x] publications/ パッケージ分割: publication_requirements.py (2,369行) → 7ファイルに分割 ✅
+- [x] gemini_config.py: Gemini モデル名・パラメータの一元管理 ✅
+- [x] 書籍ID統一: PUB_X_NNN → 記述的ID (67件全件) ✅
+- [x] 書籍 applicability_rules JSON 化 ✅
+- [x] 00011_publications_v2.sql: applicability_rules JSONB + last_verified_at + verified_by ✅
+- [x] 戦略ロードマップ v6→v7 更新: 「航海士個人のための情報の蒸留器」方針 ✅
+
 ---
 
 ## 変更ログ
@@ -433,3 +451,6 @@
 - 2026-03-31 — [Agent C/Role C] Verified バッジ: 年次刊行物の2026年版を ✓ Verified 2026 で表示
 - 2026-03-31 — [Agent C/Role C] publication-data.ts: 2026年版更新 + フォールバック化コメント追加
 - 2026-03-31 — [Role D/Opus] 統合チェック: 121テスト全通過 + TSC + next build 全パス + 旧IDゼロ確認
+- 2026-04-01 — [User] 00011_publications_v2.sql を Supabase で実行 ✅
+- 2026-04-01 — [Role D/Opus] seed-publications 再実行成功: 67書籍 (新ID + applicability_rules + 2026年版)
+- 2026-04-01 — [Role D/Opus] 全ドキュメント v7 方針更新: STRATEGIC_ROADMAP_v6.md→v7, HANDOFF.md, PROGRESS.md, CLAUDE.md
