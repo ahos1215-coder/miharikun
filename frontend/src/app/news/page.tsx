@@ -276,6 +276,7 @@ export default async function NewsPage({
     .from("regulations")
     .select(selectFields, { count: "exact" })
     .neq("needs_review", true)
+    .or("published_at.gte.2024-01-01,published_at.is.null")
     .range(offset, offset + PAGE_SIZE - 1);
 
   // Sort order

@@ -44,7 +44,7 @@ from utils.gdrive_client import upload_json  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
 from utils.pdf_preprocess import preprocess_pdf, check_pdf_url  # type: ignore
 from utils.stealth_fetcher import stealth_get, stealth_download_bytes  # type: ignore
-from utils.filters import MARITIME_KEYWORDS, should_exclude_rss  # type: ignore
+from utils.filters import MARITIME_KEYWORDS, should_exclude_rss, is_too_old  # type: ignore
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -298,6 +298,11 @@ def fetch_rss_entries(
                     pub_date = parse_published_date(entry)
                     if pub_date and pub_date < since:
                         continue
+
+                # 2024年以前は取り込まない
+                pub_date_str = entry.get("published", "")
+                if is_too_old(pub_date_str):
+                    continue
 
                 # 除外を先にチェック（効率的）
                 if should_exclude_rss(title, summary):

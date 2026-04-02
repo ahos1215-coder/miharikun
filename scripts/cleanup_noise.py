@@ -30,7 +30,7 @@ from typing import Optional
 import requests
 
 from utils.supabase_client import SupabaseClient  # type: ignore
-from utils.filters import is_noise, NOISE_KEYWORDS_SINGLE, NOISE_KEYWORD_PAIRS  # type: ignore
+from utils.filters import is_noise, is_too_old, NOISE_KEYWORDS_SINGLE, NOISE_KEYWORD_PAIRS  # type: ignore
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -63,7 +63,7 @@ def find_noise_records(client: SupabaseClient) -> list[dict]:
             resp = requests.get(
                 f"{client.url}/rest/v1/regulations",
                 params={
-                    "select": "id,source_id,source,title,summary_ja,url,pdf_url",
+                    "select": "id,source_id,source,title,summary_ja,url,pdf_url,published_at",
                     "limit": str(page_size),
                     "offset": str(offset),
                 },
@@ -90,6 +90,14 @@ def find_noise_records(client: SupabaseClient) -> list[dict]:
         # NK はすべて実務情報のため、ノイズ判定をスキップ
         if (record.get("source") or "").lower() == "nk":
             continue
+
+        # 2024年以前の MLIT データは不要
+        published = record.get("published_at") or ""
+        if is_too_old(published):
+            record["_noise_reason"] = f"2024年以前のデータ ({published[:10]})"
+            noise_records.append(record)
+            continue
+
         title = record.get("title") or ""
         summary = record.get("summary_ja") or ""
         noise, reason = is_noise(title, summary)
