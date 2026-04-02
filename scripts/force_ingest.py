@@ -178,14 +178,16 @@ def call_gemini(prompt: str) -> dict | None:
 def upsert_regulation(record: dict) -> bool:
     try:
         resp = requests.post(
-            f"{SUPABASE_URL}/rest/v1/regulations?on_conflict=source,source_id",
+            f"{SUPABASE_URL}/rest/v1/regulations",
             json=record,
-            headers={**_headers(), "Prefer": "resolution=merge-duplicates"},
+            headers={**_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
             timeout=15,
         )
+        if resp.status_code >= 300:
+            logger.error(f"DB upsert HTTP {resp.status_code}: {resp.text[:300]}")
         return resp.status_code < 300
     except Exception as e:
-        logger.error(f"DB upsert 失敗: {e}")
+        logger.error(f"DB upsert 例外: {e}")
         return False
 
 
