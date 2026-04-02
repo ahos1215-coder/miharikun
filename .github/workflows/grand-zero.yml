@@ -33,7 +33,19 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      # Step 2: シードURL方式クローラー実行
+      # Step 2: NK スクレイパー実行
+      - name: Run NK Scraper
+        if: ${{ github.event.inputs.step == 'all' }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python scripts/scrape_nk.py $ARGS || true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      # Step 3: シードURL方式クローラー実行
       - name: Run MLIT Seed Crawler
         if: ${{ github.event.inputs.step == 'crawl' || github.event.inputs.step == 'all' }}
         run: |
@@ -45,7 +57,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
 
-      # Step 3: 基本訓練ページ強制取り込み
+      # Step 4: 基本訓練ページ強制取り込み（Self-Critique）
       - name: Force Ingest Static Pages
         if: ${{ github.event.inputs.step == 'ingest' || github.event.inputs.step == 'all' }}
         run: |
