@@ -275,6 +275,7 @@ export default async function NewsPage({
   let query = supabase
     .from("regulations")
     .select(selectFields, { count: "exact" })
+    .neq("needs_review", true)
     .range(offset, offset + PAGE_SIZE - 1);
 
   // Sort order
@@ -321,20 +322,23 @@ export default async function NewsPage({
 
   const totalPages = Math.ceil(totalFiltered / PAGE_SIZE);
 
-  // --- Source counts ---
+  // --- Source counts (hidden を除外) ---
   const { count: totalCount } = await supabase
     .from("regulations")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .neq("needs_review", true);
 
   const { count: nkCount } = await supabase
     .from("regulations")
     .select("*", { count: "exact", head: true })
-    .ilike("source", "nk");
+    .ilike("source", "nk")
+    .neq("needs_review", true);
 
   const { count: mlitCount } = await supabase
     .from("regulations")
     .select("*", { count: "exact", head: true })
-    .ilike("source", "MLIT");
+    .ilike("source", "MLIT")
+    .neq("needs_review", true);
 
   // --- URL builders ---
 
