@@ -16,7 +16,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 
-def fetch_all(source: str = "MLIT") -> list[dict]:
+def fetch_all(source: str | None = None) -> list[dict]:
     all_rows: list[dict] = []
     offset = 0
     while True:
@@ -24,8 +24,10 @@ def fetch_all(source: str = "MLIT") -> list[dict]:
             "select": "id,source_id,source,title,headline,summary_ja,category,severity,"
                       "published_at,effective_date,url,pdf_url,"
                       "applicable_ship_types,applicable_gt_min,applicable_gt_max,"
-                      "citations,confidence,applicability_rules",
-            "order": "published_at.desc.nullslast",
+                      "citations,confidence,applicability_rules,"
+                      "onboard_actions,shore_actions,sms_chapters",
+            "order": "source.asc,published_at.desc.nullslast",
+            "needs_review": "neq.true",
             "limit": "1000",
             "offset": str(offset),
         }
@@ -101,13 +103,12 @@ def format_rules(rules: dict | None) -> str:
 
 
 def main():
-    source = os.environ.get("EXPORT_SOURCE", "MLIT")
-    rows = fetch_all(source=source)
-    print(f"# {source} 規制データ一覧（{len(rows)}件）\n")
-    print("## Gemini レビュー用")
-    print("以下の各記事について、航海士にとって本当に必要な情報かどうか検査してください。\n")
-    print("**判定基準**: 「読んでも設備変更/マニュアル改訂/免状手続き変更がない → ノイズ」\n")
-    print("**検査項目**: 適用条約・関連法令、会社側対応、船側対応が適切か\n")
+    source = os.environ.get("EXPORT_SOURCE", "")  # 空=全ソース
+    rows = fetch_all(source=source if source else None)
+    label = source if source else "全ソース"
+    print(f"# MIHARIKUN 蒸留レポート — {label}（{len(rows)}件）\n")
+    print(f"> Phase 1.5 グランドゼロ完了後の最終版")
+    print(f"> Self-Critique + F-D-H ルール適用済み\n")
     print("---\n")
 
     for i, row in enumerate(rows, 1):
@@ -130,7 +131,8 @@ def main():
         citations = row.get("citations")
         rules = row.get("applicability_rules")
 
-        print(f"## {i}. [{severity}] {headline or title}")
+        src = row.get("source") or "?"
+        print(f"## {i}. [{src}] [{severity}] {headline or title}")
         if headline and title != headline:
             print(f"原題: {title}")
         print(f"カテゴリ: {category} | 掲載日: {published[:10] if published and published != '日付不明' else '不明'}", end="")
