@@ -282,7 +282,7 @@ export default async function NewsPage({
   if (activeSort === "effective") {
     query = query.order("effective_date", { ascending: true, nullsFirst: false });
   } else {
-    query = query.order("published_at", { ascending: false });
+    query = query.order("published_at", { ascending: false, nullsFirst: false });
   }
 
   // Source filter
@@ -667,7 +667,7 @@ export default async function NewsPage({
                       <DeadlineBadge effectiveDate={reg.effective_date} className="shrink-0" />
                     </div>
 
-                    {/* Title (headline first) */}
+                    {/* Title (headline first) + TEC number for NK */}
                     <h3
                       className={cn(
                         "text-base font-semibold leading-snug mb-1.5",
@@ -676,6 +676,11 @@ export default async function NewsPage({
                           : "text-zinc-900 dark:text-zinc-100",
                       )}
                     >
+                      {reg.source_id && reg.source_id.startsWith("TEC-") && (
+                        <span className="text-xs font-mono text-cyan-500 dark:text-cyan-400 mr-1.5">
+                          [{reg.source_id}]
+                        </span>
+                      )}
                       {displayTitle.text}
                     </h3>
 
