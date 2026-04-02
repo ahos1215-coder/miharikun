@@ -1,0 +1,66 @@
+name: Grand Zero (MLIT Reset + Re-collect)
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: 'ステップ: reset / crawl / ingest / all'
+        type: string
+        default: 'all'
+      dry_run:
+        description: 'Dry run'
+        type: boolean
+        default: false
+
+jobs:
+  grand-zero:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests python-dotenv PyMuPDF beautifulsoup4
+
+      # Step 1: MLIT データ全削除
+      - name: Reset MLIT data
+        if: ${{ github.event.inputs.step == 'reset' || github.event.inputs.step == 'all' }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          python scripts/reset_mlit_data.py $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Step 2: シードURL方式クローラー実行
+      - name: Run MLIT Seed Crawler
+        if: ${{ github.event.inputs.step == 'crawl' || github.event.inputs.step == 'all' }}
+        run: |
+          ARGS="--verbose"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python scripts/scrape_mlit_crawl.py $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+
+      # Step 3: 基本訓練ページ強制取り込み
+      - name: Force Ingest Static Pages
+        if: ${{ github.event.inputs.step == 'ingest' || github.event.inputs.step == 'all' }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          python scripts/force_ingest.py $ARGS > ingest_report.md
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: grand-zero-report
+          path: ingest_report.md
+          retention-days: 30
+          if-no-files-found: ignore

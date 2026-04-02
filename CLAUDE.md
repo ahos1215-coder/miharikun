@@ -54,6 +54,14 @@
   - `python -m py_compile` 全ファイル
   - pytest 実行
 
+### ■ Agent Teams SSoT 強制ルール（絶対遵守）
+Agent Team を編成して並列タスクを処理する場合、**各 Agent に以下を必ず伝達すること**:
+
+1. **scripts/utils/ の事前読み込み義務**: 実装開始前に `gemini_client.py`, `supabase_client.py`, `filters.py`, `gemini_config.py` を読み、既存の共通関数を把握すること
+2. **独自実装の禁止**: `call_gemini()`, `_headers()`, `download_pdf_text()` 等を各スクリプトに新規定義することは禁止。`utils/` の既存関数を拡張せよ
+3. **F-D-H ルールの共有**: 情報抽出タスクでは「Form/Deadline/Hardware」の3原則を厳守。Self-Critique ループを必ず回すこと
+4. **違反時の対応**: リードが統合チェック時に独自実装を発見した場合、即時削除して `utils/` の共通関数に差し替える
+
 ### リソース適応型 Agent Teams 運用ルール（厳守）
 
 **セッション使用率 90% 未満の場合:**
