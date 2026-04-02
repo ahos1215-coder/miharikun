@@ -271,3 +271,111 @@ def _augment_prompt(prompt: str) -> str:
     if "confidence" in prompt and "citations" in prompt:
         return prompt
     return prompt + addition
+
+
+# ---------------------------------------------------------------------------
+# テキスト専用 Gemini 呼び出し（SSoT: 全スクリプトはこれを使うこと）
+# ---------------------------------------------------------------------------
+
+def call_gemini_text(
+    prompt: str,
+    temperature: float = 0.1,
+    source_id: str = "",
+) -> dict | None:
+    """
+    テキストのみの Gemini API 呼び出し（PDF なし）。
+    全スクリプトで共通利用すること。各スクリプトに独自の call_gemini を書くのは禁止。
+
+    Returns:
+        パースされた JSON dict、または失敗時は None
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "") or _CFG_API_KEY
+    model = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
+
+    if not api_key:
+        print(f"[Gemini] GEMINI_API_KEY が未設定です")
+        return None
+
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": temperature},
+    }
+
+    _rate_limit_wait()
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.post(url, json=payload, timeout=90)
+
+            if resp.status_code == 200:
+                data = resp.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                return _parse_gemini_json(text, source_id)
+
+            elif _should_retry(str(resp.status_code)):
+                wait = _exponential_backoff(attempt)
+                print(f"[Gemini] {resp.status_code} — リトライ {attempt+1}/{MAX_RETRIES} ({wait:.1f}s)")
+                time.sleep(wait)
+                continue
+            else:
+                print(f"[Gemini] HTTP {resp.status_code}: {resp.text[:200]}")
+                return None
+
+        except requests.RequestException as e:
+            if attempt < MAX_RETRIES - 1:
+                wait = _exponential_backoff(attempt)
+                time.sleep(wait)
+                continue
+            print(f"[Gemini] 例外: {e}")
+            return None
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Self-Critique 型プロンプトテンプレート（F-D-H ルール強制）
+# ---------------------------------------------------------------------------
+
+SELF_CRITIQUE_PROMPT = """あなたは一級海技士の資格を持つ海事規制の専門家です。
+以下のPDF本文を読み、**本文に書いてある事実のみに基づいて**情報を構造化してください。
+
+## ★ 絶対ルール（違反したら即失格）
+1. **テンプレ推論は絶対禁止**。PDF に書いていないことは一切推測しない。
+2. 「理解する」「認識する」「貢献する」「注意する」はアクションではない。除外せよ。
+3. 既に日常業務として実施している基本作業（救命訓練の実施等）は新規性がないので除外。
+
+## ★ F-D-H ルール（アクション抽出の3原則）
+抽出するアクションは、以下の3つのいずれかの**実務的変化**を伴うものに限定せよ:
+- **Form（様式）**: 第○号様式の変更、記録簿の備置義務、証書の書換・申請、届出書類の変更
+- **Deadline（期限）**: ○年○月○日までに○○を完了、経過措置の期限、施行日
+- **Hardware/Budget（金と物）**: 設備の換装・追加購入、検査の受検、SMS改訂
+
+## PDF 本文
+{pdf_text}
+
+## ページタイトル
+{page_title}
+
+## 出力（JSON、Self-Critique 構造）
+```json
+{{
+  "title_ja": "1行の日本語タイトル",
+  "summary_ja": "背景・目的・具体的数値を含む要約（200-400字）",
+  "legal_basis": "適用条約・法令（条文レベル）",
+  "effective_date": "YYYY-MM-DD or null",
+  "category": "船員資格/船舶安全/環境規制 等",
+  "severity": "critical/action_required/informational",
+  "draft_actions": [
+    "候補1: ○○の届出が必要",
+    "候補2: △△の理解を深める",
+    "候補3: 第X号様式の備置義務"
+  ],
+  "self_critique_log": "候補1→YES（届出=Form変更）。候補2→NO（精神論、削除）。候補3→YES（様式=Form変更）。",
+  "final_onboard_actions": ["Self-Critiqueを通過した船側アクションのみ"],
+  "final_shore_actions": ["Self-Critiqueを通過した会社側アクションのみ"],
+  "sms_chapters": [],
+  "is_actionable": true
+}}
+```
+"""

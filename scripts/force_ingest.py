@@ -13,7 +13,6 @@ import sys
 import os
 import json
 import logging
-import re
 import time
 import argparse
 from datetime import datetime, timezone
@@ -25,25 +24,15 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from utils.gemini_config import (
-        DEFAULT_PRIMARY_MODEL, GEMINI_API_BASE, GEMINI_API_KEY,
-        MAX_RETRIES, BASE_WAIT, MAX_WAIT,
-    )
+    from utils.gemini_client import call_gemini_text, SELF_CRITIQUE_PROMPT
 except ImportError:
-    DEFAULT_PRIMARY_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-    MAX_RETRIES = 6
-    BASE_WAIT = 1.0
-    MAX_WAIT = 32.0
+    from gemini_client import call_gemini_text, SELF_CRITIQUE_PROMPT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("force_ingest")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-API_KEY = os.environ.get("GEMINI_API_KEY", "") or GEMINI_API_KEY
-MODEL = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
 USER_AGENT = "MaritimeRegsMonitor/0.3"
 
 # デフォルト: 基本訓練 + 主要施策ページ
@@ -112,67 +101,8 @@ def download_pdf_text(pdf_url: str) -> str | None:
         return None
 
 
-INGEST_PROMPT = """あなたは一級海技士の資格を持つ海事規制の専門家です。
-以下のPDF本文テキストを読み、**本文に書いてある事実のみに基づいて**構造化してください。
-
-## ★ ルール
-1. テンプレ推論は絶対禁止。PDF に書いていないことは一切推測しない。
-2. 「免状維持」「設備変更」「マニュアル改訂」に関わる具体的アクションを箇条書きで抽出。
-3. 記載がない項目は「（該当文書に記載なし）」と正直に書く。
-
-## PDF 本文
-{pdf_text}
-
-## ページタイトル
-{page_title}
-
-## 出力（JSON）
-```json
-{{
-  "title_ja": "1行の日本語タイトル",
-  "summary_ja": "背景・目的・具体的数値を含む要約（200-400字）",
-  "legal_basis": "適用条約・法令（条文レベルまで特定）",
-  "effective_date": "YYYY-MM-DD or null",
-  "category": "カテゴリ（船員資格/船舶安全/環境規制等）",
-  "severity": "critical/action_required/informational",
-  "onboard_actions": ["具体的な船側アクション"],
-  "shore_actions": ["具体的な会社側アクション"],
-  "sms_chapters": ["該当SMS章番号"],
-  "is_actionable": true
-}}
-```
-"""
-
-
-def call_gemini(prompt: str) -> dict | None:
-    url = f"{GEMINI_API_BASE}/{MODEL}:generateContent?key={API_KEY}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1},
-    }
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = requests.post(url, json=payload, timeout=90)
-            if resp.status_code == 200:
-                data = resp.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
-                match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(1))
-                match = re.search(r"\{.*\}", text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(0))
-                return None
-            elif resp.status_code == 429:
-                time.sleep(min(BASE_WAIT * (2 ** attempt), MAX_WAIT))
-                continue
-            else:
-                logger.error(f"Gemini HTTP {resp.status_code}")
-                return None
-        except Exception as e:
-            logger.error(f"Gemini error: {e}")
-            return None
-    return None
+# プロンプトとGemini呼び出しは utils/gemini_client.py に統合済み
+# SELF_CRITIQUE_PROMPT + call_gemini_text を使用
 
 
 def upsert_regulation(record: dict) -> bool:
@@ -220,19 +150,24 @@ def main():
 
             logger.info(f"  [{counter}] 解析中: {pdf['text'][:40]} ({len(pdf_text)}文字)")
 
-            prompt = INGEST_PROMPT.format(
+            prompt = SELF_CRITIQUE_PROMPT.format(
                 pdf_text=pdf_text,
                 page_title=f"{page_title} / {pdf['text']}",
             )
-            result = call_gemini(prompt)
+            result = call_gemini_text(prompt)
             time.sleep(4)
 
             if not result:
                 logger.warning(f"  [{counter}] Gemini 解析失敗")
                 continue
 
-            onboard = result.get("onboard_actions") or []
-            shore = result.get("shore_actions") or []
+            # Self-Critique 構造対応: final_* を優先
+            onboard = result.get("final_onboard_actions") or result.get("onboard_actions") or []
+            shore = result.get("final_shore_actions") or result.get("shore_actions") or []
+
+            critique = result.get("self_critique_log", "")
+            if critique:
+                logger.info(f"  [Self-Critique] {critique[:120]}")
 
             if not result.get("is_actionable") and not onboard and not shore:
                 logger.info(f"  [{counter}] アクションなし → スキップ")
