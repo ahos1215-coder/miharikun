@@ -87,6 +87,9 @@ def find_noise_records(client: SupabaseClient) -> list[dict]:
     # ローカルでノイズ判定
     noise_records: list[dict] = []
     for record in all_records:
+        # NK はすべて実務情報のため、ノイズ判定をスキップ
+        if (record.get("source") or "").lower() == "nk":
+            continue
         title = record.get("title") or ""
         summary = record.get("summary_ja") or ""
         noise, reason = is_noise(title, summary)

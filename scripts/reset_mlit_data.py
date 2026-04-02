@@ -140,10 +140,35 @@ def delete_mlit_only(dry_run: bool) -> None:
         pass
 
 
+def delete_nk_only(dry_run: bool) -> None:
+    """NK のみ削除"""
+    if dry_run:
+        return
+
+    resp = requests.delete(
+        f"{SUPABASE_URL}/rest/v1/regulations",
+        params={"source": "eq.nk"},
+        headers=_headers(),
+        timeout=60,
+    )
+    resp.raise_for_status()
+
+    try:
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/pending_queue",
+            params={"source": "eq.nk"},
+            headers=_headers(),
+            timeout=30,
+        )
+    except Exception:
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--mlit-only", action="store_true", help="MLIT のみ削除（NK は保持）")
+    parser.add_argument("--nk-only", action="store_true", help="NK のみ削除（MLIT は保持）")
     args = parser.parse_args()
 
     mlit_count = count_mlit()
@@ -155,7 +180,18 @@ def main():
     logger.info(f"  MLIT: {mlit_count}件")
     logger.info(f"  NK: {nk_count}件")
 
-    if args.mlit_only:
+    if args.mlit_only and args.nk_only:
+        logger.error("--mlit-only と --nk-only は同時に指定できません。全件削除するにはどちらも外してください。")
+        return
+
+    if args.nk_only:
+        logger.info(f"  モード: NK のみ削除（MLIT 保持）")
+        if args.dry_run:
+            logger.info(f"[DRY RUN] NK {nk_count}件が削除対象")
+            return
+        delete_nk_only(dry_run=False)
+        logger.info(f"=== 完了: NK {nk_count}件削除, MLIT {mlit_count}件保持 ===")
+    elif args.mlit_only:
         logger.info(f"  モード: MLIT のみ削除（NK 保持）")
         if args.dry_run:
             logger.info(f"[DRY RUN] MLIT {mlit_count}件が削除対象")

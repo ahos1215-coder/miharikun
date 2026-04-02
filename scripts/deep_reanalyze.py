@@ -54,7 +54,7 @@ def fetch_articles() -> list[dict]:
             params={
                 "source": "eq.MLIT",
                 "needs_review": "eq.false",
-                "select": "id,source_id,title,headline,summary_ja,category,severity,"
+                "select": "id,source_id,source,title,headline,summary_ja,category,severity,"
                           "effective_date,confidence,pdf_url,url",
                 "order": "published_at.desc.nullslast",
                 "limit": "1000",
@@ -202,10 +202,15 @@ def main():
             if not args.dry_run:
                 update_article(reg_id, result)
         else:
-            non_actionable.append({"title": new_title, "reason": "アクションなし"})
-            logger.info(f"  ❌ アクションなし → hidden")
-            if not args.dry_run:
-                hide_article(reg_id)
+            # NK はすべて実務情報 → hidden にしない
+            source = art.get("source", "")
+            if source.lower() == "nk":
+                logger.info(f"  NK データのため hidden をスキップ（常時アクティブ）")
+            else:
+                non_actionable.append({"title": new_title, "reason": "アクションなし"})
+                logger.info(f"  ❌ アクションなし → hidden")
+                if not args.dry_run:
+                    hide_article(reg_id)
 
     # レポート出力
     print(f"# MIHARIKUN 蒸留レポート — 事実ベース再解析版")

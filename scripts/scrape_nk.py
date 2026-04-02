@@ -205,15 +205,18 @@ CONFIDENCE_THRESHOLD = 0.7
 # Step 1: 一覧ページのスクレイピング
 # ---------------------------------------------------------------------------
 
-def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
+def fetch_nk_list(max_pages: int = 1, max_entries: int = 50) -> list[NKEntry]:
     """
-    NK テクニカルインフォメーション一覧ページをスクレイプ。
-    日次運用では max_pages=1（最新 50 件）で十分。
-    初回の全量取得時は max_pages=14 に設定。
+    NK テクニカルインフォメーション一覧を取得する。
 
-    NOTE: ページネーションは ASP.NET の __VIEWSTATE を使った PostBack。
-    max_pages > 1 の場合は PostBack を模擬する（現在は最新ページのみ対応）。
+    Phase 1: 一覧ページ（1ページ目）から HTML パース（タイトル付き、約50件）
+    Phase 2: max_entries が Phase 1 の件数を超える場合、URL パターンベースで
+             古い TEC 番号を HEAD リクエストで補完する。
+
+    日次運用では max_entries=50（1ページ分）で十分。
+    初回の全量取得時は max_entries=100 等に設定。
     """
+    # Phase 1: 一覧ページから取得
     entries: list[NKEntry] = []
 
     logger.info(f"Fetching NK list page: {NK_LIST_URL}")
@@ -230,12 +233,61 @@ def fetch_nk_list(max_pages: int = 1) -> list[NKEntry]:
     soup = BeautifulSoup(resp.text, "html.parser")
     entries.extend(_parse_list_page(soup))
 
-    logger.info(f"Parsed {len(entries)} entries from page 1")
+    logger.info(f"Phase 1: 一覧ページから {len(entries)} 件取得")
 
-    # TODO: max_pages > 1 の場合は PostBack で 2 ページ目以降を取得
-    # 初回全量取得時に実装する（__VIEWSTATE + __EVENTARGUMENT を模擬）
+    if len(entries) >= max_entries:
+        return sorted(entries, key=lambda e: e.tec_number, reverse=True)[:max_entries]
 
-    return entries
+    # Phase 2: URL パターンで補完（一覧に含まれなかった古い番号を探索）
+    if entries:
+        known_tecs = {e.tec_number for e in entries}
+        lowest_tec = min(e.tec_number for e in entries)
+        remaining = max_entries - len(entries)
+
+        logger.info(
+            f"Phase 2: URL パターンで残り {remaining} 件を補完 "
+            f"(TEC-{lowest_tec - 1} から逆順探索)"
+        )
+
+        miss_streak = 0  # 連続不在カウント（早期終了用）
+        for tec_num in range(lowest_tec - 1, max(0, lowest_tec - remaining - 20) - 1, -1):
+            if tec_num in known_tecs:
+                continue
+            pdf_url = f"{NK_PDF_BASE}/T{tec_num}j.pdf"
+            try:
+                head = requests.head(
+                    pdf_url, headers=HEADERS, timeout=10, allow_redirects=True,
+                )
+                if head.status_code == 200:
+                    entries.append(NKEntry(
+                        tec_number=tec_num,
+                        title_ja=f"テクニカルインフォメーション No.TEC-{tec_num}",
+                        title_en="",
+                        published_date="",
+                        contact_dept="",
+                        pdf_url_ja=pdf_url,
+                        pdf_url_en=f"{NK_PDF_BASE}/T{tec_num}e.pdf",
+                    ))
+                    miss_streak = 0
+                    logger.debug(f"Phase 2: TEC-{tec_num} 存在確認 OK")
+                    time.sleep(REQUEST_INTERVAL * 0.5)  # 礼儀正しく
+                else:
+                    miss_streak += 1
+                    logger.debug(f"Phase 2: TEC-{tec_num} → {head.status_code} (スキップ)")
+            except Exception:
+                miss_streak += 1
+
+            # 10 件連続で不在なら探索終了
+            if miss_streak >= 10:
+                logger.info(f"Phase 2: 10 件連続不在のため探索終了 (最終: TEC-{tec_num})")
+                break
+
+            if len(entries) >= max_entries:
+                break
+
+        logger.info(f"Phase 2 完了: 合計 {len(entries)} 件")
+
+    return sorted(entries, key=lambda e: e.tec_number, reverse=True)[:max_entries]
 
 
 def _parse_list_page(soup: BeautifulSoup) -> list[NKEntry]:
@@ -772,6 +824,12 @@ def main() -> int:
         help="Max entries to process per run (default: 10)",
     )
     parser.add_argument(
+        "--max-entries",
+        type=int,
+        default=50,
+        help="取得する最大エントリ数（default: 50, 100件対応時は --max-entries 100）",
+    )
+    parser.add_argument(
         "--json-output",
         action="store_true",
         help="Print result summary JSON to stdout (for GHA artifact use)",
@@ -791,7 +849,10 @@ def main() -> int:
 
     # ---- Step 1: 一覧ページ取得 ----
     try:
-        entries = fetch_nk_list(max_pages=14 if args.all_pages else 1)
+        entries = fetch_nk_list(
+            max_pages=14 if args.all_pages else 1,
+            max_entries=args.max_entries,
+        )
     except Exception as e:
         logger.error(f"Fatal: Failed to fetch NK list page: {e}")
         return 1
