@@ -20,6 +20,14 @@ SEED_URLS: list[str] = [
     "https://www.mlit.go.jp/maritime/maritime_tk10_000017.html",  # 船員養成
     "https://www.mlit.go.jp/maritime/maritime_fr1_000027.html",   # 法律
 
+    # === 追加インデックス（Gemini 監査で指摘）===
+    "https://www.mlit.go.jp/maritime/maritime_tk1_000004.html",   # 海事局・主要施策一覧
+    "https://www.mlit.go.jp/maritime/maritime_tk7_000002.html",   # 船舶安全
+    "https://www.mlit.go.jp/maritime/maritime_tk10_000003.html",  # 海技資格
+    "https://www.mlit.go.jp/maritime/maritime_tk7_000005.html",   # 環境対策
+    "https://www.mlit.go.jp/maritime/maritime_tk4_000009.html",   # 船員の確保・雇用
+    "https://www.mlit.go.jp/maritime/maritime_tk10_000006.html",  # 海技資格・免許
+
     # === 重要施策ページ（直接監視）===
     "https://www.mlit.go.jp/maritime/maritime_fr4_000055.html",   # 基本訓練（令和8年2月14日適用）
     "https://www.mlit.go.jp/maritime/maritime_fr4_000043.html",   # 船員の安全教育

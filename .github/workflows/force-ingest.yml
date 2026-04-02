@@ -1,0 +1,38 @@
+name: Force Ingest Static Pages
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'スペース区切りのURL（空=基本訓練ページ）'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run'
+        type: boolean
+        default: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests python-dotenv PyMuPDF beautifulsoup4
+      - run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          URLS="${{ github.event.inputs.urls }}"
+          if [ -n "$URLS" ]; then ARGS="$ARGS --url $URLS"; fi
+          python scripts/force_ingest.py $ARGS > ingest_report.md
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ingest-report
+          path: ingest_report.md
+          retention-days: 30
