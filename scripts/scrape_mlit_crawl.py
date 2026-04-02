@@ -411,51 +411,83 @@ def register_new_pdfs(
     dry_run: bool,
 ) -> int:
     """
-    新規 PDF を regulations + pending_queue に登録する。
+    新規 PDF を即時解析（統一プロンプト）して regulations に保存する。
+    pending_queue は使わない（シンプル化）。
 
     Returns:
         更新後の source_counter
     """
+    from utils.gemini_client import call_gemini_text, download_and_extract_pdf_text, UNIFIED_PROMPT
+    from utils.filters import is_noise
+
     for pdf in new_pdfs:
         source_counter += 1
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
         source_id = f"{SOURCE_PREFIX}-{date_str}-{source_counter:03d}"
 
-        # 金脈判定: タイトルに GOLD_MINE_KEYWORDS が含まれるか
         pdf_title = pdf["text"] or pdf["url"].split("/")[-1]
         gold_mine = is_gold_mine(pdf_title)
 
         if gold_mine:
             logger.info("  ★ 金脈検出（フィルタバイパス）: %s", pdf_title[:60])
 
-        # regulations に仮レコード（金脈は severity を action_required に昇格）
-        record = {
+        # ノイズ判定（金脈はバイパス）
+        if not gold_mine:
+            noise, reason = is_noise(pdf_title, "")
+            if noise:
+                logger.info("  ノイズ除外: %s — %s", pdf_title[:40], reason)
+                continue
+
+        if dry_run:
+            logger.info("  [dry-run] %s", pdf_title[:60])
+            continue
+
+        # PDF テキスト抽出 → 統一プロンプトで即時解析
+        pdf_text = download_and_extract_pdf_text(pdf["url"])
+
+        if pdf_text and len(pdf_text.strip()) > 50:
+            prompt = UNIFIED_PROMPT.format(
+                pdf_text=pdf_text,
+                doc_info=f"ソース: MLIT / ページ: {page_url} / ファイル: {pdf_title}",
+            )
+            result = call_gemini_text(prompt, source_id=source_id)
+            time.sleep(4)  # レート制限
+        else:
+            result = None
+
+        # DB 保存
+        now_iso = datetime.now(timezone.utc).isoformat()
+        record: dict = {
             "source_id": source_id,
             "source": "MLIT",
             "title": pdf_title,
             "url": page_url,
             "pdf_url": pdf["url"],
-            "scraped_at": datetime.now(timezone.utc).isoformat(),
-            "severity": "action_required" if gold_mine else "informational",
+            "scraped_at": now_iso,
+            "needs_review": False,
         }
-        if not dry_run:
-            client.upsert_regulation(record)
 
-        # pending_queue に登録（金脈は priority=high で区別）
-        if not dry_run:
-            reason = "gold_mine_bypass" if gold_mine else "awaiting_classification"
-            detail = (
-                f"金脈キーワード検出: ノイズフィルタをバイパス。process-queue で優先分類予定。"
-                if gold_mine
-                else "シードURL方式で検出。Gemini分類は process-queue で実行予定。"
-            )
-            client.queue_pending(
-                source="MLIT",
-                source_id=source_id,
-                pdf_url=pdf["url"],
-                reason=reason,
-                error_detail=detail,
-            )
+        if result:
+            record.update({
+                "headline": result.get("headline", ""),
+                "summary_ja": result.get("summary_ja", ""),
+                "category": result.get("category", ""),
+                "severity": result.get("severity", "informational"),
+                "confidence": result.get("confidence"),
+                "citations": result.get("citations"),
+                "effective_date": result.get("effective_date"),
+                "applicable_ship_types": result.get("applicable_ship_types"),
+                "applicable_gt_min": result.get("applicable_gt_min"),
+                "onboard_actions": result.get("final_onboard_actions") or result.get("onboard_actions") or [],
+                "shore_actions": result.get("final_shore_actions") or result.get("shore_actions") or [],
+                "sms_chapters": result.get("sms_chapters") or [],
+            })
+            logger.info("  ✅ 解析完了: %s", result.get("headline", pdf_title)[:50])
+        else:
+            record["severity"] = "informational"
+            logger.info("  ⚠️ 解析スキップ（テキスト抽出失敗）: %s", pdf_title[:50])
+
+        client.upsert_regulation(record)
         logger.info("新規PDF登録: %s -> %s", source_id, pdf["url"])
 
     return source_counter

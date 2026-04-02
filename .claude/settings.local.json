@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf frontend)",
+      "Bash(yes n:*)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Shouma.abe\\\\Desktop\\\\All Python project\\\\miharikun\\\\.claude\\\\worktrees\\\\agent-a2dd0ab2\\\\scripts\\\\utils\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Shouma.abe\\\\Desktop\\\\All Python project\\\\miharikun\\\\.claude\\\\worktrees\\\\agent-a2dd0ab2\\\\.github\\\\workflows\")",
+      "Bash(mkdir -p \"C:/Users/Shouma.abe/Desktop/All Python project/miharikun/.claude/worktrees/agent-a4cbe888/scripts/utils\")",
+      "Bash(mkdir -p \"C:/Users/Shouma.abe/Desktop/All Python project/miharikun/.claude/worktrees/agent-a4cbe888/tests/python\")",
+      "Bash(mkdir -p \"C:/Users/Shouma.abe/Desktop/All Python project/miharikun/.claude/worktrees/agent-a4cbe888/.github/workflows\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Shouma.abe\\\\Desktop\\\\All Python project\\\\miharikun\\\\scripts\\\\utils\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Shouma.abe\\\\Desktop\\\\All Python project\\\\miharikun\\\\.github\\\\workflows\")",
+      "Bash(WT_C=\"C:/Users/Shouma.abe/Desktop/All Python project/miharikun/.claude/worktrees/agent-a2dd0ab2\")",
+      "Bash(WT_A=\"C:/Users/Shouma.abe/Desktop/All Python project/miharikun/.claude/worktrees/agent-a4cbe888\")",
+      "Bash(MAIN=\"C:/Users/Shouma.abe/Desktop/All Python project/miharikun\")",
+      "Bash(cp \"$WT_C/scripts/utils/__init__.py\" \"$MAIN/scripts/utils/__init__.py\")",
+      "Bash(cp \"$WT_C/scripts/utils/gemini_client.py\" \"$MAIN/scripts/utils/gemini_client.py\")",
+      "Bash(cp \"$WT_A/scripts/scrape_nk.py\" \"$MAIN/scripts/scrape_nk.py\")",
+      "Bash(cp \"$WT_A/scripts/utils/supabase_client.py\" \"$MAIN/scripts/utils/supabase_client.py\")",
+      "Bash(cp \"$WT_A/.github/workflows/scrape-nk.yml\" \"$MAIN/.github/workflows/scrape-nk.yml\")",
+      "Bash(touch \"$MAIN/tests/__init__.py\")",
+      "Bash(cp \"$WT_A/tests/python/__init__.py\" \"$MAIN/tests/python/__init__.py\")",
+      "Bash(done)"
+    ]
+  }
+}

@@ -1,10 +1,9 @@
-name: NK Daily Scraper
+name: NK Weekly Scraper
 
 on:
-  # JST 07:00 = UTC 22:00 に毎日実行
-  # self-hosted runner (Windows 11 ローカル PC) で動作するため classnk.or.jp にアクセス可能
+  # JST 日曜 07:00 = UTC 土曜 22:00 に週次実行
   schedule:
-    - cron: '0 22 * * *'
+    - cron: '0 22 * * 0'
   workflow_dispatch:
     inputs:
       dry_run:
