@@ -28,25 +28,21 @@ try:
 except ImportError:
     from gemini_client import call_gemini_text, download_and_extract_pdf_text, SELF_CRITIQUE_PROMPT
 
+try:
+    from utils.supabase_client import get_supabase_url, get_supabase_headers
+except ImportError:
+    from supabase_client import get_supabase_url, get_supabase_headers
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("force_ingest")
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_URL = get_supabase_url()
 USER_AGENT = "MaritimeRegsMonitor/0.3"
 
 # デフォルト: 基本訓練 + 主要施策ページ
 DEFAULT_URLS = [
     "https://www.mlit.go.jp/maritime/maritime_fr4_000055.html",  # 基本訓練
 ]
-
-
-def _headers():
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
 
 
 def fetch_page(url: str) -> str | None:
@@ -93,7 +89,7 @@ def upsert_regulation(record: dict) -> bool:
         resp = requests.post(
             f"{SUPABASE_URL}/rest/v1/regulations",
             json=record,
-            headers={**_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+            headers={**get_supabase_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
             timeout=15,
         )
         if resp.status_code >= 300:

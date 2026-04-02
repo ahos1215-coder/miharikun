@@ -24,6 +24,11 @@ import requests
 
 from utils.matching import match_regulation_to_ship
 
+try:
+    from utils.supabase_client import get_supabase_url, get_supabase_headers
+except ImportError:
+    from supabase_client import get_supabase_url, get_supabase_headers
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -39,21 +44,11 @@ logger.setLevel(logging.INFO)
 # Supabase REST API ヘルパー
 # ---------------------------------------------------------------------------
 
-SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-
-
-def _headers() -> dict[str, str]:
-    """Supabase REST API 共通ヘッダー"""
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
+SUPABASE_URL: str = get_supabase_url()
 
 
 def _supabase_configured() -> bool:
-    return bool(SUPABASE_URL and SUPABASE_KEY)
+    return bool(SUPABASE_URL and get_supabase_headers().get("apikey"))
 
 
 def fetch_all_paginated(table: str, select: str = "*", extra_params: Optional[dict] = None) -> list[dict]:
@@ -77,7 +72,7 @@ def fetch_all_paginated(table: str, select: str = "*", extra_params: Optional[di
         resp = requests.get(
             f"{SUPABASE_URL}/rest/v1/{table}",
             params=params,
-            headers=_headers(),
+            headers=get_supabase_headers(),
             timeout=30,
         )
         resp.raise_for_status()
@@ -162,7 +157,7 @@ def upsert_match(
             f"{SUPABASE_URL}/rest/v1/user_matches?on_conflict=regulation_id,ship_profile_id",
             json=row,
             headers={
-                **_headers(),
+                **get_supabase_headers(),
                 "Prefer": "resolution=merge-duplicates",
             },
             timeout=30,

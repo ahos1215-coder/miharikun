@@ -28,6 +28,11 @@ try:
 except ImportError:
     from gemini_client import call_gemini_text, download_and_extract_pdf_text, SELF_CRITIQUE_PROMPT
 
+try:
+    from utils.supabase_client import get_supabase_url, get_supabase_headers
+except ImportError:
+    from supabase_client import get_supabase_url, get_supabase_headers
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -35,22 +40,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("deep_reanalyze")
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_URL = get_supabase_url()
 
 MIN_INTERVAL = 4.0
-
-
-# ---------------------------------------------------------------------------
-# Supabase
-# ---------------------------------------------------------------------------
-
-def _headers() -> dict:
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
 
 
 def fetch_articles() -> list[dict]:
@@ -68,7 +60,7 @@ def fetch_articles() -> list[dict]:
                 "limit": "1000",
                 "offset": str(offset),
             },
-            headers=_headers(),
+            headers=get_supabase_headers(),
             timeout=30,
         )
         resp.raise_for_status()
@@ -105,7 +97,7 @@ def update_article(reg_id: str, data: dict) -> bool:
             f"{SUPABASE_URL}/rest/v1/regulations",
             params={"id": f"eq.{reg_id}"},
             json=update_fields,
-            headers={**_headers(), "Prefer": "return=minimal"},
+            headers={**get_supabase_headers(), "Prefer": "return=minimal"},
             timeout=15,
         )
         return resp.status_code < 300
@@ -120,7 +112,7 @@ def hide_article(reg_id: str) -> bool:
             f"{SUPABASE_URL}/rest/v1/regulations",
             params={"id": f"eq.{reg_id}"},
             json={"needs_review": True},
-            headers={**_headers(), "Prefer": "return=minimal"},
+            headers={**get_supabase_headers(), "Prefer": "return=minimal"},
             timeout=15,
         )
         return resp.status_code < 300

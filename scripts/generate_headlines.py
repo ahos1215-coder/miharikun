@@ -36,6 +36,11 @@ except ImportError:
         MIN_REQUEST_INTERVAL,
     )
 
+try:
+    from utils.supabase_client import get_supabase_url, get_supabase_headers
+except ImportError:
+    from supabase_client import get_supabase_url, get_supabase_headers
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -50,22 +55,13 @@ logger.setLevel(logging.INFO)
 # Supabase / Gemini 設定（gemini_config から統一取得）
 # ---------------------------------------------------------------------------
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_URL = get_supabase_url()
 GEMINI_API_KEY = _CFG_API_KEY or os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
 GEMINI_API_BASE = _CFG_API_BASE
 MIN_INTERVAL = float(os.environ.get("GEMINI_MIN_INTERVAL", "0.5"))
 
 _last_call: float = 0.0
-
-
-def _headers():
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
 
 
 def fetch_regulations_without_headline(limit: int = 100) -> list[dict]:
@@ -78,7 +74,7 @@ def fetch_regulations_without_headline(limit: int = 100) -> list[dict]:
             "order": "created_at.desc",
             "limit": str(limit),
         },
-        headers=_headers(),
+        headers=get_supabase_headers(),
         timeout=30,
     )
     resp.raise_for_status()
@@ -157,7 +153,7 @@ def update_headline(reg_id: str, headline: str) -> bool:
         f"{SUPABASE_URL}/rest/v1/regulations",
         params={"id": f"eq.{reg_id}"},
         json={"headline": headline},
-        headers={**_headers(), "Prefer": "return=minimal"},
+        headers={**get_supabase_headers(), "Prefer": "return=minimal"},
         timeout=15,
     )
     return resp.status_code < 300
@@ -170,7 +166,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="既存 headline も再生成")
     args = parser.parse_args()
 
-    if not SUPABASE_URL or not SUPABASE_KEY or not GEMINI_API_KEY:
+    if not SUPABASE_URL or not get_supabase_headers().get("apikey") or not GEMINI_API_KEY:
         logger.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY が必要です")
         sys.exit(1)
 
@@ -183,7 +179,7 @@ def main():
                 "order": "created_at.desc",
                 "limit": str(args.limit),
             },
-            headers=_headers(),
+            headers=get_supabase_headers(),
             timeout=30,
         )
         resp.raise_for_status()

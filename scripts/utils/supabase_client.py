@@ -93,6 +93,32 @@ def _with_retry(func, *args, **kwargs):
 # SupabaseClient
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# モジュールレベルのヘルパー（SSoT: 全スクリプトはこれを使うこと）
+# ---------------------------------------------------------------------------
+
+_MODULE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+_MODULE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+
+def get_supabase_url() -> str:
+    """Supabase URL を返す。"""
+    return _MODULE_URL
+
+
+def get_supabase_headers() -> dict[str, str]:
+    """Supabase REST API の共通ヘッダーを返す。SSoT: 全スクリプトはこれを使うこと。"""
+    return {
+        "apikey": _MODULE_KEY,
+        "Authorization": f"Bearer {_MODULE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+
+# ---------------------------------------------------------------------------
+# SupabaseClient
+# ---------------------------------------------------------------------------
+
 class SupabaseClient:
     """
     Supabase REST API クライアント。

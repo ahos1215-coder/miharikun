@@ -25,6 +25,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import requests
 
+try:
+    from utils.supabase_client import get_supabase_url, get_supabase_headers
+except ImportError:
+    from supabase_client import get_supabase_url, get_supabase_headers
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -39,8 +44,7 @@ logger.setLevel(logging.INFO)
 # Supabase REST API ヘルパー
 # ---------------------------------------------------------------------------
 
-SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_URL: str = get_supabase_url()
 
 # メール送信設定
 RESEND_API_URL: str = os.environ.get(
@@ -52,17 +56,8 @@ SUMMARY_API_KEY: str = os.environ.get("SUMMARY_API_KEY", "")
 NOTIFY_EMAIL: str = os.environ.get("NOTIFY_EMAIL", "")
 
 
-def _headers() -> dict[str, str]:
-    """Supabase REST API 共通ヘッダー"""
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
-
-
 def _supabase_configured() -> bool:
-    return bool(SUPABASE_URL and SUPABASE_KEY)
+    return bool(SUPABASE_URL and get_supabase_headers().get("apikey"))
 
 
 def fetch_all_paginated(
@@ -90,7 +85,7 @@ def fetch_all_paginated(
         resp = requests.get(
             f"{SUPABASE_URL}/rest/v1/{table}",
             params=params,
-            headers=_headers(),
+            headers=get_supabase_headers(),
             timeout=30,
         )
         resp.raise_for_status()

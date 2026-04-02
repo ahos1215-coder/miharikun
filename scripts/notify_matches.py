@@ -22,6 +22,11 @@ import requests
 
 from utils.line_notify import send_alert
 
+try:
+    from utils.supabase_client import get_supabase_url, get_supabase_headers
+except ImportError:
+    from supabase_client import get_supabase_url, get_supabase_headers
+
 # ---------------------------------------------------------------------------
 # ロガー設定
 # ---------------------------------------------------------------------------
@@ -36,21 +41,11 @@ logger.setLevel(logging.INFO)
 # Supabase REST API ヘルパー
 # ---------------------------------------------------------------------------
 
-SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-
-
-def _headers() -> dict[str, str]:
-    """Supabase REST API 共通ヘッダー"""
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
+SUPABASE_URL: str = get_supabase_url()
 
 
 def _supabase_configured() -> bool:
-    return bool(SUPABASE_URL and SUPABASE_KEY)
+    return bool(SUPABASE_URL and get_supabase_headers().get("apikey"))
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +65,7 @@ def fetch_unnotified_matches() -> list[dict]:
             "is_applicable": "eq.true",
             "limit": "1000",
         },
-        headers=_headers(),
+        headers=get_supabase_headers(),
         timeout=30,
     )
     resp.raise_for_status()
@@ -88,7 +83,7 @@ def fetch_regulation(regulation_id: str) -> Optional[dict]:
             "id": f"eq.{regulation_id}",
             "limit": "1",
         },
-        headers=_headers(),
+        headers=get_supabase_headers(),
         timeout=30,
     )
     resp.raise_for_status()
@@ -105,7 +100,7 @@ def fetch_ship_profile(ship_profile_id: str) -> Optional[dict]:
             "id": f"eq.{ship_profile_id}",
             "limit": "1",
         },
-        headers=_headers(),
+        headers=get_supabase_headers(),
         timeout=30,
     )
     resp.raise_for_status()
@@ -131,7 +126,7 @@ def fetch_user_preferences(user_id: str) -> dict:
                 "user_id": f"eq.{user_id}",
                 "limit": "1",
             },
-            headers=_headers(),
+            headers=get_supabase_headers(),
             timeout=30,
         )
         resp.raise_for_status()
@@ -194,7 +189,7 @@ def mark_notified(match_id: str) -> bool:
             f"{SUPABASE_URL}/rest/v1/user_matches",
             params={"id": f"eq.{match_id}"},
             json={"notified": True},
-            headers=_headers(),
+            headers=get_supabase_headers(),
             timeout=30,
         )
         resp.raise_for_status()
