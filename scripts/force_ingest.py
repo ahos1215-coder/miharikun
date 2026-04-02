@@ -24,9 +24,9 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from utils.gemini_client import call_gemini_text, SELF_CRITIQUE_PROMPT
+    from utils.gemini_client import call_gemini_text, download_and_extract_pdf_text, SELF_CRITIQUE_PROMPT
 except ImportError:
-    from gemini_client import call_gemini_text, SELF_CRITIQUE_PROMPT
+    from gemini_client import call_gemini_text, download_and_extract_pdf_text, SELF_CRITIQUE_PROMPT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("force_ingest")
@@ -84,25 +84,8 @@ def extract_page_title(html: str) -> str:
     return ""
 
 
-def download_pdf_text(pdf_url: str) -> str | None:
-    try:
-        resp = requests.get(pdf_url, headers={"User-Agent": USER_AGENT}, timeout=30)
-        resp.raise_for_status()
-        try:
-            import fitz
-            doc = fitz.open(stream=resp.content, filetype="pdf")
-            text = "\n".join(page.get_text() for page in doc)
-            doc.close()
-            return text[:8000] if text.strip() else None
-        except ImportError:
-            return None
-    except Exception as e:
-        logger.warning(f"PDF取得失敗: {pdf_url} — {e}")
-        return None
-
-
-# プロンプトとGemini呼び出しは utils/gemini_client.py に統合済み
-# SELF_CRITIQUE_PROMPT + call_gemini_text を使用
+# プロンプトとGemini呼び出し、PDF抽出は utils/gemini_client.py に統合済み
+# SELF_CRITIQUE_PROMPT + call_gemini_text + download_and_extract_pdf_text を使用
 
 
 def upsert_regulation(record: dict) -> bool:
@@ -143,7 +126,7 @@ def main():
 
         for pdf in pdfs:
             counter += 1
-            pdf_text = download_pdf_text(pdf["url"])
+            pdf_text = download_and_extract_pdf_text(pdf["url"])
             if not pdf_text or len(pdf_text.strip()) < 50:
                 logger.info(f"  [{counter}] スキップ（テキスト不足）: {pdf['text'][:40]}")
                 continue

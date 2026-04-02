@@ -13,7 +13,6 @@ Gemini API を使い、各規制について
 
 import sys
 import os
-import json
 import logging
 import time
 import argparse
@@ -24,23 +23,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 import requests
 
 try:
-    from utils.gemini_config import (
-        DEFAULT_PRIMARY_MODEL,
-        GEMINI_API_BASE,
-        GEMINI_API_KEY,
-        MATCHING_TEMPERATURE,
-        MAX_RETRIES,
-        BASE_WAIT,
-        MAX_WAIT,
-    )
+    from utils.gemini_client import call_gemini_text
 except ImportError:
-    DEFAULT_PRIMARY_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-    MATCHING_TEMPERATURE = 0.1
-    MAX_RETRIES = 6
-    BASE_WAIT = 1.0
-    MAX_WAIT = 32.0
+    from gemini_client import call_gemini_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,8 +36,6 @@ logger = logging.getLogger("extract_actions")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-API_KEY = os.environ.get("GEMINI_API_KEY", "") or GEMINI_API_KEY
-MODEL = os.environ.get("GEMINI_MODEL", DEFAULT_PRIMARY_MODEL)
 
 MIN_INTERVAL = 4.0  # Tier 1: 15 RPM
 
@@ -92,44 +75,15 @@ ACTION_PROMPT = """あなたは一級海技士の資格を持つ海事コンサ�
 ```
 
 `is_actionable` は、船側・会社側のいずれかに1つでも具体的アクションがある場合のみ true。
+
+## ★ F-D-H ルール（絶対基準）
+アクションは以下の3つのいずれかの実務的変化を伴うものに限定:
+- Form（様式）: 第○号様式の変更、記録簿備置義務、証書書換
+- Deadline（期限）: ○年○月○日までの完了義務
+- Hardware/Budget（金と物）: 設備換装、検査受検、SMS改訂
+
+「理解する」「認識する」「注意する」はアクションではない。除外せよ。
 """
-
-
-def call_gemini(prompt: str) -> dict | None:
-    url = f"{GEMINI_API_BASE}/{MODEL}:generateContent?key={API_KEY}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": MATCHING_TEMPERATURE},
-    }
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = requests.post(url, json=payload, timeout=60)
-            if resp.status_code == 200:
-                data = resp.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
-                # JSON 抽出
-                import re
-                match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(1))
-                match = re.search(r"\{.*\}", text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(0))
-                logger.warning("JSON not found in response")
-                return None
-            elif resp.status_code == 429:
-                wait = min(BASE_WAIT * (2 ** attempt), MAX_WAIT)
-                logger.warning(f"429 Rate limit. Waiting {wait}s...")
-                time.sleep(wait)
-                continue
-            else:
-                logger.error(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}")
-                return None
-        except Exception as e:
-            logger.error(f"Gemini error: {e}")
-            return None
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +198,7 @@ def main():
             effective_date=effective,
         )
 
-        result = call_gemini(prompt)
+        result = call_gemini_text(prompt)
         time.sleep(MIN_INTERVAL)
 
         if result is None:

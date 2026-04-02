@@ -337,6 +337,34 @@ def call_gemini_text(
 # Self-Critique 型プロンプトテンプレート（F-D-H ルール強制）
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# PDF ダウンロード + テキスト抽出（SSoT: 全スクリプトはこれを使うこと）
+# ---------------------------------------------------------------------------
+
+def download_and_extract_pdf_text(pdf_url: str, max_chars: int = 8000) -> str | None:
+    """
+    PDF をダウンロードしてテキストを抽出する。
+    SSoT: 全スクリプトはこの関数を使うこと。独自実装は禁止。
+    """
+    try:
+        resp = requests.get(
+            pdf_url,
+            headers={"User-Agent": "MaritimeRegsMonitor/0.3"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        try:
+            import fitz
+            doc = fitz.open(stream=resp.content, filetype="pdf")
+            text = "\n".join(page.get_text() for page in doc)
+            doc.close()
+            return text[:max_chars] if text.strip() else None
+        except ImportError:
+            return None
+    except Exception:
+        return None
+
+
 SELF_CRITIQUE_PROMPT = """あなたは一級海技士の資格を持つ海事規制の専門家です。
 以下のPDF本文を読み、**本文に書いてある事実のみに基づいて**情報を構造化してください。
 
