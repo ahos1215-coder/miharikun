@@ -467,3 +467,10 @@
 - 2026-04-01 — [Role B/Opus] extract_actions.py: 44件にGeminiでアクション抽出 → アクションなし=hidden
 - 2026-04-01 — [Role D/Opus] ドキュメント全面更新: PROGRESS + HANDOFF + ROADMAP
 - 2026-04-01 — [Role B/Opus] 深層哨戒機能: 金脈キーワード19語 + シードURL 14件に拡充 + ノイズフィルタバイパス
+- 2026-04-01 — [Role D/Opus] Self-Critique ループ実装: F-D-Hルール + draft→critique→final 3段階
+- 2026-04-01 — [Role B/Opus] Gemini SSoT統合: call_gemini_text + download_and_extract_pdf_text + SELF_CRITIQUE_PROMPT
+- 2026-04-01 — [Role D/Opus] Phase 1.5 CI強化: Ruff lint + Cyclomatic Complexity + 設計レビュー強制
+- 2026-04-02 — [Role D/Opus] グランドゼロ実行: DB全削除(231件) → NK再取得(30件) → MLIT クローラー(1162件pending) → 基本訓練(19件)
+- 2026-04-02 — [Role B/Opus] Supabase _headers 7重複を完全解消: get_supabase_headers() SSoT化
+- 2026-04-02 — [Role D/Opus] NK 深層再解析実行中 (Self-Critique + F-D-H)
+- 2026-04-02 — [Role D/Opus] ドキュメント全面更新: GHA 22本 / Migration 13 / DRY違反ゼロ

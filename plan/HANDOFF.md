@@ -37,7 +37,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | デプロイ | Vercel 自動デプロイ (git push → 自動ビルド) |
 | DB | Supabase (PostgreSQL + Auth + RLS) |
 | AI | Google Gemini 2.5 Flash API (**Tier 1 Pay-as-you-go**) |
-| バッチ | GitHub Actions (19 ワークフロー) |
+| バッチ | GitHub Actions (22 ワークフロー) |
 | リポジトリ | Public (GHA 無制限のため) |
 | コード規模 | 約 15,018 行 |
 
@@ -69,7 +69,7 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | `publications` | 書籍マスターデータ (67件, GHAバッチ更新) |
 | `ship_publications` | 船舶別 備付書籍状況 (ユーザー管理) |
 
-マイグレーション: `supabase/migrations/` (12 ファイル、全て適用済み)
+マイグレーション: `supabase/migrations/` (13 ファイル、全て適用済み)
 - `00001_initial_schema.sql` — regulations + pending_queue
 - `00002_mlit_crawl.sql` — mlit_crawl_state
 - `00003_rls_policies.sql` — RLS ポリシー
@@ -82,10 +82,11 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 - `00010_radio_equipment.sql` — ship_profiles に radio_equipment カラム追加
 - `00011_publications_v2.sql` — publications に applicability_rules JSONB + last_verified_at + verified_by
 - `00012_regulations_applicability.sql` — regulations に applicability_rules JSONB
+- `00013_regulation_actions.sql` — regulations に onboard_actions/shore_actions/sms_chapters
 
 ---
 
-## 5. GitHub Actions ワークフロー (全 19)
+## 5. GitHub Actions ワークフロー (全 22)
 
 | ファイル | スケジュール | 内容 |
 |---------|------------|------|
@@ -104,7 +105,10 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | `ci.yml` | PR / push | CI (TypeScript + pytest + ESLint) |
 | `scrape-kanto.yml` | 週次 火曜 JST 12:00 | 関東運輸局テスト監視 |
 | `cleanup-noise.yml` | 手動 | ノイズデータ一括清掃 (filters.py v2.4) |
-| `extract-actions.yml` | 手動 | Gemini でアクション抽出 (最終蒸留) |
+| `extract-actions.yml` | 手動 | Gemini でアクション抽出 |
+| `deep-reanalyze.yml` | 手動 | PDF本文ベース深層再解析 (Self-Critique) |
+| `force-ingest.yml` | 手動 | 常設ページ強制取り込み (基本訓練等) |
+| `grand-zero.yml` | 手動 | DB全削除+NK/MLIT再収集 |
 | `export-mlit.yml` | 手動 | MLIT記事エクスポート (監査用) |
 | `security-scan.yml` | 週次 / PR | TruffleHog + npm/pip audit |
 | `notify-on-failure.yml` | — | 再利用可能失敗通知 (called by others) |
@@ -237,10 +241,20 @@ DB 事後清掃 → filters.py (is_noise) → cleanup_noise.py
 - 元データ: 453件 → 蒸留後: 44件（MLIT）+ 34件（NK）= 78件
 - 除去率: 90%
 
+### コード品質（Phase 1.5 グランドゼロ完了）
+- **Gemini API**: `gemini_client.py` に `call_gemini_text()` + `SELF_CRITIQUE_PROMPT` 統合。独自実装ゼロ
+- **Supabase**: `supabase_client.py` に `get_supabase_headers()` 統合。独自 `_headers()` ゼロ
+- **PDF抽出**: `gemini_client.py` に `download_and_extract_pdf_text()` 統合。独自実装ゼロ
+- **プロンプト**: F-D-H ルール（Form/Deadline/Hardware）+ Self-Critique ループ
+- **DRY原則違反**: 解消済み
+
 ### 主要ファイル
-- `scripts/utils/filters.py` — ノイズフィルタ定義の SSoT
+- `scripts/utils/filters.py` — ノイズフィルタ定義の SSoT (351パターン)
+- `scripts/utils/gemini_client.py` — Gemini API + PDF抽出 + Self-Critique の SSoT
+- `scripts/utils/supabase_client.py` — Supabase 接続の SSoT
 - `scripts/cleanup_noise.py` — DB事後清掃
-- `scripts/extract_actions.py` — Gemini でアクション抽出
+- `scripts/force_ingest.py` — 常設ページ強制取り込み (Self-Critique)
+- `scripts/deep_reanalyze.py` — 既存データの深層再解析
 
 ---
 
