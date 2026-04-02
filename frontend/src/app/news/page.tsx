@@ -278,11 +278,13 @@ export default async function NewsPage({
     .neq("needs_review", true)
     .range(offset, offset + PAGE_SIZE - 1);
 
-  // Sort order
+  // Sort order（published_at が null の記事は scraped_at でフォールバック）
   if (activeSort === "effective") {
     query = query.order("effective_date", { ascending: true, nullsFirst: false });
   } else {
-    query = query.order("published_at", { ascending: false, nullsFirst: false });
+    query = query
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .order("scraped_at", { ascending: false, nullsFirst: false });
   }
 
   // Source filter

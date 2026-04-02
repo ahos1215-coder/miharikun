@@ -71,6 +71,8 @@ jobs:
             ARGS="$ARGS --limit ${{ inputs.limit }}"
           fi
 
+          ARGS="$ARGS --max-entries 100"
+
           # スクリプトは scripts/ 配下で実行（utils/ の import パスを解決するため）
           cd scripts
           $PYTHON_CMD scrape_nk.py $ARGS
