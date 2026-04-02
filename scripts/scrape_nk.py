@@ -438,7 +438,8 @@ def _build_regulation_from_classification(
     confidence: float = float(classification.get("confidence", 0.5))
     # 0.0-1.0 の範囲に clamp
     confidence = max(0.0, min(1.0, confidence))
-    needs_review = confidence < CONFIDENCE_THRESHOLD
+    # NK のテクニカルインフォメーションはすべて実務情報 → 常に表示（完全無審査パス）
+    needs_review = False
 
     return ClassifiedRegulation(
         source="nk",

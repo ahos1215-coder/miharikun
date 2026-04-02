@@ -515,14 +515,14 @@ WHITELIST_KEYWORDS: list[str] = [
 # ---------------------------------------------------------------------------
 
 def is_too_old(published_at: str | None, cutoff_year: int = 2024) -> bool:
-    """2024年より前のMLITデータはノイズとして扱う。"""
+    """2024年より前のデータ、または日付不明のデータはノイズとして扱う。"""
     if not published_at:
-        return False  # 日付不明は残す（別の判定に任せる）
+        return True  # 日付不明 = 古いデータとして削除
     try:
         year = int(published_at[:4])
         return year < cutoff_year
     except (ValueError, IndexError):
-        return False
+        return True  # パース失敗 = 古いデータとして削除
 
 
 def is_noise(title: str, summary: str) -> tuple[bool, str]:
