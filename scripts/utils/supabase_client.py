@@ -67,7 +67,8 @@ def _with_retry(func, *args, **kwargs):
         except requests.HTTPError as e:
             status_code = e.response.status_code if e.response is not None else 0
             if not _is_transient_error(status_code):
-                logger.error(f"Non-transient HTTP error {status_code}: {e}")
+                body = e.response.text[:500] if e.response is not None else ""
+                logger.error(f"Non-transient HTTP error {status_code}: {e}\n  Response body: {body}")
                 return False, None
             last_error = e
             logger.warning(
