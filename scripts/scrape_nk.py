@@ -527,7 +527,7 @@ def save_to_supabase(db: SupabaseClient, regulation: ClassifiedRegulation) -> bo
         "summary_ja": regulation.summary_ja,
         "url": regulation.url,
         "pdf_url": regulation.pdf_url,
-        "published_at": regulation.published_at,
+        "published_at": regulation.published_at or None,  # 空文字→null（PostgreSQL timestamp対策）
         "applicable_ship_types": regulation.applicable_ship_types,
         "applicable_gt_min": regulation.applicable_gt_min,
         "applicable_gt_max": regulation.applicable_gt_max,

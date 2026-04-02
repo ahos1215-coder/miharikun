@@ -299,10 +299,10 @@ class TestMockClassification:
         # confidence=0.87 > 0.7 → needs_review=False
         assert regulation.needs_review is False
 
-    def test_build_regulation_needs_review_when_low_confidence(
+    def test_build_regulation_needs_review_always_false_for_nk(
         self, mock_gemini_response_low_confidence: dict
     ):
-        """confidence < 0.7 の場合 needs_review=True になること"""
+        """NK は完全無審査パス: confidence に関わらず needs_review=False"""
         entry = nk.NKEntry(
             tec_number=9999,
             title_ja="低確信度テスト通達",
@@ -319,8 +319,7 @@ class TestMockClassification:
             full_text="",
         )
 
-        assert regulation.needs_review is True
-        assert regulation.confidence < nk.CONFIDENCE_THRESHOLD
+        assert regulation.needs_review is False  # NK は常に False
 
     def test_build_regulation_confidence_clamped_to_range(self):
         """confidence が範囲外の値でも 0.0〜1.0 にクランプされること"""
