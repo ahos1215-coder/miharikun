@@ -40,10 +40,24 @@ jobs:
           pip install pytest
       - run: python -m pytest tests/python/ -v --tb=short --ignore=tests/python/test_scrape_nk.py
 
-  lint:
-    name: Lint
+  python-lint:
+    name: Python Lint (Ruff)
     runs-on: ubuntu-latest
-    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - name: Ruff lint
+        run: ruff check scripts/ --select E,W,F,I --ignore E501 --output-format github
+      - name: Ruff complexity check
+        run: ruff check scripts/ --select C901 --config "lint.mccabe.max-complexity = 15" --output-format github
+        continue-on-error: true
+
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
