@@ -182,7 +182,7 @@ export function GlassRegulationCard({
           href={`/news/${regulation.id}`}
           className="group font-medium text-sm leading-snug block mb-1.5 text-zinc-200 hover:text-accent-cyan transition-colors"
         >
-          {regulation.title}
+          {regulation.headline ?? regulation.title}
           <ExternalLink size={12} className="inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
         </Link>
       ) : (

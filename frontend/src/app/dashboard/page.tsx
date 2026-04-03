@@ -4,8 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import {
   Ship,
-  Pencil,
-  ArrowUpDown,
   Plus,
   Eye,
   EyeOff,
@@ -14,10 +12,10 @@ import type {
   ShipProfile,
   UserMatch,
   Regulation,
+  Publication,
   ShipType,
 } from "@/lib/types";
 import { SHIP_TYPE_LABELS } from "@/lib/types";
-import { getRequiredPublications } from "@/lib/publication-data";
 import { DashboardShell } from "./dashboard-shell";
 
 /* ──────────────────── category tab definitions ──────────────────── */
@@ -41,6 +39,7 @@ type MatchWithReg = UserMatch & { regulation?: Regulation };
 function matchesTab(m: MatchWithReg, tab: CategoryTab): boolean {
   if (!tab.keywords) return true;
   const searchText = [
+    m.regulation?.headline ?? "",
     m.regulation?.title ?? "",
     m.regulation?.summary_ja ?? "",
     m.regulation?.category ?? "",
@@ -56,13 +55,12 @@ function matchesTab(m: MatchWithReg, tab: CategoryTab): boolean {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string; tab?: string; sort?: string }>;
+  searchParams: Promise<{ show?: string; tab?: string }>;
 }) {
   const params = await searchParams;
   const showAll = params.show === "all";
   const activeTabKey = params.tab ?? "all";
   const activeTab = CATEGORY_TABS.find((t) => t.key === activeTabKey) ?? CATEGORY_TABS[0];
-  const sortByDeadline = params.sort === "deadline";
 
   const supabase = await createClient();
   const {
@@ -113,6 +111,15 @@ export default async function DashboardPage({
     }
   }
 
+  // Fetch publications from DB (法定書籍 — 船舶登録不要で全件表示)
+  const { data: dbPubs } = await supabase
+    .from("publications")
+    .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
+    .order("category", { ascending: true })
+    .order("title_ja", { ascending: true });
+
+  const allPublications = (dbPubs ?? []) as Publication[];
+
   /* ── Build serializable data for client shell ── */
 
   const shipData = shipList.map((ship) => {
@@ -120,13 +127,6 @@ export default async function DashboardPage({
       const order = (v: boolean | null) => (v === true ? 0 : v === null ? 1 : 2);
       const orderDiff = order(a.is_applicable) - order(b.is_applicable);
       if (orderDiff !== 0) return orderDiff;
-      if (sortByDeadline) {
-        const edA = a.regulation?.effective_date ?? "";
-        const edB = b.regulation?.effective_date ?? "";
-        if (edA && !edB) return -1;
-        if (!edA && edB) return 1;
-        if (edA && edB) return edA.localeCompare(edB);
-      }
       const dateA = a.regulation?.published_at ?? "";
       const dateB = b.regulation?.published_at ?? "";
       return dateB.localeCompare(dateA);
@@ -134,42 +134,10 @@ export default async function DashboardPage({
 
     const applicableMatches = allShipMatches.filter((m) => m.is_applicable === true);
     const potentialMatches = allShipMatches.filter(
-      (m) => m.is_applicable === null && m.match_method === "potential_match",
+      (m) => m.is_applicable === null,
     );
     const baseMatches = showAll ? allShipMatches : applicableMatches;
     const filteredMatches = baseMatches.filter((m) => matchesTab(m, activeTab));
-
-    // Build timeline items from matches with effective_date
-    const timelineItems = allShipMatches
-      .filter((m) => m.regulation?.effective_date && m.is_applicable === true)
-      .map((m) => {
-        const effDate = m.regulation!.effective_date!;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const target = new Date(effDate);
-        target.setHours(0, 0, 0, 0);
-        const daysUntil = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return {
-          id: m.id,
-          regulationId: m.regulation_id,
-          title: m.regulation!.title,
-          effectiveDate: effDate,
-          daysUntil,
-          severity: m.regulation!.severity,
-        };
-      })
-      .sort((a, b) => a.daysUntil - b.daysUntil)
-      .slice(0, 10);
-
-    // Build required publications list
-    const requiredPubs = getRequiredPublications({
-      ship_type: ship.ship_type,
-      gross_tonnage: ship.gross_tonnage,
-      navigation_area: ship.navigation_area,
-      flag_state: ship.flag_state,
-      classification_society: ship.classification_society,
-      radio_equipment: ship.radio_equipment ?? [],
-    });
 
     return {
       ship,
@@ -178,10 +146,9 @@ export default async function DashboardPage({
       potentialCount: potentialMatches.length,
       potentialMatches: showAll ? [] : potentialMatches.slice(0, 3),
       filteredMatches,
-      timelineItems,
       hasMorePotential: potentialMatches.length > 3,
       totalPotential: potentialMatches.length,
-      requiredPublications: requiredPubs,
+      publications: allPublications,
     };
   });
 
@@ -189,7 +156,7 @@ export default async function DashboardPage({
     <div className="min-h-screen bg-navy dark:bg-navy">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-white mb-1">
             Maritime Command Center
           </h1>
@@ -213,14 +180,13 @@ export default async function DashboardPage({
           </div>
         ) : (
           <>
-            {/* Category tabs */}
+            {/* Category tabs — 記事の直上 */}
             <nav className="flex gap-1.5 mb-5 overflow-x-auto pb-1 -mx-1 px-1">
               {CATEGORY_TABS.map((tab) => {
                 const isActive = tab.key === activeTab.key;
                 const p = new URLSearchParams();
                 if (showAll) p.set("show", "all");
                 if (tab.key !== "all") p.set("tab", tab.key);
-                if (sortByDeadline) p.set("sort", "deadline");
                 const qs = p.toString();
                 const href = `/dashboard${qs ? `?${qs}` : ""}`;
                 return (
@@ -240,45 +206,7 @@ export default async function DashboardPage({
               })}
             </nav>
 
-            {/* Sort links */}
-            <div className="flex items-center gap-1.5 text-sm mb-6">
-              <ArrowUpDown size={14} className="text-zinc-500" />
-              <Link
-                href={(() => {
-                  const p = new URLSearchParams();
-                  if (showAll) p.set("show", "all");
-                  if (activeTabKey !== "all") p.set("tab", activeTabKey);
-                  return `/dashboard${p.toString() ? `?${p.toString()}` : ""}`;
-                })()}
-                className={cn(
-                  "rounded-md px-2.5 py-1 transition-colors",
-                  !sortByDeadline
-                    ? "bg-white/10 text-zinc-200 font-medium"
-                    : "text-zinc-500 hover:text-zinc-300",
-                )}
-              >
-                掲載日順
-              </Link>
-              <Link
-                href={(() => {
-                  const p = new URLSearchParams();
-                  if (showAll) p.set("show", "all");
-                  if (activeTabKey !== "all") p.set("tab", activeTabKey);
-                  p.set("sort", "deadline");
-                  return `/dashboard?${p.toString()}`;
-                })()}
-                className={cn(
-                  "rounded-md px-2.5 py-1 transition-colors",
-                  sortByDeadline
-                    ? "bg-white/10 text-zinc-200 font-medium"
-                    : "text-zinc-500 hover:text-zinc-300",
-                )}
-              >
-                適用日順
-              </Link>
-            </div>
-
-            {/* Ship sections (client-rendered with animations) */}
+            {/* Ship sections */}
             <DashboardShell
               shipData={shipData.map((sd) => ({
                 ship: {
@@ -291,7 +219,6 @@ export default async function DashboardPage({
                 applicableCount: sd.applicableCount,
                 potentialCount: sd.potentialCount,
                 totalCount: sd.allCount,
-                timelineItems: sd.timelineItems,
                 filteredMatches: sd.filteredMatches.map((m) => ({
                   matchId: m.id,
                   regulation: m.regulation,
@@ -310,7 +237,7 @@ export default async function DashboardPage({
                 })),
                 hasMorePotential: sd.hasMorePotential,
                 totalPotential: sd.totalPotential,
-                requiredPublications: sd.requiredPublications,
+                publications: sd.publications,
               }))}
               showAll={showAll}
               activeTabKey={activeTabKey}
