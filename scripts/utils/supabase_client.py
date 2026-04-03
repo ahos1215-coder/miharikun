@@ -102,6 +102,54 @@ _MODULE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 _MODULE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 
+def build_applicability_rules(row: dict) -> dict | None:
+    """
+    個別フィールド (applicable_ship_types, applicable_gt_min 等) から
+    applicability_rules JSONB を自動構築する。SSoT: 全スクリプトはこれを使うこと。
+
+    返り値が None の場合は applicability_rules を設定しない（Stage 2 スキップ）。
+    """
+    ship_types = row.get("applicable_ship_types") or []
+    gt_min = row.get("applicable_gt_min")
+    gt_max = row.get("applicable_gt_max")
+    built_after = row.get("applicable_built_after")
+    routes = row.get("applicable_routes") or []
+    flags = row.get("applicable_flags") or []
+
+    # "all" は条件なしと同義 → 空リストに正規化
+    if ship_types == ["all"]:
+        ship_types = []
+    if routes == ["all"]:
+        routes = []
+    if flags == ["all"]:
+        flags = []
+
+    # 全て空なら設定不要
+    if not any([ship_types, gt_min, gt_max, built_after, routes, flags]):
+        return None
+
+    # navigation フィールド名の正規化 (routes → navigation)
+    navigation = []
+    for r in routes:
+        if "international" in r:
+            navigation.append("international")
+        elif "coastal" in r or "domestic" in r:
+            navigation.append("coastal")
+    navigation = list(set(navigation)) if navigation else []
+
+    return {
+        "ship_types": ship_types,
+        "excluded_types": [],
+        "gt_min": gt_min,
+        "gt_max": gt_max,
+        "navigation": navigation,
+        "flag_state": flags[0] if len(flags) == 1 else None,
+        "build_year_after": built_after,
+        "conventions": [],
+        "radio_equipment": [],
+    }
+
+
 def get_supabase_url() -> str:
     """Supabase URL を返す。"""
     return _MODULE_URL

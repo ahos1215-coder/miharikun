@@ -51,7 +51,7 @@ from utils.gemini_client import classify_pdf
 from utils.gdrive_client import upload_json
 from utils.line_notify import send_alert
 from utils.stealth_fetcher import stealth_get, stealth_download_bytes
-from utils.supabase_client import SupabaseClient
+from utils.supabase_client import SupabaseClient, build_applicability_rules
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -544,6 +544,10 @@ def save_to_supabase(db: SupabaseClient, regulation: ClassifiedRegulation) -> bo
         "contact_dept": regulation.contact_dept,
         "gdrive_text_file_id": regulation.gdrive_text_file_id,
     }
+    # applicability_rules JSONB 自動構築（Stage 2 マッチング用）
+    rules = build_applicability_rules(row)
+    if rules:
+        row["applicability_rules"] = rules
     return db.upsert_regulation(row)
 
 

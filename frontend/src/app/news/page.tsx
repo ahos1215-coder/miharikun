@@ -299,6 +299,10 @@ export default async function NewsPage({
   if (activeTab === "main") {
     if (matchedRegulationIds && matchedRegulationIds.length > 0) {
       query = query.in("id", matchedRegulationIds);
+      // My Ship: severity 優先ソート (critical > action_required > informational)
+      query = query
+        .order("severity", { ascending: true })
+        .order("published_at", { ascending: false, nullsFirst: false });
     } else if (!authError) {
       query = query.in("id", ["__no_match__"]);
     }
@@ -516,6 +520,16 @@ export default async function NewsPage({
       </div>
 
       {/* Main tab -- auth error message */}
+      {/* Main tab -- match count header */}
+      {activeTab === "main" && !authError && items.length > 0 && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-900 dark:bg-emerald-950/30 mb-4 motion-preset-fade">
+          <p className="text-sm text-emerald-700 dark:text-emerald-300">
+            <Star size={14} className="inline mr-1.5 -mt-0.5" />
+            全 {totalCount ?? 0} 件中 <strong>{totalFiltered}</strong> 件が自船に該当
+          </p>
+        </div>
+      )}
+
       {activeTab === "main" && authError && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center dark:border-blue-900 dark:bg-blue-950/30 motion-preset-fade">
           <Star size={32} className="mx-auto mb-3 text-blue-400" />

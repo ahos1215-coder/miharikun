@@ -41,7 +41,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from utils.supabase_client import SupabaseClient  # type: ignore
+from utils.supabase_client import SupabaseClient, build_applicability_rules  # type: ignore
 from utils.line_notify import send_alert, send_scraper_error  # type: ignore
 from utils.mlit_seed_urls import (  # type: ignore
     SEED_URLS,
@@ -486,6 +486,11 @@ def register_new_pdfs(
         else:
             record["severity"] = "informational"
             logger.info("  ⚠️ 解析スキップ（テキスト抽出失敗）: %s", pdf_title[:50])
+
+        # applicability_rules JSONB 自動構築（Stage 2 マッチング用）
+        rules = build_applicability_rules(record)
+        if rules:
+            record["applicability_rules"] = rules
 
         client.upsert_regulation(record)
         logger.info("新規PDF登録: %s -> %s", source_id, pdf["url"])

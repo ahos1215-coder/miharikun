@@ -19,8 +19,8 @@ on:
   # スクレイピング完了後に自動実行
   workflow_run:
     workflows:
-      - "NK Daily Scraper"
-      - "MLIT RSS Daily"
+      - "NK Weekly Scraper"
+      - "MLIT Weekly Crawl"
     types:
       - completed
 
