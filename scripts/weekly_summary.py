@@ -45,11 +45,12 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------------
 
 SUPABASE_URL: str = get_supabase_url()
+_BASE_URL: str = os.environ.get("MIHARIKUN_BASE_URL", "https://miharikun2.vercel.app")
 
 # メール送信設定
 RESEND_API_URL: str = os.environ.get(
     "RESEND_API_URL",
-    "https://miharikun2.vercel.app/api/send-summary",
+    f"{_BASE_URL}/api/send-summary",
 )
 SUMMARY_API_KEY: str = os.environ.get("SUMMARY_API_KEY", "")
 # TODO: auth.users から取得する仕組みに置き換える
@@ -139,9 +140,7 @@ def fetch_recent_matches(since_iso: str) -> list[dict]:
 # メール送信
 # ---------------------------------------------------------------------------
 
-MIHARIKUN_BASE_URL: str = os.environ.get(
-    "MIHARIKUN_BASE_URL", "https://miharikun2.vercel.app"
-)
+MIHARIKUN_BASE_URL: str = _BASE_URL
 
 
 def _email_configured() -> bool:
