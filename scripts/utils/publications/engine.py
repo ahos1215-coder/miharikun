@@ -25,8 +25,19 @@ from .data_category_a import (
     _is_international,
     _is_solas_ship,
 )
-from .data_category_b import JHO_PUBLICATIONS, NGA_PUBLICATIONS, UKHO_PUBLICATIONS
-from .data_category_c import CLASS_SOCIETY_PUBLICATIONS, JPN_FLAG_PUBLICATIONS
+from .data_category_b import (
+    JHO_PUBLICATIONS,
+    ITU_PUBLICATIONS,
+    NAVIGATION_REFERENCE_PUBLICATIONS,
+    NGA_PUBLICATIONS,
+    UKHO_PUBLICATIONS,
+)
+from .data_category_c import (
+    CLASS_SOCIETY_PUBLICATIONS,
+    ISM_REFERENCE_PUBLICATIONS,
+    JPN_FLAG_PUBLICATIONS,
+    NK_SPECIALIZED_PUBLICATIONS,
+)
 from .data_category_d import CATEGORY_D_PUBLICATIONS
 
 # ---------------------------------------------------------------------------
@@ -179,6 +190,26 @@ def determine_required_publications(
         for pub in NGA_PUBLICATIONS:
             _add_pub(pub)
 
+    # ITU無線刊行物（GMDSS船 = 国際航行300GT以上）
+    if is_intl and ship.get("gross_tonnage", 0) >= 300:
+        for pub in ITU_PUBLICATIONS:
+            _add_pub(pub)
+
+    # 日本旗船の無線局名録
+    if is_jpn:
+        for pub in ITU_PUBLICATIONS:
+            if pub.get("applicability_rules", {}).get("flag_state") == "JPN":
+                _add_pub(pub)
+
+    # SMS管理図書（航海実務参考書 — 法定義務なし）
+    if is_jpn:
+        for pub in NAVIGATION_REFERENCE_PUBLICATIONS:
+            _add_pub(pub)
+    elif is_intl:
+        for pub in NAVIGATION_REFERENCE_PUBLICATIONS:
+            if not pub.get("applicability_rules", {}).get("flag_state"):
+                _add_pub(pub)
+
     # ===== カテゴリC: 旗国・船級 =====
     # 日本旗国書籍
     if is_jpn:
@@ -190,6 +221,16 @@ def determine_required_publications(
     class_pubs = CLASS_SOCIETY_PUBLICATIONS.get(class_soc, [])
     for pub in class_pubs:
         _add_pub(pub)
+
+    # NK専門規則（NK船級のみ）
+    if class_soc in ("NK", "ClassNK"):
+        for pub in NK_SPECIALIZED_PUBLICATIONS:
+            _add_pub(pub)
+
+    # ISM実務参考書（SMS管理図書 — 法定義務なし）
+    if is_intl and is_jpn:
+        for pub in ISM_REFERENCE_PUBLICATIONS:
+            _add_pub(pub)
 
     # ===== カテゴリD: 船上マニュアル =====
     for pub in CATEGORY_D_PUBLICATIONS:

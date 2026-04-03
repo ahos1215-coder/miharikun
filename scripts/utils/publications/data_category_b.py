@@ -1,7 +1,8 @@
 """
-data_category_b.py — カテゴリB: 航海用刊行物マスターデータ (16件)
+data_category_b.py — カテゴリB: 航海用刊行物マスターデータ (22件)
 ================================================================
-日本水路部(JHO)、英国水路部(UKHO)、米国NGA刊行物のデータ定義。
+日本水路部(JHO)、英国水路部(UKHO)、米国NGA、ITU無線刊行物、
+及び航海実務参考書のデータ定義。
 """
 
 from __future__ import annotations
@@ -443,5 +444,177 @@ NGA_PUBLICATIONS: list[dict] = [
             "build_year_after": None,
         },
         "reason_template": "国際航行船舶にPub.117の備付推奨",
+    },
+]
+
+
+# ---------------------------------------------------------------------------
+# ITU 無線関係刊行物
+# ---------------------------------------------------------------------------
+
+ITU_PUBLICATIONS: list[dict] = [
+    {
+        "publication_id": "ITU_LIST_COAST_STATIONS",
+        "title": "List of Coast Stations and Special Service Stations (ITU List IV)",
+        "title_ja": "海岸局及び特別業務局便覧 (ITU List IV)",
+        "category": CAT_B,
+        "legal_basis": "SOLAS Chapter IV + ITU Radio Regulations 12.3",
+        "publisher": "ITU",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "不定期（補遺あり）",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": ["SOLAS"],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": 300,
+            "gt_max": None,
+            "navigation": ["international"],
+            "flag_state": None,
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "SOLAS IV章及びITU無線通信規則に基づくGMDSS船の法定備付書籍",
+    },
+    {
+        "publication_id": "ITU_LIST_SHIP_STATIONS",
+        "title": "List of Ship Stations and Maritime Mobile Service Identity Assignments (ITU List V)",
+        "title_ja": "船舶局及びMMSI便覧 (ITU List V)",
+        "category": CAT_B,
+        "legal_basis": "SOLAS Chapter IV + ITU Radio Regulations 12.3",
+        "publisher": "ITU",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "不定期（補遺あり）",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": ["SOLAS"],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": 300,
+            "gt_max": None,
+            "navigation": ["international"],
+            "flag_state": None,
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "SOLAS IV章及びITU無線通信規則に基づくGMDSS船の法定備付書籍",
+    },
+    {
+        "publication_id": "ITU_MANUAL_MARITIME_MOBILE",
+        "title": "Manual for Use by the Maritime Mobile and Maritime Mobile-Satellite Services",
+        "title_ja": "海上移動業務及び海上移動衛星業務用マニュアル",
+        "category": CAT_B,
+        "legal_basis": "SOLAS Chapter IV + ITU Radio Regulations 12.3",
+        "publisher": "ITU",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "不定期",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": ["SOLAS"],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": 300,
+            "gt_max": None,
+            "navigation": ["international"],
+            "flag_state": None,
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "SOLAS IV章及びITU無線通信規則に基づくGMDSS船の法定備付書籍",
+    },
+    {
+        "publication_id": "JPN_RADIO_STATION_LIST",
+        "title": "Japan Maritime Radio Station Directory",
+        "title_ja": "日本海上関係無線局局名録",
+        "category": CAT_B,
+        "legal_basis": "電波法施行規則",
+        "publisher": "情報通信振興会",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "年1回",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": [],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": None,
+            "gt_max": None,
+            "navigation": [],
+            "flag_state": "JPN",
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "日本旗船として電波法施行規則に基づく法定備付書籍",
+    },
+]
+
+
+# ---------------------------------------------------------------------------
+# 航海実務参考書（SMS管理図書 — 法定備置義務なし）
+# ---------------------------------------------------------------------------
+
+NAVIGATION_REFERENCE_PUBLICATIONS: list[dict] = [
+    {
+        "publication_id": "NAVIGATION_HANDBOOK",
+        "title": "Navigation Handbook",
+        "title_ja": "航海便覧",
+        "category": CAT_B,
+        "legal_basis": "SMS管理図書（法定備置義務なし）",
+        "publisher": "海文堂",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "不定期改訂",
+        "priority": RECOMMENDED,
+        "applicability_rules": {
+            "conventions": [],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": None,
+            "gt_max": None,
+            "navigation": [],
+            "flag_state": "JPN",
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "SMS管理図書として航海便覧の備付を推奨（法定備置義務なし）",
+    },
+    {
+        "publication_id": "EMERGENCY_ENTRY_HANDBOOK",
+        "title": "Emergency Area Entry Handbook",
+        "title_ja": "緊急入域ハンドブック",
+        "category": CAT_B,
+        "legal_basis": "SMS管理図書（法定備置義務なし）— IMO MSC.1/Circ.1521参考",
+        "publisher": "海文堂",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "不定期改訂",
+        "priority": RECOMMENDED,
+        "applicability_rules": {
+            "conventions": [],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": None,
+            "gt_max": None,
+            "navigation": ["international"],
+            "flag_state": None,
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "SMS管理図書として緊急入域ハンドブックの備付を推奨（法定備置義務なし）",
     },
 ]

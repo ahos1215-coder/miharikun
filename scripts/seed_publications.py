@@ -27,6 +27,10 @@ from utils.publication_requirements import (
     NGA_PUBLICATIONS,
     JPN_FLAG_PUBLICATIONS,
     CLASS_SOCIETY_PUBLICATIONS,
+    ITU_PUBLICATIONS,
+    NAVIGATION_REFERENCE_PUBLICATIONS,
+    NK_SPECIALIZED_PUBLICATIONS,
+    ISM_REFERENCE_PUBLICATIONS,
 )
 
 # ---------------------------------------------------------------------------
@@ -92,11 +96,15 @@ def collect_all_publications() -> list[dict]:
     _add(JHO_PUBLICATIONS)
     _add(UKHO_PUBLICATIONS)
     _add(NGA_PUBLICATIONS)
+    _add(ITU_PUBLICATIONS)
+    _add(NAVIGATION_REFERENCE_PUBLICATIONS)
 
     # カテゴリC: 旗国・船級
     _add(JPN_FLAG_PUBLICATIONS)
     for class_pubs in CLASS_SOCIETY_PUBLICATIONS.values():
         _add(class_pubs)
+    _add(NK_SPECIALIZED_PUBLICATIONS)
+    _add(ISM_REFERENCE_PUBLICATIONS)
 
     # カテゴリD: 船上マニュアル
     _add(CATEGORY_D_PUBLICATIONS)

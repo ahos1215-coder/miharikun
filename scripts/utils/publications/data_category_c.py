@@ -1,7 +1,8 @@
 """
-data_category_c.py — カテゴリC: 旗国・船級マスターデータ (12件)
+data_category_c.py — カテゴリC: 旗国・船級マスターデータ (16件)
 =============================================================
 日本旗国法令集および各船級協会(NK/DNV/LR/ABS)規則のデータ定義。
+NK専門規則（海洋汚染防止/冷蔵設備/自動化設備）及びISM解説書を含む。
 """
 
 from __future__ import annotations
@@ -355,6 +356,130 @@ ABS_PUBLICATIONS: list[dict] = [
         "reason_template": "ABS船級船としてABS規則の備付義務",
     },
 ]
+
+# ---------------------------------------------------------------------------
+# 船級社マッピング
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# NK 専門規則（船級維持条件・該当船のみ）
+# ---------------------------------------------------------------------------
+
+NK_SPECIALIZED_PUBLICATIONS: list[dict] = [
+    {
+        "publication_id": "NK_MARPOL_RULES",
+        "title": "NK Rules for Marine Pollution Prevention Equipment",
+        "title_ja": "海洋汚染防止のための構造及び設備規則・同検査要領",
+        "category": CAT_C,
+        "legal_basis": "NK船級維持条件 (MARPOL関連設備)",
+        "publisher": "ClassNK",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "年1回",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": ["MARPOL"],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": None,
+            "gt_max": None,
+            "navigation": [],
+            "flag_state": None,
+            "class_society": "NK",
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "NK船級船としてMARPOL関連構造設備規則の備付義務",
+    },
+    {
+        "publication_id": "NK_REFRIGERATION_RULES",
+        "title": "NK Rules for Refrigerating Installations",
+        "title_ja": "冷蔵設備規則・同検査要領",
+        "category": CAT_C,
+        "legal_basis": "NK船級維持条件（冷蔵設備搭載船）",
+        "publisher": "ClassNK",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "年1回",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": [],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": None,
+            "gt_max": None,
+            "navigation": [],
+            "flag_state": None,
+            "class_society": "NK",
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "NK船級・冷蔵設備搭載船として冷蔵設備規則の備付義務",
+    },
+    {
+        "publication_id": "NK_AUTOMATION_RULES",
+        "title": "NK Rules for Automation of Ships",
+        "title_ja": "自動化設備規則・同検査要領",
+        "category": CAT_C,
+        "legal_basis": "NK船級維持条件（UMS/自動化船）",
+        "publisher": "ClassNK",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "年1回",
+        "priority": MANDATORY,
+        "applicability_rules": {
+            "conventions": [],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": None,
+            "gt_max": None,
+            "navigation": [],
+            "flag_state": None,
+            "class_society": "NK",
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "NK船級・自動化船(UMS)として自動化設備規則の備付義務",
+    },
+]
+
+
+# ---------------------------------------------------------------------------
+# ISM実務参考書（SMS管理図書 — 法定備置義務なし）
+# ---------------------------------------------------------------------------
+
+ISM_REFERENCE_PUBLICATIONS: list[dict] = [
+    {
+        "publication_id": "ISM_GUIDE_KAIBUNDO",
+        "title": "ISM Code Explained (Japanese Practical Guide)",
+        "title_ja": "ISMコードの解説と検査の実際",
+        "category": CAT_C,
+        "legal_basis": "SMS管理図書（法定備置義務なし）— ISM Code実務参考",
+        "publisher": "海文堂 / 成山堂",
+        "current_edition": "最新版",
+        "current_edition_date": None,
+        "update_cycle": "不定期改訂",
+        "priority": RECOMMENDED,
+        "applicability_rules": {
+            "conventions": ["SOLAS"],
+            "ship_types": [],
+            "excluded_types": [],
+            "gt_min": 500,
+            "gt_max": None,
+            "navigation": ["international"],
+            "flag_state": "JPN",
+            "class_society": None,
+            "radio_equipment": [],
+            "build_year_before": None,
+            "build_year_after": None,
+        },
+        "reason_template": "SMS管理図書としてISM解説書の備付を推奨（法定備置義務なし）",
+    },
+]
+
 
 # ---------------------------------------------------------------------------
 # 船級社マッピング

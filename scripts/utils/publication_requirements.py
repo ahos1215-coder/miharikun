@@ -26,10 +26,37 @@ from utils.publications import (
     get_publications_by_category,
 )
 
-# 後方互換: 直接インポートしているコードのために re-export
+# データ定数の re-export（seed_publications.py 等から使用）
+from utils.publications.data_category_a import CATEGORY_A_PUBLICATIONS
+from utils.publications.data_category_b import (
+    JHO_PUBLICATIONS,
+    ITU_PUBLICATIONS,
+    NAVIGATION_REFERENCE_PUBLICATIONS,
+    NGA_PUBLICATIONS,
+    UKHO_PUBLICATIONS,
+)
+from utils.publications.data_category_c import (
+    CLASS_SOCIETY_PUBLICATIONS,
+    ISM_REFERENCE_PUBLICATIONS,
+    JPN_FLAG_PUBLICATIONS,
+    NK_SPECIALIZED_PUBLICATIONS,
+)
+from utils.publications.data_category_d import CATEGORY_D_PUBLICATIONS
+
 __all__ = [
     "determine_required_publications",
     "get_mandatory_publications",
     "get_publications_by_category",
     "get_publication_summary",
+    "CATEGORY_A_PUBLICATIONS",
+    "CATEGORY_D_PUBLICATIONS",
+    "JHO_PUBLICATIONS",
+    "ITU_PUBLICATIONS",
+    "NAVIGATION_REFERENCE_PUBLICATIONS",
+    "UKHO_PUBLICATIONS",
+    "NGA_PUBLICATIONS",
+    "JPN_FLAG_PUBLICATIONS",
+    "CLASS_SOCIETY_PUBLICATIONS",
+    "NK_SPECIALIZED_PUBLICATIONS",
+    "ISM_REFERENCE_PUBLICATIONS",
 ]
