@@ -1,253 +1,158 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BookOpen, Ship, Inbox } from "lucide-react";
+import { BookOpen, Ship } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { PublicationStats } from "@/components/publications/publication-stats";
-import { GlassPublicationCard } from "@/components/publications/glass-publication-card";
-import type {
-  Publication,
-  ShipPublication,
-  PublicationCategory,
-} from "@/lib/types";
+import type { Publication, PublicationCategory } from "@/lib/types";
 
-/* ──── Compliance Gauge (publications-specific) ──── */
-
-function PublicationGauge({
-  shipName,
-  rate,
-}: {
-  shipName: string;
-  rate: number;
-}) {
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (rate / 100) * circumference;
-
-  const gaugeColor =
-    rate >= 80 ? "#06b6d4" : rate >= 50 ? "#f59e0b" : "#f43f5e";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-      className="glass rounded-2xl p-6 glow-cyan"
-    >
-      <div className="flex items-center gap-6">
-        {/* SVG Gauge */}
-        <div className="relative shrink-0">
-          <svg width="128" height="128" viewBox="0 0 128 128">
-            <circle
-              cx="64"
-              cy="64"
-              r={radius}
-              fill="none"
-              stroke="rgba(255,255,255,0.06)"
-              strokeWidth="8"
-            />
-            <motion.circle
-              cx="64"
-              cy="64"
-              r={radius}
-              fill="none"
-              stroke={gaugeColor}
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              initial={{ strokeDashoffset: circumference }}
-              animate={{ strokeDashoffset: offset }}
-              transition={{
-                duration: 1.5,
-                ease: [0.4, 0, 0.2, 1],
-                delay: 0.3,
-              }}
-              transform="rotate(-90 64 64)"
-              style={{ filter: `drop-shadow(0 0 8px ${gaugeColor}50)` }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span
-              className="text-2xl font-bold tabular-nums"
-              style={{ color: gaugeColor }}
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.8 }}
-            >
-              {rate}%
-            </motion.span>
-            <span className="text-[10px] text-zinc-500">コンプライアンス</span>
-          </div>
-        </div>
-
-        {/* Ship info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Ship size={16} className="text-accent-cyan shrink-0" />
-            <h1 className="text-lg font-semibold truncate text-white">
-              {shipName}
-            </h1>
-          </div>
-          <p className="text-sm text-zinc-500 mb-1">備付書籍管理</p>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-            <BookOpen size={12} className="text-cyan-500/60" />
-            <span>
-              必須書籍の最新版保有率
-            </span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ──── Category Tabs ──── */
-
-const CATEGORIES: { key: PublicationCategory | "all"; label: string }[] = [
-  { key: "all", label: "全て" },
+const CATEGORY_TABS: { key: PublicationCategory | null; label: string }[] = [
+  { key: null, label: "全て" },
   { key: "A", label: "A: 条約" },
   { key: "B", label: "B: 航海用" },
-  { key: "C", label: "C: 旗国" },
+  { key: "C", label: "C: 旗国/船級" },
   { key: "D", label: "D: マニュアル" },
 ];
 
-function CategoryTabs({
-  active,
-  shipId,
-}: {
-  active: PublicationCategory | null;
-  shipId: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.3 }}
-      className="flex gap-2 overflow-x-auto pb-1"
-    >
-      {CATEGORIES.map((cat) => {
-        const isActive =
-          cat.key === "all" ? active === null : active === cat.key;
-        const href =
-          cat.key === "all"
-            ? `/ships/${shipId}/publications`
-            : `/ships/${shipId}/publications?category=${cat.key}`;
+const catColors: Record<string, string> = {
+  A: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
+  B: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+  C: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+  D: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+};
 
-        return (
-          <Link
-            key={cat.key}
-            href={href}
-            className={cn(
-              "shrink-0 rounded-lg px-4 py-2 text-xs font-medium transition-all duration-200",
-              isActive
-                ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/25"
-                : "glass text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08]",
-            )}
-          >
-            {cat.label}
-          </Link>
-        );
-      })}
-    </motion.div>
-  );
-}
-
-/* ──── Empty State ──── */
-
-function EmptyState() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.4 }}
-      className="glass rounded-2xl p-12 text-center"
-    >
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-cyan-500/10 mb-4">
-        <Inbox size={28} className="text-cyan-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-zinc-200 mb-2">
-        備付書籍が未登録です
-      </h3>
-      <p className="text-sm text-zinc-500 max-w-md mx-auto leading-relaxed">
-        この船舶の備付書籍はまだ登録されていません。
-        船舶プロファイルを元に、必要な書籍が自動で追加されます。
-      </p>
-    </motion.div>
-  );
-}
-
-/* ──── Main Shell ──── */
+const catLabels: Record<string, string> = {
+  A: "条約",
+  B: "航海用",
+  C: "旗国/船級",
+  D: "マニュアル",
+};
 
 interface PublicationsShellProps {
   shipName: string;
-  complianceRate: number;
-  stats: {
-    mandatory: number;
-    current: number;
-    outdated: number;
-    unknown: number;
-  };
-  publications: (ShipPublication & { publication: Publication })[];
+  publications: Publication[];
   activeCategory: PublicationCategory | null;
   shipId: string;
-  isEmpty: boolean;
+  totalCount: number;
 }
 
 export function PublicationsShell({
   shipName,
-  complianceRate,
-  stats,
   publications,
   activeCategory,
   shipId,
-  isEmpty,
+  totalCount,
 }: PublicationsShellProps) {
   return (
-    <div className="space-y-6">
-      {/* Hero gauge */}
-      <PublicationGauge shipName={shipName} rate={complianceRate} />
-
-      {/* Stats cards */}
-      <PublicationStats
-        mandatory={stats.mandatory}
-        current={stats.current}
-        outdated={stats.outdated}
-        unknown={stats.unknown}
-      />
+    <div className="space-y-5">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="glass rounded-2xl p-5"
+      >
+        <div className="flex items-center gap-3">
+          <Ship size={20} className="text-cyan-400" />
+          <div>
+            <h1 className="text-lg font-bold text-white">{shipName}</h1>
+            <p className="text-sm text-zinc-400">
+              備付書籍管理 — 法定書籍 {totalCount} 冊
+            </p>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Category tabs */}
-      <CategoryTabs active={activeCategory} shipId={shipId} />
+      <nav className="flex gap-1.5 overflow-x-auto pb-1">
+        {CATEGORY_TABS.map((tab) => {
+          const isActive = tab.key === activeCategory;
+          const href = tab.key
+            ? `/ships/${shipId}/publications?category=${tab.key}`
+            : `/ships/${shipId}/publications`;
+          return (
+            <Link
+              key={tab.key ?? "all"}
+              href={href}
+              className={cn(
+                "whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all",
+                isActive
+                  ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/20"
+                  : "glass text-zinc-400 hover:text-zinc-200",
+              )}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </nav>
 
-      {/* Content */}
-      {isEmpty ? (
-        <EmptyState />
-      ) : publications.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="glass rounded-xl p-8 text-center"
-        >
-          <p className="text-sm text-zinc-500">
-            このカテゴリに該当する書籍はありません
-          </p>
-        </motion.div>
+      {/* Count */}
+      <p className="text-xs text-zinc-500">{publications.length} 件表示</p>
+
+      {/* Publication list */}
+      {publications.length === 0 ? (
+        <div className="glass rounded-xl p-8 text-center">
+          <BookOpen size={32} className="mx-auto mb-3 text-zinc-600" />
+          <p className="text-sm text-zinc-500">該当する書籍はありません</p>
+        </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.4 }}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          {publications.map((sp, i) => (
-            <GlassPublicationCard
-              key={sp.id}
-              shipPublication={sp}
-              publication={sp.publication}
-              index={i}
-            />
-          ))}
-        </motion.div>
+        <div className="flex flex-col gap-2">
+          {publications.map((pub, i) => {
+            const isSms = pub.legal_basis?.includes("SMS管理図書") ?? false;
+            return (
+              <motion.div
+                key={pub.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3) }}
+                className="glass rounded-xl p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                          catColors[pub.category] ?? "",
+                        )}
+                      >
+                        {catLabels[pub.category] ?? pub.category}
+                      </span>
+                      {isSms && (
+                        <span className="text-[10px] text-zinc-500 border border-zinc-700 rounded-full px-1.5 py-0.5">
+                          SMS管理
+                        </span>
+                      )}
+                      <span className="text-[10px] text-zinc-500">
+                        {pub.publisher}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-medium text-zinc-200 mb-0.5">
+                      {pub.title_ja ?? pub.title}
+                    </h3>
+                    <p className="text-xs text-zinc-500">{pub.title}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-zinc-400">
+                      {pub.current_edition ?? "—"}
+                    </p>
+                    {pub.current_edition_date && (
+                      <p className="text-[10px] text-zinc-500 tabular-nums">
+                        {pub.current_edition_date.slice(0, 7)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {pub.legal_basis && (
+                  <p className="text-[10px] text-zinc-600 mt-1.5">
+                    根拠: {pub.legal_basis}
+                  </p>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

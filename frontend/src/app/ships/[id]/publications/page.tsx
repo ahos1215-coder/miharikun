@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type {
   ShipProfile,
   Publication,
-  ShipPublication,
   PublicationCategory,
 } from "@/lib/types";
 import { PublicationsShell } from "./publications-shell";
@@ -55,39 +54,14 @@ export default async function ShipPublicationsPage({
 
   const typedShip = ship as ShipProfile;
 
-  // Fetch ship_publications joined with publications
-  const { data: shipPublications, error: pubError } = await supabase
-    .from("ship_publications")
-    .select("*, publication:publications(*)")
-    .eq("ship_profile_id", id);
+  // Fetch ALL publications from DB master (法定書籍は船舶登録に関係なく表示)
+  const { data: dbPubs } = await supabase
+    .from("publications")
+    .select("*")
+    .order("category", { ascending: true })
+    .order("title_ja", { ascending: true });
 
-  if (pubError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <p className="text-zinc-500">書籍情報の取得に失敗しました</p>
-      </div>
-    );
-  }
-
-  const publications: (ShipPublication & { publication: Publication })[] =
-    (shipPublications ?? []) as (ShipPublication & {
-      publication: Publication;
-    })[];
-
-  // Compute stats
-  const mandatory = publications.filter((p) => p.priority === "mandatory");
-  const stats = {
-    mandatory: mandatory.length,
-    current: mandatory.filter((p) => p.status === "current").length,
-    outdated: mandatory.filter((p) => p.status === "outdated").length,
-    unknown: mandatory.filter(
-      (p) => p.status === "unknown" || p.status === "missing",
-    ).length,
-  };
-
-  // Compliance gauge
-  const totalForGauge = stats.mandatory || 1;
-  const complianceRate = Math.round((stats.current / totalForGauge) * 100);
+  const allPublications = (dbPubs ?? []) as Publication[];
 
   // Category filter
   const validCategories: PublicationCategory[] = ["A", "B", "C", "D"];
@@ -97,22 +71,8 @@ export default async function ShipPublicationsPage({
       : null;
 
   const filtered = activeCategory
-    ? publications.filter((p) => p.publication.category === activeCategory)
-    : publications;
-
-  // Sort: outdated first, then missing, then unknown, then current
-  const statusOrder: Record<string, number> = {
-    outdated: 0,
-    missing: 1,
-    unknown: 2,
-    current: 3,
-    not_required: 4,
-  };
-  const sorted = [...filtered].sort(
-    (a, b) => (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5),
-  );
-
-  const isEmpty = publications.length === 0;
+    ? allPublications.filter((p) => p.category === activeCategory)
+    : allPublications;
 
   return (
     <div className="min-h-screen bg-[#0a1628]">
@@ -126,15 +86,12 @@ export default async function ShipPublicationsPage({
           ダッシュボードに戻る
         </Link>
 
-        {/* Hero: Ship name + Compliance gauge */}
         <PublicationsShell
           shipName={typedShip.ship_name}
-          complianceRate={complianceRate}
-          stats={stats}
-          publications={sorted}
+          publications={filtered}
           activeCategory={activeCategory}
           shipId={id}
-          isEmpty={isEmpty}
+          totalCount={allPublications.length}
         />
 
         {/* Footer */}
