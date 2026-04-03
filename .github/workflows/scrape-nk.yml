@@ -22,6 +22,10 @@ on:
         description: '1回の実行で処理する最大件数'
         type: string
         default: '10'
+      force_all:
+        description: '新着フィルタをスキップし全件処理（初回全量取得用）'
+        type: boolean
+        default: false
 
 jobs:
   scrape:
@@ -69,6 +73,10 @@ jobs:
 
           if [ -n "${{ inputs.limit }}" ]; then
             ARGS="$ARGS --limit ${{ inputs.limit }}"
+          fi
+
+          if [ "${{ inputs.force_all }}" = "true" ]; then
+            ARGS="$ARGS --force-all"
           fi
 
           ARGS="$ARGS --max-entries 100"

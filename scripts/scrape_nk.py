@@ -831,6 +831,11 @@ def main() -> int:
         help="取得する最大エントリ数（default: 50, 100件対応時は --max-entries 100）",
     )
     parser.add_argument(
+        "--force-all",
+        action="store_true",
+        help="新着フィルタをスキップし全件を処理する（初回全量取得用）",
+    )
+    parser.add_argument(
         "--json-output",
         action="store_true",
         help="Print result summary JSON to stdout (for GHA artifact use)",
@@ -871,8 +876,11 @@ def main() -> int:
             return 1
     else:
         # ---- Step 2: 新着フィルタ ----
-        known_max = get_known_max_tec(db)
-        entries = filter_new_entries(entries, known_max)
+        if args.force_all:
+            logger.info("--force-all: skipping new-entry filter, processing all entries")
+        else:
+            known_max = get_known_max_tec(db)
+            entries = filter_new_entries(entries, known_max)
 
     # 件数制限
     if len(entries) > args.limit:
