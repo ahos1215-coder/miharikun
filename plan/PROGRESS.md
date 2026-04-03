@@ -19,7 +19,8 @@
 | マッチングエンジン刷新 (v3→4段階) | — | ✅ 完了 | 2026-04-01 |
 | コードベース整理 (publications分割等) | — | ✅ 完了 | 2026-04-01 |
 | 国交省スクレイピング再設計 | — | ✅ 完了 | 2026-04-01 |
-| ノイズフィルタ v2.4 + アクション抽出 | — | ⏳ 実行中 | 2026-04-01 |
+| ノイズフィルタ v2.4 + アクション抽出 | — | ✅ 完了 | 2026-04-02 |
+| シンプル化 + NK100件 + UI改善 | — | ✅ 完了 | 2026-04-03 |
 
 ---
 
@@ -474,3 +475,10 @@
 - 2026-04-02 — [Role B/Opus] Supabase _headers 7重複を完全解消: get_supabase_headers() SSoT化
 - 2026-04-02 — [Role D/Opus] NK 深層再解析実行中 (Self-Critique + F-D-H)
 - 2026-04-02 — [Role D/Opus] ドキュメント全面更新: GHA 22本 / Migration 13 / DRY違反ゼロ
+- 2026-04-02 — [Role D/Opus] シンプル化: 不要スクリプト11個 + GHA14個廃止、MLIT即時解析化
+- 2026-04-02 — [Role D/Opus] NK 100件対応: --max-entries 100, needs_review=false強制, published_at空文字→null修正
+- 2026-04-02 — [Role D/Opus] ニュースページ改善: scraped_atフォールバックソート, TEC番号表示, CI lint修正
+- 2026-04-03 — [Role D/Opus] NK --force-all フラグ追加: 新着フィルタスキップで全量再取得可能に
+- 2026-04-03 — [Role D/Opus] 「適用日が近い順」ソート削除: 新着順のみに統一
+- 2026-04-03 — [Role D/Opus] MLIT「日付不明」改善: published_at=null時にscraped_atを「取得」日として表示
+- 2026-04-03 — [Role D/Opus] CI全パス確認: Ruff + Frontend Lint + Security Scan 全グリーン
