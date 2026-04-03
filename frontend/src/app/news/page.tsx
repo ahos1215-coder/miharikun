@@ -24,7 +24,7 @@ const PAGE_SIZE = 10;
 
 // --- Category tab definitions ---
 
-type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "domestic" | "publications";
+type TabKey = "all" | "main" | "review" | "safety" | "environment" | "crew" | "domestic" | "publications";
 type SortKey = "newest";
 
 interface TabDef {
@@ -38,6 +38,7 @@ interface TabDef {
 const TABS: TabDef[] = [
   { key: "all", label: "全て", param: "", icon: <List size={16} />, keywords: [] },
   { key: "main", label: "主要 / My Ship", param: "main", icon: <Star size={16} />, keywords: [] },
+  { key: "review", label: "確認待ち", param: "review", icon: <HelpCircle size={16} />, keywords: [] },
   {
     key: "safety",
     label: "SOLAS / 安全",
@@ -213,7 +214,10 @@ export default async function NewsPage({
   let matchedRegulationIds: string[] | null = null;
   let authError = false;
 
-  if (activeTab === "main") {
+  // reviewRegulationIds: マッチ不明 (is_applicable=null) の規制ID
+  let reviewRegulationIds: string[] | null = null;
+
+  if (activeTab === "main" || activeTab === "review") {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       userId = user.id;
@@ -224,17 +228,33 @@ export default async function NewsPage({
 
       if (ships && ships.length > 0) {
         const shipIds = ships.map((s: { id: string }) => s.id);
-        const { data: matches } = await supabase
-          .from("user_matches")
-          .select("regulation_id")
-          .in("ship_profile_id", shipIds)
-          .eq("is_applicable", true);
 
-        matchedRegulationIds = matches
-          ? matches.map((m: { regulation_id: string }) => m.regulation_id)
-          : [];
+        if (activeTab === "main") {
+          const { data: matches } = await supabase
+            .from("user_matches")
+            .select("regulation_id")
+            .in("ship_profile_id", shipIds)
+            .eq("is_applicable", true);
+
+          matchedRegulationIds = matches
+            ? matches.map((m: { regulation_id: string }) => m.regulation_id)
+            : [];
+        }
+
+        if (activeTab === "review") {
+          const { data: reviewMatches } = await supabase
+            .from("user_matches")
+            .select("regulation_id")
+            .in("ship_profile_id", shipIds)
+            .is("is_applicable", null);
+
+          reviewRegulationIds = reviewMatches
+            ? reviewMatches.map((m: { regulation_id: string }) => m.regulation_id)
+            : [];
+        }
       } else {
         matchedRegulationIds = [];
+        reviewRegulationIds = [];
       }
     } else {
       authError = true;
@@ -303,6 +323,12 @@ export default async function NewsPage({
       query = query
         .order("severity", { ascending: true })
         .order("published_at", { ascending: false, nullsFirst: false });
+    } else if (!authError) {
+      query = query.in("id", ["__no_match__"]);
+    }
+  } else if (activeTab === "review") {
+    if (reviewRegulationIds && reviewRegulationIds.length > 0) {
+      query = query.in("id", reviewRegulationIds);
     } else if (!authError) {
       query = query.in("id", ["__no_match__"]);
     }
@@ -558,6 +584,40 @@ export default async function NewsPage({
           >
             船舶を登録
           </Link>
+        </div>
+      )}
+
+      {/* Review tab -- header */}
+      {activeTab === "review" && !authError && items.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900 dark:bg-amber-950/30 mb-4 motion-preset-fade">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            <HelpCircle size={14} className="inline mr-1.5 -mt-0.5" />
+            以下の <strong>{totalFiltered}</strong> 件は自動判定できませんでした。内容を確認して自船に関係あるか判断してください。
+          </p>
+        </div>
+      )}
+
+      {activeTab === "review" && authError && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center dark:border-blue-900 dark:bg-blue-950/30 motion-preset-fade">
+          <HelpCircle size={32} className="mx-auto mb-3 text-blue-400" />
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            ログインすると確認待ちの規制を表示できます
+          </p>
+          <Link
+            href="/login"
+            className="mt-3 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            ログイン
+          </Link>
+        </div>
+      )}
+
+      {activeTab === "review" && !authError && items.length === 0 && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900 motion-preset-fade">
+          <CheckCircle size={32} className="mx-auto mb-3 text-emerald-400" />
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            確認待ちの規制はありません。全て自動判定済みです。
+          </p>
         </div>
       )}
 

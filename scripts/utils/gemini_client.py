@@ -380,6 +380,11 @@ UNIFIED_PROMPT = """あなたは一級海技士の資格を持つ海事規制の
 - **Deadline（期限）**: ○年○月○日までに○○を完了、経過措置の期限
 - **Hardware/Budget（金と物）**: 設備の換装・追加購入、検査の受検、SMS改訂
 
+## ★ 旗国分類ルール
+- 「○○籍船」「○○旗国の船舶」「Flag State: ○○」等の記載がある場合、applicable_flags にその旗国コードを入れよ（例: ["UK"], ["panama"], ["palau"]）
+- 旗国限定の通達を "all" にするのは**分類ミス**。特定旗国向けの通達は必ずその旗国を指定せよ
+- 全船対象の国際条約・IMO決議等は ["all"] でよい
+
 ## ★ severity 基準（3段階）
 - **critical**: 法的義務変更。やらなければ違反・PSC detention リスク
 - **action_required**: 対応が必要だが期限に余裕あり、または強い推奨事項
@@ -404,6 +409,7 @@ UNIFIED_PROMPT = """あなたは一級海技士の資格を持つ海事規制の
   "applicable_ship_types": ["bulk_carrier","tanker","container","general_cargo","passenger","roro","lpg","lng","chemical","all"],
   "applicable_gt_min": null,
   "applicable_gt_max": null,
+  "applicable_flags": ["all"],
   "confidence": 0.95,
   "citations": [{{"text": "根拠となる原文50-150字", "page": 1, "source": "文書ID"}}],
   "draft_actions": ["候補1: ...", "候補2: ..."],

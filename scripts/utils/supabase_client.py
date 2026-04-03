@@ -124,8 +124,24 @@ def build_applicability_rules(row: dict) -> dict | None:
     if flags == ["all"]:
         flags = []
 
-    # 全て空なら設定不要
+    # 全て空の場合: NK の技術情報（equipment/environment/safety/survey）は
+    # 国際航海船向けのため、デフォルトルール（国際航海）を生成
     if not any([ship_types, gt_min, gt_max, built_after, routes, flags]):
+        source = row.get("source", "")
+        category = row.get("category", "")
+        nk_categories = {"equipment", "environment", "safety", "survey", "recycling"}
+        if source == "nk" and category in nk_categories:
+            return {
+                "ship_types": [],
+                "excluded_types": [],
+                "gt_min": None,
+                "gt_max": None,
+                "navigation": ["international"],
+                "flag_state": None,
+                "build_year_after": None,
+                "conventions": [],
+                "radio_equipment": [],
+            }
         return None
 
     # navigation フィールド名の正規化 (routes → navigation)
