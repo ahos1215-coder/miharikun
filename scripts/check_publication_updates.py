@@ -335,9 +335,18 @@ def check_jho_publications() -> list[dict]:
 
 # 海文堂タイトルキーワード → DB の publication_id
 KAIBUNDO_TITLE_MAP: dict[str, str] = {
-    "図説 海上衝突予防法": "JPN_COLREG_COMMENTARY",
-    "図説　海上衝突予防法": "JPN_COLREG_COMMENTARY",
     "海上衝突予防法": "JPN_COLREG_COMMENTARY",
+    "海事法令集": "JPN_SHIP_SAFETY_ACT",
+    "船員法": "JPN_SEAFARERS_ACT",
+    "港則法": "JPN_PORT_REGULATIONS",
+    "海上交通安全法": "JPN_MARITIME_TRAFFIC_SAFETY",
+    "航海便覧": "NAVIGATION_HANDBOOK",
+    "緊急入域ハンドブック": "EMERGENCY_ENTRY_HANDBOOK",
+    "ISMコード": "ISM_GUIDE_KAIBUNDO",
+    "訓練手引書": "SOLAS_TRAINING_MANUAL",
+    "防火訓練": "FIRE_SAFETY_TRAINING_MANUAL",
+    "油濁防止緊急措置手引書": "SOPEP",
+    "廃棄物汚染防止規程": "GARBAGE_MANAGEMENT_PLAN",
 }
 
 
@@ -441,6 +450,115 @@ def check_nk_publications() -> list[dict]:
     return []
 
 
+# ---------------------------------------------------------------------------
+# 成山堂書店 (Seizando) チェッカー
+# ---------------------------------------------------------------------------
+
+# 成山堂タイトルキーワード → DB の publication_id
+SEIZANDO_TITLE_MAP: dict[str, str] = {
+    "海事法令集": "JPN_SHIP_SAFETY_ACT",
+    "船員法": "JPN_SEAFARERS_ACT",
+    "海上衝突予防法": "JPN_COLREG_COMMENTARY",
+    "港則法": "JPN_PORT_REGULATIONS",
+    "海上交通安全法": "JPN_MARITIME_TRAFFIC_SAFETY",
+    "ISMコード": "ISM_GUIDE_KAIBUNDO",
+    "訓練手引書": "SOLAS_TRAINING_MANUAL",
+    "防火訓練": "FIRE_SAFETY_TRAINING_MANUAL",
+    "航海便覧": "NAVIGATION_HANDBOOK",
+    "国際信号書": "NGA_INT_CODE_OF_SIGNALS",
+    "STCW": "STCW_CODE",
+    "船舶安全法": "JPN_SHIP_SAFETY_ACT",
+}
+
+
+def _match_seizando_publication_id(title: str) -> Optional[str]:
+    """成山堂タイトルから DB の publication_id を推定"""
+    for keyword, pub_id in SEIZANDO_TITLE_MAP.items():
+        if keyword in title:
+            return pub_id
+    return None
+
+
+# 成山堂の検索カテゴリURL
+SEIZANDO_URLS = [
+    # 海事法規
+    "https://www.seizando.co.jp/book/genre/1-1/",
+    # 航海・運用
+    "https://www.seizando.co.jp/book/genre/1-2/",
+    # 船舶・海洋工学
+    "https://www.seizando.co.jp/book/genre/1-3/",
+]
+
+
+def check_seizando_publications() -> list[dict]:
+    """
+    成山堂書店の海事カテゴリページをスクレイプし、書籍情報を返す。
+    海文堂にない書籍を成山堂でカバーする。
+    """
+    results: list[dict] = []
+    seen_ids: set[str] = set()
+
+    for url in SEIZANDO_URLS:
+        try:
+            time.sleep(3)  # 礼儀正しく
+            resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=30)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            logger.error(f"[成山堂] ページ取得失敗 ({url}): {e}")
+            continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        items_found = 0
+        for item in soup.select(
+            "article, .book-item, .product, .post, .entry, "
+            "li.book, .book-list-item, .item, div.book"
+        ):
+            title_el = item.find(["h2", "h3", "h4", "a"])
+            if not title_el:
+                continue
+
+            title_text = title_el.get_text(strip=True)
+            if not title_text:
+                continue
+
+            items_found += 1
+            full_text = item.get_text(" ", strip=True)
+
+            # 版情報を抽出
+            edition_str = title_text
+            ver_match = re.search(r'第\s*(\d+)\s*版', title_text)
+            rev_match = re.search(r'(\d+)\s*訂版', title_text)
+            year_match = re.search(r'(\d{4})年版', title_text)
+
+            if ver_match:
+                edition_str = f"第{ver_match.group(1)}版"
+            elif rev_match:
+                edition_str = f"{rev_match.group(1)}訂版"
+            elif year_match:
+                edition_str = f"{year_match.group(1)}年版"
+
+            date_str = _extract_japanese_date(full_text)
+
+            pub_id = _match_seizando_publication_id(title_text)
+            if pub_id and pub_id not in seen_ids:
+                seen_ids.add(pub_id)
+                results.append({
+                    "publication_id": pub_id,
+                    "latest_edition": edition_str,
+                    "latest_date": date_str,
+                })
+                logger.info(f"[成山堂] DBマッチ: {title_text} → {pub_id}")
+            elif not pub_id:
+                logger.debug(
+                    f"[成山堂] DB未登録: {title_text} / 版: {edition_str}"
+                )
+
+        logger.info(f"[成山堂] {url} から {items_found} 件検出、{len(results)} 件累計マッチ")
+
+    return results
+
+
 def check_ukho_publications() -> list[dict]:
     """
     UKHO (UK Hydrographic Office) の最新版をチェック。
@@ -470,10 +588,13 @@ CHECKERS: dict[str, callable] = {
     "海上保安庁 水路部": check_jho_publications,
     "日本水路協会": check_jho_publications,
     "海文堂": check_kaibundo_publications,
+    "成山堂": check_seizando_publications,
+    "海文堂 / 成山堂": check_seizando_publications,  # 両方扱う出版社
     "ClassNK": check_nk_publications,
     "NK": check_nk_publications,
     "UKHO": check_ukho_publications,
     "ILO": check_ilo_publications,
+    "情報通信振興会": check_seizando_publications,  # フォールバック
 }
 
 
