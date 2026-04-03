@@ -62,6 +62,7 @@ export interface Regulation {
   onboard_actions: string[] | null;
   shore_actions: string[] | null;
   sms_chapters: string[] | null;
+  scraped_at: string | null;
   created_at: string;
 }
 

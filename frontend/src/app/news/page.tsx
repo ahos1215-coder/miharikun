@@ -270,7 +270,7 @@ export default async function NewsPage({
   }
 
   // --- Build query ---
-  const selectFields = "id,source,source_id,title,headline,category,severity,confidence,published_at,effective_date,summary_ja";
+  const selectFields = "id,source,source_id,title,headline,category,severity,confidence,published_at,scraped_at,effective_date,summary_ja";
 
   let query = supabase
     .from("regulations")
@@ -609,7 +609,7 @@ export default async function NewsPage({
         <>
           <ul className="flex flex-col gap-4">
             {items.map((reg, index) => {
-              const isNew = isWithin24Hours(reg.published_at);
+              const isNew = isWithin24Hours(reg.published_at ?? reg.scraped_at);
               const isApplicable = allMatchedIds.has(reg.id);
               const displayTitle = getDisplayTitle(reg);
               const actionTags = getActionTags(reg);
@@ -680,7 +680,11 @@ export default async function NewsPage({
                         )}
                       </div>
                       <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
-                        {formatDate(reg.published_at)} 掲載
+                        {reg.published_at
+                          ? `${formatDate(reg.published_at)} 掲載`
+                          : reg.scraped_at
+                            ? `${formatDate(reg.scraped_at)} 取得`
+                            : ""}
                       </span>
                     </div>
                   </Link>
