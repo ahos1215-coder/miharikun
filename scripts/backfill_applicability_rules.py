@@ -40,8 +40,9 @@ def fetch_all_regulations() -> list[dict]:
     headers = get_supabase_headers()
 
     fields = (
-        "id,source,source_id,applicable_ship_types,"
+        "id,source,source_id,category,applicable_ship_types,"
         "applicable_gt_min,applicable_gt_max,"
+        "applicable_routes,applicable_flags,"
         "applicability_rules"
     )
     resp = requests.get(
