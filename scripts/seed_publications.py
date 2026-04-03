@@ -32,6 +32,7 @@ from utils.publication_requirements import (
     NK_SPECIALIZED_PUBLICATIONS,
     ISM_REFERENCE_PUBLICATIONS,
 )
+from utils.supabase_client import get_supabase_url, get_supabase_headers
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -118,22 +119,17 @@ def collect_all_publications() -> list[dict]:
 
 def upsert_publications(
     publications: list[dict],
-    supabase_url: str,
-    supabase_key: str,
     dry_run: bool = False,
 ) -> tuple[int, int]:
     """
     publications テーブルに upsert する。
+    Supabase接続は supabase_client.py のSSoTを使用。
 
     Returns:
         (success_count, fail_count)
     """
-    headers = {
-        "apikey": supabase_key,
-        "Authorization": f"Bearer {supabase_key}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates",
-    }
+    base_url = get_supabase_url()
+    headers = {**get_supabase_headers(), "Prefer": "resolution=merge-duplicates"}
 
     success = 0
     failed = 0
@@ -148,7 +144,7 @@ def upsert_publications(
 
         try:
             resp = requests.post(
-                f"{supabase_url}/rest/v1/publications?on_conflict=id",
+                f"{base_url}/rest/v1/publications?on_conflict=id",
                 json=pub,
                 headers=headers,
                 timeout=30,
@@ -180,16 +176,18 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 環境変数
-    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-
-    if not args.dry_run and (not supabase_url or not supabase_key):
-        logger.error(
-            "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。"
-            "--dry-run で実行するか環境変数を設定してください。"
-        )
-        sys.exit(1)
+    # 環境変数チェック（supabase_client.py が読み込み時に取得済み）
+    if not args.dry_run:
+        try:
+            url = get_supabase_url()
+            if not url:
+                raise ValueError("empty")
+        except Exception:
+            logger.error(
+                "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。"
+                "--dry-run で実行するか環境変数を設定してください。"
+            )
+            sys.exit(1)
 
     # 全書籍データ収集
     publications = collect_all_publications()
@@ -211,8 +209,6 @@ def main() -> None:
 
     success, failed = upsert_publications(
         publications,
-        supabase_url,
-        supabase_key,
         dry_run=args.dry_run,
     )
 

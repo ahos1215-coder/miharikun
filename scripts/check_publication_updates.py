@@ -30,6 +30,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from utils.line_notify import send_alert
+from utils.supabase_client import get_supabase_url, get_supabase_headers
 
 # ---------------------------------------------------------------------------
 # ロガー設定
@@ -603,16 +604,14 @@ CHECKERS: dict[str, callable] = {
 # ===========================================================================
 
 class PublicationDBClient:
-    """publications / ship_publications テーブル操作クライアント"""
+    """publications / ship_publications テーブル操作クライアント
+    Supabase接続は supabase_client.py のSSoTを使用。
+    """
 
-    def __init__(self, url: str, key: str):
-        self.url = url.rstrip("/")
-        self.key = key
-        self.headers = {
-            "apikey": key,
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-        }
+    def __init__(self, url: str = "", key: str = ""):
+        # SSoT: supabase_client.py から取得（引数は後方互換で受け付けるが無視）
+        self.url = get_supabase_url()
+        self.headers = get_supabase_headers()
 
     def get_all_publications(self) -> list[dict]:
         """publications テーブルの全レコードを取得"""
@@ -788,16 +787,18 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 環境変数
-    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-
-    if not args.dry_run and (not supabase_url or not supabase_key):
-        logger.error(
-            "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。"
-            "--dry-run で実行するか環境変数を設定してください。"
-        )
-        sys.exit(1)
+    # 環境変数チェック（supabase_client.py が読み込み時に取得済み）
+    if not args.dry_run:
+        try:
+            url = get_supabase_url()
+            if not url:
+                raise ValueError("empty")
+        except Exception:
+            logger.error(
+                "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。"
+                "--dry-run で実行するか環境変数を設定してください。"
+            )
+            sys.exit(1)
 
     # チェッカー実行
     logger.info("=== 書籍最新版チェック開始 ===")
@@ -807,8 +808,8 @@ def main() -> None:
         logger.info("全チェッカーからの更新情報なし。正常終了。")
         return
 
-    # DB 比較・更新
-    db = PublicationDBClient(supabase_url, supabase_key)
+    # DB 比較・更新（SSoT: supabase_client.py から接続情報取得）
+    db = PublicationDBClient()
     mode = "DRY-RUN" if args.dry_run else "LIVE"
     logger.info(f"=== {mode} モードで比較・更新開始 ===")
 
