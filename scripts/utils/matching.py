@@ -953,7 +953,7 @@ def ai_match(
 # 統合関数: 条約ベース → ルールベース → AI の3段階マッチング
 # ---------------------------------------------------------------------------
 
-def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
+def match_regulation_to_ship(regulation: dict, ship: dict, no_ai: bool = False) -> dict:
     """
     規制と船舶プロファイルの3段階マッチングを実行する。
 
@@ -1043,6 +1043,21 @@ def match_regulation_to_ship(regulation: dict, ship: dict) -> dict:
         return rules_result
 
     # --- Stage 3: Gemini AI フォールバック（applicability_rules がない場合のみ） ---
+    if no_ai:
+        logger.info(f"[Stage3] SKIPPED (--no-ai): regulation={source_label}")
+        return {
+            "is_applicable": None,
+            "match_method": "skipped_ai",
+            "confidence": 0.0,
+            "reason": "Stage 3 (Gemini AI) をスキップ（--no-ai モード）",
+            "conventions": [],
+            "actions": [],
+            "national_laws": [],
+            "certificates": [],
+            "citations": [],
+            "needs_review": True,
+        }
+
     logger.info(f"[Stage3] applicability_rules なし → Gemini AI フォールバック: regulation={source_label}")
     ai_result = ai_match(regulation, ship, compliance=compliance)
 

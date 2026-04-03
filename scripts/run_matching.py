@@ -177,7 +177,7 @@ def upsert_match(
 # メイン処理
 # ---------------------------------------------------------------------------
 
-def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool = False) -> None:
+def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool = False, no_ai: bool = False) -> None:
     """バッチマッチングのメインロジック"""
 
     if not _supabase_configured():
@@ -230,7 +230,7 @@ def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool
         logger.info("=== DRY RUN モード: DB 書き込みをスキップします ===")
 
     # 5. マッチング実行
-    stats = {"processed": 0, "applicable": 0, "not_applicable": 0, "error": 0, "skipped_429": 0}
+    stats = {"processed": 0, "applicable": 0, "not_applicable": 0, "error": 0, "skipped_429": 0, "skipped_ai": 0}
 
     for i, (reg, ship) in enumerate(pairs_to_process, 1):
         reg_id = reg["id"]
@@ -241,7 +241,7 @@ def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool
         logger.info(f"[{i}/{len(pairs_to_process)}] {source_label} × {ship_label}")
 
         try:
-            result = match_regulation_to_ship(reg, ship)
+            result = match_regulation_to_ship(reg, ship, no_ai=no_ai)
         except Exception as e:
             error_msg = str(e)
             # Gemini 429 レート制限を検出して graceful に処理
@@ -273,7 +273,9 @@ def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool
                 continue
 
         stats["processed"] += 1
-        if is_applicable is True:
+        if method == "skipped_ai":
+            stats["skipped_ai"] += 1
+        elif is_applicable is True:
             stats["applicable"] += 1
         elif is_applicable is False:
             stats["not_applicable"] += 1
@@ -284,8 +286,15 @@ def run_matching(dry_run: bool = False, limit: Optional[int] = None, force: bool
     logger.info(f"  処理済み:      {stats['processed']}")
     logger.info(f"  適用:          {stats['applicable']}")
     logger.info(f"  非適用:        {stats['not_applicable']}")
+    logger.info(f"  AI スキップ:   {stats['skipped_ai']}")
     logger.info(f"  エラー:        {stats['error']}")
     logger.info(f"  429 スキップ:  {stats['skipped_429']}")
+
+    if stats["skipped_ai"] > 0:
+        logger.info(
+            f"⚠️ {stats['skipped_ai']} 件が Stage 3 (Gemini AI) 候補です。"
+            f" --no-ai を外して再実行すると Gemini で判定されます。"
+        )
     logger.info("=" * 60)
 
 
@@ -313,6 +322,11 @@ def main() -> None:
         action="store_true",
         help="既存の全マッチング結果を無視し、全ペアを再処理する",
     )
+    parser.add_argument(
+        "--no-ai",
+        action="store_true",
+        help="Gemini AI (Stage 3) を呼ばずにスキップ。Stage 3 候補の件数だけ報告する",
+    )
     args = parser.parse_args()
 
     logger.info("バッチマッチング開始")
@@ -320,10 +334,12 @@ def main() -> None:
         logger.info("モード: DRY RUN")
     if args.force:
         logger.info("モード: FORCE（全件再処理）")
+    if args.no_ai:
+        logger.info("モード: NO-AI（Gemini Stage 3 スキップ）")
     if args.limit:
         logger.info(f"規制取得上限: {args.limit} 件")
 
-    run_matching(dry_run=args.dry_run, limit=args.limit, force=args.force)
+    run_matching(dry_run=args.dry_run, limit=args.limit, force=args.force, no_ai=args.no_ai)
 
     logger.info("バッチマッチング終了")
 
