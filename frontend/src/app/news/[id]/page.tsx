@@ -477,14 +477,15 @@ export async function generateMetadata({
     return { title: "規制情報が見つかりません | MIHARIKUN" };
   }
 
+  const displayTitle = reg.headline || reg.title;
   const description =
-    reg.summary_ja ?? `${reg.source} の規制情報: ${reg.title}`;
+    reg.summary_ja ?? `${reg.source} の規制情報: ${displayTitle}`;
 
   return {
-    title: `${reg.title} | MIHARIKUN`,
+    title: `${displayTitle} | MIHARIKUN`,
     description,
     openGraph: {
-      title: `[${reg.source}] ${reg.title}`,
+      title: `[${reg.source}] ${displayTitle}`,
       description,
       type: "article",
       publishedTime: reg.published_at ?? undefined,
@@ -524,13 +525,9 @@ export default async function RegulationDetailPage({
           )}
         </div>
 
-        <h1 className="text-xl font-semibold mb-1">{reg.title}</h1>
-
-        {reg.headline && (
-          <p className="text-lg text-blue-600 dark:text-blue-400 font-medium mt-1 mb-1">
-            {reg.headline}
-          </p>
-        )}
+        <h1 className="text-xl font-semibold mb-1">
+          {reg.headline || reg.title}
+        </h1>
 
         {reg.title_en && (
           <p className="text-sm text-zinc-400 mb-4">{reg.title_en}</p>
