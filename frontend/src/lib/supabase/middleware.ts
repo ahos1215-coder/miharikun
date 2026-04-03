@@ -38,20 +38,21 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 認証が必要なページにアクセスしたがログインしていない
-  if (!user && !isPublic(request.nextUrl.pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
-  }
-
-  // ログイン済みでログインページにアクセス → ダッシュボードへ
-  if (user && request.nextUrl.pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
+  // ============================================================
+  // 開発モード: 認証リダイレクト一時停止
+  // 誰でも全ページ閲覧可能。本番復帰時にこのブロックを元に戻すこと。
+  // ============================================================
+  // if (!user && !isPublic(request.nextUrl.pathname)) {
+  //   const url = request.nextUrl.clone();
+  //   url.pathname = "/login";
+  //   url.searchParams.set("redirect", request.nextUrl.pathname);
+  //   return NextResponse.redirect(url);
+  // }
+  // if (user && request.nextUrl.pathname === "/login") {
+  //   const url = request.nextUrl.clone();
+  //   url.pathname = "/dashboard";
+  //   return NextResponse.redirect(url);
+  // }
 
   return supabaseResponse;
 }

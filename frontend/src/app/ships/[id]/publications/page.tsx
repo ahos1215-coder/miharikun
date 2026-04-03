@@ -22,19 +22,18 @@ export default async function ShipPublicationsPage({
   const { category } = await searchParams;
   const supabase = await createClient();
 
-  // Auth check
+  // Auth check — 開発モード: 認証不要
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // if (!user) redirect("/login");
 
-  // Fetch ship profile with ownership check
-  const { data: ship, error: shipError } = await supabase
-    .from("ship_profiles")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  // Fetch ship profile (開発モード: user_id チェックを緩和)
+  let query = supabase.from("ship_profiles").select("*").eq("id", id);
+  if (user) {
+    query = query.eq("user_id", user.id);
+  }
+  const { data: ship, error: shipError } = await query.single();
 
   if (shipError || !ship) {
     return (

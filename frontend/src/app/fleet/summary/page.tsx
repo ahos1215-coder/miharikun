@@ -51,15 +51,15 @@ export default async function FleetSummaryPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  // 開発モード: 認証不要
+  // if (!user) redirect("/login");
 
-  // 全船舶を取得
-  const { data: ships } = await supabase
-    .from("ship_profiles")
-    .select("*")
-    .eq("user_id", user.id);
+  // 全船舶を取得（開発モード: user_id チェック緩和）
+  let shipsQuery = supabase.from("ship_profiles").select("*");
+  if (user) {
+    shipsQuery = shipsQuery.eq("user_id", user.id);
+  }
+  const { data: ships } = await shipsQuery;
 
   const shipList = (ships ?? []) as ShipProfile[];
   const shipIds = shipList.map((s) => s.id);

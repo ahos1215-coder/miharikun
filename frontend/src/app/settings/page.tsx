@@ -10,40 +10,31 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  // 開発モード: 認証不要
+  // if (!user) redirect("/login");
 
-  // Fetch existing preferences
-  const { data: existing } = await supabase
-    .from("user_preferences")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  // Fetch existing preferences (開発モード: user が null ならデフォルト)
+  let preferences: UserPreferences = {
+    id: "",
+    user_id: "",
+    email_notify: false,
+    line_notify: false,
+    notify_severity: "all",
+    weekly_summary: false,
+    created_at: "",
+    updated_at: "",
+  };
 
-  let preferences: UserPreferences;
-
-  if (existing) {
-    preferences = existing as UserPreferences;
-  } else {
-    // Create default row on first visit
-    const { data: created, error } = await supabase
+  if (user) {
+    const { data: existing } = await supabase
       .from("user_preferences")
-      .insert({ user_id: user.id })
-      .select()
+      .select("*")
+      .eq("user_id", user.id)
       .single();
 
-    if (error || !created) {
-      return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <p className="text-red-600">
-            設定の初期化に失敗しました: {error?.message}
-          </p>
-        </div>
-      );
+    if (existing) {
+      preferences = existing as UserPreferences;
     }
-
-    preferences = created as UserPreferences;
   }
 
   return (
