@@ -488,3 +488,6 @@
 - 2026-04-03 — [Role B/Opus] 成山堂チェッカー追加 + 海文堂タイトルマップ拡充 (1→12件)
 - 2026-04-03 — [Role D/Opus] seed-publications GHAワークフロー作成 + DB投入 (81件 upsert成功)
 - 2026-04-03 — [User] Phase 1 品質検証合格: NK 99件 + MLIT 18件、運用フェーズへ移行
+- 2026-04-03 — [Role D/Opus] コードベース監査: デッドコード削除(process_queue 249行), URL環境変数化, Supabase SSoT化
+- 2026-04-03 — [Role D/Opus] 備付書タブDB取得切替 + maritime_knowledge.py分割(1995→281+1725行)
+- 2026-04-03 — [Role D/Opus] ドキュメント全面更新: HANDOFF.md書換, ROADMAP v7更新, PROGRESS.md同期

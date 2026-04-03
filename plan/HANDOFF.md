@@ -1,20 +1,18 @@
 # 引継ぎ書 — MIHARIKUN
 
 > **次のセッションはこのファイルから読み始めてください。**
-> 最終更新: 2026-03-31
+> 最終更新: 2026-04-03
 
 ---
 
 ## 1. 今どこにいるか
 
-**Phase 3 作業中・本番稼働中。「航海士個人のための情報の蒸留器」方針。** https://miharikun2.vercel.app
+**Phase 1 完了 → Phase 2 着手準備。** https://miharikun2.vercel.app
 
 ```
-Phase 0: 基盤構築              ✅
-Phase 1 R1: スクレイパー       ✅
-Phase 1 R2: DB + マッチング    ✅
-Phase 2: Ship Specs + UI       ✅
-Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
+Phase 1: 情報の集約と鮮度維持     ✅ 完了 (2026-04-03)
+Phase 2: パーソナライズマッチング  📋 次
+Phase 3: 通知                      📋 その次
 ```
 
 ---
@@ -23,8 +21,8 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 
 ```
 1. plan/PROGRESS.md を読んで詳細を把握
-2. 残タスク（LINE_NOTIFY_TOKEN, RESEND_API_KEY, フロントテスト）を確認
-3. plan/STRATEGIC_ROADMAP_v6.md (v7方針) の短期目標を参照して次のタスクを判断
+2. plan/STRATEGIC_ROADMAP_v6.md (v7方針) を確認
+3. CLAUDE.md のルールを遵守
 ```
 
 ---
@@ -36,23 +34,16 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 | Public URL | https://miharikun2.vercel.app |
 | デプロイ | Vercel 自動デプロイ (git push → 自動ビルド) |
 | DB | Supabase (PostgreSQL + Auth + RLS) |
-| AI | Google Gemini 2.5 Flash API (**Tier 1 Pay-as-you-go**) |
-| バッチ | GitHub Actions (22 ワークフロー) |
+| AI | Google Gemini 2.5 Flash API (Tier 1 Pay-as-you-go) |
+| バッチ | GitHub Actions (11 ワークフロー) |
 | リポジトリ | Public (GHA 無制限のため) |
-| コード規模 | 約 15,018 行 |
-
-### Vercel 環境変数 (設定済み)
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 ### GitHub Secrets (設定済み)
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `GEMINI_API_KEY`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`
 
-### 未設定の Secrets
-- `LINE_NOTIFY_TOKEN` — LINE 通知を有効化するために必要
-- `RESEND_API_KEY` — 週次サマリーメール送信に必要
+### 未設定の Secrets (Phase 3 で必要)
+- `LINE_NOTIFY_TOKEN` — LINE 通知
+- `RESEND_API_KEY` — 週次サマリーメール
 
 ---
 
@@ -60,390 +51,115 @@ Phase 3: Fleet + コンプライアンス + プロUI  ⏳ 作業中
 
 | テーブル | 用途 |
 |---------|------|
-| `regulations` | 規制情報 (NK + MLIT + e-Gov)。`headline` カラム追加済み |
-| `pending_queue` | Gemini 分類失敗時のリトライキュー |
-| `mlit_crawl_state` | MLIT クローラーの BFS 状態管理 |
-| `ship_profiles` | ユーザーの船舶スペック登録 (`radio_equipment` 追加済み) |
+| `regulations` | 規制情報 (NK 99件 + MLIT 18件) |
+| `ship_profiles` | ユーザーの船舶スペック登録 |
 | `user_matches` | マッチング結果 (船舶×規制) |
-| `user_preferences` | 通知設定 (LINE/メール/頻度) |
-| `publications` | 書籍マスターデータ (67件, GHAバッチ更新) |
-| `ship_publications` | 船舶別 備付書籍状況 (ユーザー管理) |
+| `user_preferences` | 通知設定 |
+| `publications` | 書籍マスター (81冊) |
+| `ship_publications` | 船舶別 備付書籍状況 |
+| `mlit_crawl_state` | MLIT クローラー状態管理 |
+| `pending_queue` | レガシー (未使用) |
 
 マイグレーション: `supabase/migrations/` (13 ファイル、全て適用済み)
-- `00001_initial_schema.sql` — regulations + pending_queue
-- `00002_mlit_crawl.sql` — mlit_crawl_state
-- `00003_rls_policies.sql` — RLS ポリシー
-- `00004_indexes.sql` — インデックス
-- `00005_ship_profiles.sql` — ship_profiles + user_matches
-- `00006_user_preferences.sql` — user_preferences
-- `00007_headline.sql` — regulations.headline カラム追加
-- `00008_feedback.sql` — user_matches に user_feedback/needs_review 追加
-- `00009_publications.sql` — publications + ship_publications テーブル
-- `00010_radio_equipment.sql` — ship_profiles に radio_equipment カラム追加
-- `00011_publications_v2.sql` — publications に applicability_rules JSONB + last_verified_at + verified_by
-- `00012_regulations_applicability.sql` — regulations に applicability_rules JSONB
-- `00013_regulation_actions.sql` — regulations に onboard_actions/shore_actions/sms_chapters
 
 ---
 
-## 5. GitHub Actions ワークフロー (全 22)
+## 5. システム構成
 
-| ファイル | スケジュール | 内容 |
-|---------|------------|------|
-| `scrape-nk.yml` | 日次 JST 07:00 | ClassNK スクレイパー (**ubuntu-latest**) |
-| `scrape-mlit-rss.yml` | 日次 JST 08:00 | 国交省 RSS スクレイパー |
-| `scrape-mlit-crawl.yml` | 週次 日曜 JST 06:00 | 国交省 BFS クローラー |
-| `scrape-egov.yml` | 日次 | e-Gov パブコメスクレイパー |
-| `run-matching.yml` | スクレイパー完了後 | マッチングエンジン v3 (4段階) + LINE 通知 |
-| `extract-rules.yml` | 手動 / スクレイパー完了後 | 規制→applicability_rules 抽出 (Gemini) |
-| `generate-headlines.yml` | スクレイパー完了後 | Gemini headline 一括生成 |
-| `process-queue.yml` | 毎時 | pending_queue リトライ |
-| `health-check.yml` | 6 時間毎 | システムヘルスチェック |
-| `weekly-summary.yml` | 週次 月曜 JST 09:00 | 週次サマリーメール |
-| `seed-publications.yml` | 手動 | 67書籍マスターデータ初期投入 (**実行済み**) |
-| `check-publications.yml` | 週次 月曜 JST 11:00 | 書籍版数更新チェッカー (5発行元) |
-| `ci.yml` | PR / push | CI (TypeScript + pytest + ESLint) |
-| `scrape-kanto.yml` | 週次 火曜 JST 12:00 | 関東運輸局テスト監視 |
-| `cleanup-noise.yml` | 手動 | ノイズデータ一括清掃 (filters.py v2.4) |
-| `extract-actions.yml` | 手動 | Gemini でアクション抽出 |
-| `deep-reanalyze.yml` | 手動 | PDF本文ベース深層再解析 (Self-Critique) |
-| `force-ingest.yml` | 手動 | 常設ページ強制取り込み (基本訓練等) |
-| `grand-zero.yml` | 手動 | DB全削除+NK/MLIT再収集 |
-| `export-mlit.yml` | 手動 | MLIT記事エクスポート (監査用) |
-| `security-scan.yml` | 週次 / PR | TruffleHog + npm/pip audit |
-| `notify-on-failure.yml` | — | 再利用可能失敗通知 (called by others) |
+### スクリプト (9個)
+| ファイル | 用途 |
+|---------|------|
+| `scrape_nk.py` | NK 週次取得 (100件, --force-all対応) |
+| `scrape_mlit_crawl.py` | MLIT シードURL方式 (即時Gemini解析) |
+| `scrape_kanto_bureau.py` | 関東運輸局テスト監視 |
+| `run_matching.py` | 4段階マッチング |
+| `notify_matches.py` | LINE 通知 |
+| `weekly_summary.py` | 週次サマリーメール |
+| `health_check.py` | システム監視 |
+| `check_publication_updates.py` | 書籍版数チェック (IMO/JHA/海文堂/成山堂) |
+| `seed_publications.py` | 書籍マスター投入 (81冊) |
 
-**重要: NK は ubuntu-latest で動作する。Self-hosted Runner は不要。**
-ClassNK のブロックは IP ベースではなく UA ベースだった。UA 修正済みのため GHA 直接実行が可能。
+### GHA ワークフロー (11個)
+| ファイル | スケジュール |
+|---------|------------|
+| `scrape-nk.yml` | 週次 日曜 07:00 JST |
+| `scrape-mlit-crawl.yml` | 週次 日曜 06:00 JST |
+| `scrape-kanto.yml` | 週次 火曜 12:00 JST |
+| `run-matching.yml` | 手動トリガー |
+| `weekly-summary.yml` | 週次 月曜 09:00 JST |
+| `health-check.yml` | 6時間毎 |
+| `check-publications.yml` | 月次 1日 11:00 JST |
+| `seed-publications.yml` | 手動 (書籍追加時) |
+| `ci.yml` | PR/push |
+| `security-scan.yml` | 週次/PR |
+| `notify-on-failure.yml` | 再利用可能 |
 
----
-
-## 6. テスト (121件)
-
-| 種別 | 件数 | ファイル |
-|------|------|---------|
-| pytest 単体テスト | 41 | `tests/python/test_scrape_nk.py` |
-| Golden Set 精度テスト | 29 | `tests/python/test_matching_golden.py` |
-| 備付書籍テスト | 51 | `tests/python/test_publication_requirements.py` |
-| Playwright E2E | 9 | `frontend/e2e/{landing,news,auth}.spec.ts` |
-| **合計 (pytest)** | **121** | |
-
-Golden Set 内訳: ルールベース 19 + 条約ベース 7 + アクション精度 3
+### ユーティリティ (SSoT)
+| ファイル | 責務 |
+|---------|------|
+| `utils/gemini_client.py` | Gemini API + UNIFIED_PROMPT + Self-Critique |
+| `utils/supabase_client.py` | Supabase REST (全スクリプト共通) |
+| `utils/filters.py` | ノイズフィルタ v2.4 (351パターン) |
+| `utils/matching.py` | 4段階マッチング (1073行) |
+| `utils/maritime_knowledge.py` | 定数 + ユーティリティ (281行) |
+| `utils/maritime_convention_rules.py` | 43条約ルールデータ (1725行) |
+| `utils/ship_compliance.py` | 船舶→適用条約推論 |
+| `utils/publications/` | 備付書籍判定パッケージ (81冊) |
 
 ---
 
-## 7. 推論型コンプライアンスエンジン (4段階マッチング v3)
+## 6. コードベース健康状態 (2026-04-03 監査済み)
 
-### パイプライン
-1. **Stage 1: ルールベース** — 6 条件で高速除外 (船種・GT・旗国・航行区域・建造年・カテゴリ)
-2. **Stage 0: 条約ベース** — `maritime_knowledge.py` の 43 条約ルール + 871 キーワードで条約適用を自動推論。`ship_compliance.py` が船舶スペック 5 項目から適用条約を推定。12 SMS章マッピング + 船側/会社側アクション分類
-3. **Stage 2: applicability_rules 評価** — regulations テーブルの `applicability_rules` JSONB をローカル評価（API消費ゼロ）
-4. **Stage 3: Gemini AI フォールバック** — Stage 0/1/2 で判断できなかった規制に対して精密判定 (confidence + reason + citations)
-5. **CoVe (Chain of Verification)** — 低確信度の結果を自動再検証
+### 良好
+- Gemini SSoT: 全呼び出しが gemini_client.py 経由
+- Supabase SSoT: 全スクリプトが get_supabase_headers() 使用
+- 循環import: なし
+- secrets: ハードコードゼロ
+- TypeScript strict: フロントエンド全体
 
-### 精度保証
-- Pydantic バリデーション (`validation.py`) で Gemini 出力を構造化検証
-- 単語境界マッチングで誤マッチ防止 (ISM≠tourism)
-- Golden Set 29テスト全通過
+### 改善済み (本日)
+- process_queue.py 削除 (デッドコード)
+- ハードコードURL → MIHARIKUN_BASE_URL 環境変数化
+- 備付書タブ: ハードコード → DB取得に切替
+- maritime_knowledge.py: 1995行 → 281行 + 1725行に分割
 
-### 主要ファイル
-- `scripts/utils/maritime_knowledge.py` — 43条約ルール・871キーワード・SMS章・アクション分類
-- `scripts/utils/ship_compliance.py` — 船舶スペック→適用条約自動推論
-- `scripts/utils/matching.py` — 4段階マッチングパイプライン (v3)
-- `scripts/utils/validation.py` — Pydantic バリデーション + CoVe
-
----
-
-## 8. 知っておくべきこと
-
-### アーキテクチャ概要
-```
-[ユーザー] → [Vercel (Next.js 16)] → [Supabase (Auth + DB + RLS)]
-                                            ↑
-[GitHub Actions (ubuntu-latest, 15 workflows)] → [スクレイパー] → [Gemini AI] → [Supabase upsert]
-                                                       ↓
-                                                  [マッチング v3 (4段階)] → [LINE/メール通知]
-```
-
-### Gemini Tier 1 Pay-as-you-go
-- Free Tier から Tier 1 に移行済み（2026-03-30）
-- レートリミッター: 4秒→0.5秒に短縮
-- 429 エラーはほぼ解消（NK 40件 upsert で 429 ゼロ）
-- `pending_queue` + `process-queue.yml` は引き続きフォールバックとして稼働
-
-### 過去の罠 (再発防止)
-1. `send_line_notify` は存在しない → 正しくは `send_alert`
-2. `scripts/` から `utils/` を import するには `sys.path.insert(0, os.path.dirname(__file__))` 必須
-3. ClassNK は **UA ベース**でブロック (IP ではない) → Chrome UA で解決済み
-4. Supabase の空文字 Secret が環境変数のデフォルト値を上書きする
-5. `classify_pdf` は例外ではなく `status=pending` を返す
-6. MLIT スクレイパーのフィールド名は DB スキーマと一致させること (`confidence` not `confidence_score`)
-7. PostgREST upsert は PK 以外の UNIQUE 制約には `on_conflict` パラメータが必要
-
-### 設計文書の優先順位
-1. `plan/STRATEGIC_ROADMAP_v6.md` — 最上位の今後の方針文書 (**v7 方針**)
-2. `plan/PERSONAS.md` — Vibe OS 4ロール自動憑依システム
-3. `plan/STRATEGIC_PIVOT_v5.md` — 戦略転換の意思決定記録
-4. `plan/MARITIME_PROJECT_BLUEPRINT_v4.md` — 技術詳細 (v5/v6/v7 と矛盾する場合はそちら優先)
-5. `CLAUDE.md` — コーディング規約・運用ルール・Vibe OS ディスパッチ
-
-### 排除する機能（実装禁止）
-- 管理会社向けのログ監視、完了報告ボタン、レポート出力
-- PSC 検査対策に特化した重厚なシミュレーション
-- 書籍内容の詳細な要約生成
-- B2B 機能全般
-- IMO ニュースソース直接取得（ClassNK経由で十分）
-- 資格管理・証明書期限リマインダー
+### 残存の技術的負債 (低優先)
+- matching.py 1073行 (Phase 2 改善時に分割)
+- news/page.tsx 732行, news/[id]/page.tsx 812行 (コンポーネント分離可)
+- UKHO/ILO 版数チェッカー未実装 (更新頻度低)
+- publication-data.ts 566行 (ダッシュボードがまだ使用中、段階的に廃止)
 
 ---
 
-## 9. 法定図書自動マッピング (Publications System)
+## 7. 4段階マッチングエンジン
 
-### アーキテクチャ
-```
-ship_profiles (5項目 + radio_equipment)
-  → publication_requirements.py (67書籍の自動判定)
-  → publication-data.ts (TS版 43書籍 + 船舶別フィルタ)
-  → ダッシュボード: G/A/R ステータス可視化
-  → /ships/[id]/publications: 詳細管理ページ
-  → check_publication_updates.py: 週次版数チェック (GHA)
-```
-
-### ステータス判定
-- **Green (最新)**: editionDate が 3年以内
-- **Amber (要確認)**: editionDate が 3年〜6年前
-- **Red (要更新)**: editionDate が 6年以上前
-
-### 主要ファイル
-- `scripts/utils/publication_requirements.py` — 67書籍の判定ロジック (Python)
-- `frontend/src/lib/publication-data.ts` — 43書籍の判定ロジック (TypeScript)
-- `scripts/seed_publications.py` — DB 初期投入 (実行済み)
-- `scripts/check_publication_updates.py` — 週次版数チェッカー (5発行元フレームワーク)
+1. **Stage 1: ルールベース** — 船種・GT・旗国・航行区域で高速除外
+2. **Stage 0: 条約ベース** — 43条約 + 871キーワードで条約適用推論
+3. **Stage 2: applicability_rules** — JSONB ルール評価 (API消費ゼロ)
+4. **Stage 3: Gemini AI** — フォールバック (confidence + citations)
 
 ---
 
-## 10. ノイズフィルタリングシステム (filters.py v2.4)
+## 8. 過去の罠 (再発防止)
 
-### アーキテクチャ
-```
-RSS 入口 → filters.py (should_exclude_rss) → 除外を包含より先に実行
-DB 事後清掃 → filters.py (is_noise) → cleanup_noise.py
-アクション抽出 → extract_actions.py → アクションなし=hidden
-```
-
-### フィルタ v2.4 スペック
-- **ホワイトリスト**: 31語（EEXI/CII/船員法改正/フルハーネス/義務化 等）
-- **単独除外**: 265語（旅客船/造船/港湾/行政/GHG/MaaS/観光/内航商慣習/事務手続き等）
-- **AND条件除外**: 86ペア
-- **合計**: 351パターン
-
-### 蒸留実績
-- 元データ: 453件 → 蒸留後: 44件（MLIT）+ 34件（NK）= 78件
-- 除去率: 90%
-
-### コード品質（Phase 1.5 グランドゼロ完了）
-- **Gemini API**: `gemini_client.py` に `call_gemini_text()` + `SELF_CRITIQUE_PROMPT` 統合。独自実装ゼロ
-- **Supabase**: `supabase_client.py` に `get_supabase_headers()` 統合。独自 `_headers()` ゼロ
-- **PDF抽出**: `gemini_client.py` に `download_and_extract_pdf_text()` 統合。独自実装ゼロ
-- **プロンプト**: F-D-H ルール（Form/Deadline/Hardware）+ Self-Critique ループ
-- **DRY原則違反**: 解消済み
-
-### 主要ファイル
-- `scripts/utils/filters.py` — ノイズフィルタ定義の SSoT (351パターン)
-- `scripts/utils/gemini_client.py` — Gemini API + PDF抽出 + Self-Critique の SSoT
-- `scripts/utils/supabase_client.py` — Supabase 接続の SSoT
-- `scripts/cleanup_noise.py` — DB事後清掃
-- `scripts/force_ingest.py` — 常設ページ強制取り込み (Self-Critique)
-- `scripts/deep_reanalyze.py` — 既存データの深層再解析
+1. Agent Teams で7重複 `_headers()` 発生 → SSoT 強制ルールで解消
+2. NK は UA ベースでブロック (IP ではない) → Chrome UA で解決
+3. `is_too_old(null)` = True で NK データ誤削除 → null = False に修正
+4. Supabase 空文字 Secret がデフォルト値を上書きする
+5. MLIT の `title` が PDF 由来で文字化け → `headline` をメインタイトルに
 
 ---
 
-## 11. 既知の問題
+## 9. 次のアクション (Phase 2)
 
-- **LINE_NOTIFY_TOKEN 未設定**: LINE 通知機能は実装済みだが Token 未設定のため動作しない
-- **RESEND_API_KEY 未設定**: 週次サマリーメール機能は実装済みだが API キー未設定のため動作しない
-- **フロントエンド単体テスト未導入**: Jest/Vitest のセットアップがまだ
-- **Version Tracker**: 海文堂/JHA/IMO の3ソースは実装済み。NK/UKHO/ILO は stub
+### Phase 2: パーソナライズマッチング
+- [ ] マッチングエンジンの検証・改善
+- [ ] 「主要 / My Ship」タブで自船該当規制のみ表示
+- [ ] applicability_rules の精度向上
+- [ ] Golden Set テスト拡充
 
----
-
-## 12. 次のアクション
-
-### ユーザー作業 (手動)
+### Phase 3 準備 (手動)
 - [ ] `LINE_NOTIFY_TOKEN` を GitHub Secrets に設定
 - [ ] `RESEND_API_KEY` を Vercel env に設定
 
-### 開発タスク (短期)
-- [ ] フロントエンド単体テスト導入 (Jest/Vitest)
-- [ ] MLITクローラー（シードURL方式）のテスト実行
-- [ ] COLREG 2026 Edition / IMSBC 2025 Edition のDB反映
-
-### 中期タスク
-- [ ] 通知頻度の調整 (即時/日次/週次の切り分け)
-- [ ] ビジネスモデル実装（Free/Pro ティア）
-- [ ] DSPy プロンプト最適化（誤判定フィードバック50件蓄積後）
-
 詳細: `plan/STRATEGIC_ROADMAP_v6.md` (v7 方針)
-
----
-
-## 11. プロジェクト全体のファイル構成
-
-```
-miharikun/
-├── CLAUDE.md                              # 運用ルール + コーディング規約
-├── plan/                                  # 設計・進捗・引継ぎ文書
-│   ├── PROGRESS.md                        # 唯一の進捗ソース・オブ・トゥルース
-│   ├── HANDOFF.md                         # セッション引継ぎ (このファイル)
-│   ├── STRATEGIC_ROADMAP_v6.md            # 今後の方針 (v7 — 「航海士個人のための情報の蒸留器」)
-│   ├── STRATEGIC_PIVOT_v5.md              # 戦略転換の意思決定記録
-│   ├── MARITIME_PROJECT_BLUEPRINT_v4.md   # 技術詳細設計
-│   ├── SELF_HOSTED_RUNNER_SETUP.md        # Runner セットアップ手順 (現在不要)
-│   ├── GEMINI_ACCURACY_REPORT.md          # AI 精度検証レポート
-│   ├── AGENT_TEAMS_PLAN.md               # エージェント並列開発フレームワーク
-│   ├── IMPLEMENTATION_GUIDE.md            # 初期実装ガイド
-│   ├── MCP_SETUP.md                       # Google Drive MCP 設定ガイド
-│   └── SECURITY_CHECKLIST.md              # セキュリティチェックリスト
-├── frontend/                              # Next.js 16 フロントエンド
-│   ├── next.config.ts
-│   ├── package.json
-│   ├── playwright.config.ts
-│   ├── tsconfig.json
-│   ├── public/
-│   │   ├── icon.svg
-│   │   ├── manifest.json
-│   │   ├── offline.html                   # PWA オフラインページ
-│   │   └── sw.js                          # Service Worker (4段階キャッシュ)
-│   ├── e2e/                               # Playwright E2E テスト (9件)
-│   │   ├── landing.spec.ts
-│   │   ├── news.spec.ts
-│   │   └── auth.spec.ts
-│   └── src/
-│       ├── middleware.ts                   # 認証ミドルウェア (未認証→/login)
-│       ├── emails/
-│       │   └── weekly-summary.tsx         # React Email 週次サマリーテンプレート
-│       ├── app/
-│       │   ├── layout.tsx                 # ルートレイアウト
-│       │   ├── page.tsx                   # ランディングページ (6セクション)
-│       │   ├── loading.tsx                # グローバルローディング
-│       │   ├── error.tsx                  # エラーバウンダリ
-│       │   ├── not-found.tsx              # 404 ページ
-│       │   ├── globals.css
-│       │   ├── favicon.ico
-│       │   ├── login/page.tsx             # ログイン/サインアップ
-│       │   ├── auth/callback/route.ts     # Auth コールバック
-│       │   ├── news/page.tsx              # Yahoo!ニュース風ポータル (専門タブ)
-│       │   ├── news/[id]/page.tsx         # 規制詳細 (AI分析+キーワード推論明示)
-│       │   ├── dashboard/page.tsx         # Maritime Command Center (要認証)
-│       │   ├── dashboard/dashboard-shell.tsx  # Framer Motion アニメーション wrapper
-│       │   ├── dashboard/PotentialMatchCard.tsx  # Potential Match UI
-│       │   ├── ships/new/page.tsx         # 船舶新規登録 (要認証, 無線設備あり)
-│       │   ├── ships/[id]/page.tsx        # 船舶詳細 (要認証)
-│       │   ├── ships/[id]/ship-edit-form.tsx  # 船舶編集フォーム (無線設備あり)
-│       │   ├── ships/[id]/publications/page.tsx  # 備付書籍管理ページ
-│       │   ├── ships/[id]/publications/publications-shell.tsx  # 書籍 UI shell
-│       │   ├── api/publications/route.ts  # 書籍 GET/PUT API
-│       │   ├── fleet/page.tsx             # Fleet全船一覧 + 適用条約バッジ
-│       │   ├── fleet/summary/page.tsx     # Fleet管理者ビュー + アクション要約
-│       │   ├── settings/page.tsx          # 通知設定 (要認証)
-│       │   ├── settings/SettingsForm.tsx   # 設定フォームコンポーネント
-│       │   ├── admin/health/page.tsx      # システムヘルスダッシュボード
-│       │   └── api/send-summary/route.ts  # 週次サマリー API
-│       ├── components/
-│       │   ├── nav.tsx                    # ナビゲーション (モバイルハンバーガー対応)
-│       │   ├── footer.tsx                 # 免責事項フッター
-│       │   ├── sw-register.tsx            # Service Worker 登録
-│       │   ├── theme-provider.tsx         # ダークモード対応 (next-themes)
-│       │   ├── feedback-buttons.tsx       # 👍👎 フィードバックボタン
-│       │   ├── deadline-badge.tsx         # 適用日バッジ (urgency 色変化)
-│       │   ├── dashboard/
-│       │   │   ├── compliance-gauge.tsx   # SVG 円形ゲージ (Framer Motion)
-│       │   │   ├── timeline-strip.tsx     # 施行日横スクロールタイムライン
-│       │   │   ├── glass-regulation-card.tsx # Glassmorphism 規制カード
-│       │   │   ├── command-palette.tsx    # Cmd+K コマンドパレット
-│       │   │   └── publications-summary.tsx # 備付書籍サマリー (G/A/R可視化)
-│       │   ├── publications/
-│       │   │   ├── glass-publication-card.tsx # Glassmorphism 書籍カード
-│       │   │   └── publication-stats.tsx  # 書籍統計カード
-│       │   └── ui/
-│       │       └── badge.tsx              # カラフルピルバッジ (ダークファースト)
-│       └── lib/
-│           ├── types.ts                   # TypeScript 型定義 + 日本語ラベル (Publications型含む)
-│           ├── utils.ts                   # ユーティリティ関数
-│           ├── publication-data.ts        # 書籍マスターデータ (TS版, 43書籍 + 自動判定)
-│           └── supabase/
-│               ├── client.ts              # ブラウザ用クライアント
-│               ├── server.ts              # サーバー用クライアント
-│               └── middleware.ts          # Auth ミドルウェアヘルパー
-├── scripts/                               # Python バックエンド
-│   ├── scrape_nk.py                       # ClassNK スクレイパー (Scrapling対応)
-│   ├── scrape_mlit_rss.py                 # 国交省 RSS スクレイパー
-│   ├── scrape_mlit_crawl.py               # 国交省 BFS クローラー
-│   ├── scrape_egov.py                     # e-Gov パブコメスクレイパー
-│   ├── run_matching.py                    # マッチングエンジン v3 実行
-│   ├── generate_headlines.py              # Gemini headline 一括生成
-│   ├── process_queue.py                   # pending_queue リトライ
-│   ├── notify_matches.py                  # LINE 通知送信
-│   ├── weekly_summary.py                  # 週次サマリー生成
-│   ├── health_check.py                    # ヘルスチェック
-│   ├── seed_publications.py               # 書籍マスターデータ初期投入 (実行済み)
-│   ├── check_publication_updates.py       # 週次書籍版数チェッカー
-│   ├── extract_applicability_rules.py     # 規制→applicability_rules 抽出 (Gemini)
-│   ├── requirements.txt                   # Python 依存パッケージ
-│   └── utils/                             # 共通ユーティリティ
-│       ├── __init__.py
-│       ├── gemini_client.py               # Gemini API (2モデル切替 + 指数バックオフ)
-│       ├── gemini_config.py               # Gemini モデル名・パラメータ一元管理
-│       ├── supabase_client.py             # Supabase REST (7メソッド)
-│       ├── matching.py                    # マッチングエンジン v3 (4段階: ルール→条約→ルール評価→AI)
-│       ├── maritime_knowledge.py          # 43条約ルール + 871キーワード + SMS章 + アクション
-│       ├── ship_compliance.py             # 船舶スペック→適用条約自動推論
-│       ├── publications/                  # 備付書籍自動判定パッケージ (7ファイル, 2,369行)
-│       │   ├── __init__.py                # パッケージエントリーポイント
-│       │   ├── constants.py               # 共通定数
-│       │   ├── data_category_a.py         # カテゴリA書籍データ
-│       │   ├── data_category_b.py         # カテゴリB書籍データ
-│       │   ├── data_category_c.py         # カテゴリC書籍データ
-│       │   ├── data_category_d.py         # カテゴリD書籍データ
-│       │   └── engine.py                  # 判定エンジン
-│       ├── publication_requirements.py    # 備付書籍自動判定 (後方互換ラッパー)
-│       ├── validation.py                  # Pydantic バリデーション + CoVe 検証
-│       ├── line_notify.py                 # LINE 通知 (severity 別スロットリング)
-│       ├── gdrive_client.py               # Google Drive API v3
-│       ├── pdf_preprocess.py              # PDF 品質チェック 4段階
-│       └── stealth_fetcher.py             # Scrapling StealthyFetcher + fallback
-├── .github/workflows/                     # GitHub Actions (15)
-│   ├── scrape-nk.yml                      # NK 日次 (ubuntu-latest)
-│   ├── scrape-mlit-rss.yml                # MLIT RSS 日次
-│   ├── scrape-mlit-crawl.yml              # MLIT クロール週次
-│   ├── scrape-egov.yml                    # e-Gov パブコメ日次
-│   ├── run-matching.yml                   # マッチング v3 (4段階) + LINE 通知
-│   ├── extract-rules.yml                  # applicability_rules 抽出 (Gemini)
-│   ├── generate-headlines.yml             # headline 一括生成
-│   ├── process-queue.yml                  # 毎時リトライ
-│   ├── health-check.yml                   # 6時間毎ヘルスチェック
-│   ├── weekly-summary.yml                 # 週次サマリーメール
-│   ├── ci.yml                             # CI (TypeScript + pytest + ESLint)
-│   ├── seed-publications.yml              # 書籍マスターデータ投入 (手動, 実行済み)
-│   ├── check-publications.yml            # 週次書籍版数チェッカー (月曜 JST 11:00)
-│   ├── security-scan.yml                  # TruffleHog + audit
-│   └── notify-on-failure.yml              # 再利用可能失敗通知
-├── supabase/migrations/                   # DB マイグレーション (12ファイル、全適用済み)
-│   ├── 00001_initial_schema.sql
-│   ├── 00002_mlit_crawl.sql
-│   ├── 00003_rls_policies.sql
-│   ├── 00004_indexes.sql
-│   ├── 00005_ship_profiles.sql
-│   ├── 00006_user_preferences.sql
-│   ├── 00007_headline.sql
-│   ├── 00008_feedback.sql
-│   ├── 00009_publications.sql
-│   ├── 00010_radio_equipment.sql
-│   ├── 00011_publications_v2.sql
-│   └── 00012_regulations_applicability.sql
-└── tests/python/                          # テスト (121件 pytest)
-    ├── __init__.py
-    ├── conftest.py                        # pytest fixtures
-    ├── test_scrape_nk.py                  # NK 単体テスト (41件)
-    └── test_matching_golden.py            # Golden Set 精度テスト (29件)
-```
