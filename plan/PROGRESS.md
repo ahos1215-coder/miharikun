@@ -23,6 +23,7 @@
 | シンプル化 + NK100件 + UI改善 | — | ✅ 完了 | 2026-04-03 |
 | 備付書籍 67→81冊 + 成山堂チェッカー | — | ✅ 完了 | 2026-04-03 |
 | **Phase 1: 情報の集約と鮮度維持** | — | **✅ 完了** | **2026-04-03** |
+| **Phase 2: パーソナライズマッチング** | — | **⏳ 作業中** | **2026-04-03** |
 
 ---
 
@@ -491,3 +492,6 @@
 - 2026-04-03 — [Role D/Opus] コードベース監査: デッドコード削除(process_queue 249行), URL環境変数化, Supabase SSoT化
 - 2026-04-03 — [Role D/Opus] 備付書タブDB取得切替 + maritime_knowledge.py分割(1995→281+1725行)
 - 2026-04-03 — [Role D/Opus] ドキュメント全面更新: HANDOFF.md書換, ROADMAP v7更新, PROGRESS.md同期
+- 2026-04-03 — [Role D/Opus] Phase 2開始: applicability_rules自動生成(43件backfill) + Stage2動作確認
+- 2026-04-03 — [Role D/Opus] GHA自動連携修正: run-matching.ymlトリガー名を現行ワークフローに合わせ
+- 2026-04-03 — [Role D/Opus] My Shipタブ改善: severity優先ソート + 該当件数ヘッダー表示
