@@ -25,7 +25,7 @@ const PAGE_SIZE = 10;
 // --- Category tab definitions ---
 
 type TabKey = "all" | "main" | "safety" | "environment" | "crew" | "domestic" | "publications";
-type SortKey = "newest" | "effective";
+type SortKey = "newest";
 
 interface TabDef {
   key: TabKey;
@@ -204,7 +204,7 @@ export default async function NewsPage({
   const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const offset = (currentPage - 1) * PAGE_SIZE;
   const activeTab = (params.tab as TabKey) || "all";
-  const activeSort: SortKey = params.sort === "effective" ? "effective" : "newest";
+  const activeSort: SortKey = "newest";
 
   const supabase = await createClient();
 
@@ -279,13 +279,9 @@ export default async function NewsPage({
     .range(offset, offset + PAGE_SIZE - 1);
 
   // Sort order（published_at が null の記事は scraped_at でフォールバック）
-  if (activeSort === "effective") {
-    query = query.order("effective_date", { ascending: true, nullsFirst: false });
-  } else {
-    query = query
-      .order("published_at", { ascending: false, nullsFirst: false })
-      .order("scraped_at", { ascending: false, nullsFirst: false });
-  }
+  query = query
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("scraped_at", { ascending: false, nullsFirst: false });
 
   // Source filter
   if (sourceFilter) {
@@ -386,10 +382,6 @@ export default async function NewsPage({
 
   function tabUrl(tab: TabKey) {
     return buildUrl({ tab: tab === "all" ? "" : tab, clearTab: tab === "all", page: 1 });
-  }
-
-  function sortUrl(sort: SortKey) {
-    return buildUrl({ sort, page: 1 });
   }
 
   function clearSearchUrl() {
@@ -508,31 +500,10 @@ export default async function NewsPage({
           </Link>
         </div>
 
-        {/* Sort dropdown */}
-        <div className="flex items-center gap-1.5 text-sm shrink-0">
-          <ArrowUpDown size={14} className="text-zinc-400" />
-          <Link
-            href={sortUrl("newest")}
-            className={cn(
-              "rounded-md px-2.5 py-1 transition-colors",
-              activeSort === "newest"
-                ? "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
-            )}
-          >
-            新着順
-          </Link>
-          <Link
-            href={sortUrl("effective")}
-            className={cn(
-              "rounded-md px-2.5 py-1 transition-colors",
-              activeSort === "effective"
-                ? "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
-            )}
-          >
-            適用日が近い順
-          </Link>
+        {/* Sort: 新着順 fixed */}
+        <div className="flex items-center gap-1.5 text-sm shrink-0 text-zinc-400">
+          <ArrowUpDown size={14} />
+          <span className="font-medium text-zinc-600 dark:text-zinc-300">新着順</span>
         </div>
       </div>
 
