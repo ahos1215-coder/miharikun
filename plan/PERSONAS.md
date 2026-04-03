@@ -133,23 +133,32 @@ GHA 失敗
 
 ### Owns (責任ファイル)
 ```
-scripts/scrape_*.py
-scripts/process_queue.py
-scripts/health_check.py
-scripts/generate_headlines.py
+scripts/scrape_nk.py
+scripts/scrape_mlit_crawl.py
+scripts/scrape_kanto_bureau.py
+scripts/run_matching.py
 scripts/notify_matches.py
 scripts/weekly_summary.py
-scripts/run_matching.py
+scripts/health_check.py
+scripts/check_publication_updates.py
+scripts/seed_publications.py
 scripts/utils/gemini_client.py
 scripts/utils/supabase_client.py
+scripts/utils/filters.py
+scripts/utils/matching.py
+scripts/utils/maritime_knowledge.py
+scripts/utils/maritime_convention_rules.py
+scripts/utils/ship_compliance.py
+scripts/utils/gemini_config.py
+scripts/utils/mlit_seed_urls.py
 scripts/utils/pdf_preprocess.py
 scripts/utils/stealth_fetcher.py
 scripts/utils/line_notify.py
 scripts/utils/gdrive_client.py
+scripts/utils/publications/  (パッケージ全体)
 scripts/requirements.txt
 .github/workflows/*.yml
-tests/python/test_scrape_nk.py
-tests/python/conftest.py
+tests/python/
 ```
 
 ### Trigger Keywords

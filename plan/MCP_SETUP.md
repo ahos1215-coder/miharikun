@@ -1,3 +1,5 @@
+> **⚠️ アーカイブ文書**: このドキュメントは歴史的記録として保持されています。現在のシステム構成は `plan/HANDOFF.md` を参照してください。
+
 # MCP Google Drive Server Setup
 
 ## Overview

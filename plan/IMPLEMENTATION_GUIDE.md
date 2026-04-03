@@ -1,3 +1,5 @@
+> **⚠️ アーカイブ文書**: このドキュメントは歴史的記録として保持されています。現在のシステム構成は `plan/HANDOFF.md` を参照してください。
+
 # 実装指示書パック — Maritime Regulations Monitor
 Last updated: 2026-03-29
 
