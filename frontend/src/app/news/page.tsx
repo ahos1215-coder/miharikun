@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import type { Regulation, Severity } from "@/lib/types";
 import { DeadlineBadge } from "@/components/deadline-badge";
-import { getPublicationsByRecency } from "@/lib/publication-data";
+import type { Publication } from "@/lib/types";
 
 const PAGE_SIZE = 10;
 
@@ -338,6 +338,14 @@ export default async function NewsPage({
     .ilike("source", "MLIT")
     .neq("needs_review", true);
 
+  // --- Publications from DB ---
+  const { data: dbPublications } = await supabase
+    .from("publications")
+    .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
+    .order("current_edition_date", { ascending: false, nullsFirst: false });
+
+  const publications: Publication[] = (dbPublications ?? []) as Publication[];
+
   // --- URL builders ---
 
   function buildUrl(overrides: {
@@ -539,14 +547,14 @@ export default async function NewsPage({
         </div>
       )}
 
-      {/* Publications tab */}
+      {/* Publications tab — DB から取得 */}
       {activeTab === "publications" && (
         <div className="space-y-4">
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            主要な海事書籍の最新版情報（発行日の新しい順）
+            備付書籍マスター（{publications.length}冊） — 発行日の新しい順
           </p>
           <div className="flex flex-col gap-3">
-            {getPublicationsByRecency().map((pub, i) => {
+            {publications.map((pub, i) => {
               const catColors: Record<string, string> = {
                 A: "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
                 B: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
@@ -554,9 +562,10 @@ export default async function NewsPage({
                 D: "bg-amber-500/15 text-amber-300 border-amber-500/20",
               };
               const catLabels: Record<string, string> = { A: "条約", B: "航海用", C: "旗国/船級", D: "マニュアル" };
-              const editionYear = new Date(pub.editionDate).getFullYear();
+              const editionDate = pub.current_edition_date;
+              const editionYear = editionDate ? new Date(editionDate).getFullYear() : null;
               const currentYear = new Date().getFullYear();
-              const isAnnual = pub.updateCycle.includes("年次");
+              const isAnnual = pub.update_cycle?.includes("年") ?? false;
               const isVerified = isAnnual && editionYear === currentYear;
               return (
                 <div
@@ -567,8 +576,8 @@ export default async function NewsPage({
                   )}
                 >
                   <div className="flex items-center gap-1.5 mb-2">
-                    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium", catColors[pub.category])}>
-                      {catLabels[pub.category]}
+                    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium", catColors[pub.category] ?? "")}>
+                      {catLabels[pub.category] ?? pub.category}
                     </span>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">{pub.publisher}</span>
                     {isVerified && (
@@ -579,17 +588,19 @@ export default async function NewsPage({
                     )}
                   </div>
                   <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">
-                    {pub.titleJa}
+                    {pub.title_ja ?? pub.title}
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{pub.title}</p>
                   <div className="flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
-                    <span>最新版: <strong className="text-zinc-600 dark:text-zinc-300">{pub.currentEdition}</strong></span>
-                    <span>発行: <strong className="text-zinc-600 dark:text-zinc-300 tabular-nums">{pub.editionDate}</strong></span>
-                    <span>更新: {pub.updateCycle}</span>
+                    <span>最新版: <strong className="text-zinc-600 dark:text-zinc-300">{pub.current_edition ?? "不明"}</strong></span>
+                    {editionDate && <span>発行: <strong className="text-zinc-600 dark:text-zinc-300 tabular-nums">{editionDate}</strong></span>}
+                    {pub.update_cycle && <span>更新: {pub.update_cycle}</span>}
                   </div>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
-                    根拠: {pub.legalBasis}
-                  </p>
+                  {pub.legal_basis && (
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
+                      根拠: {pub.legal_basis}
+                    </p>
+                  )}
                 </div>
               );
             })}
