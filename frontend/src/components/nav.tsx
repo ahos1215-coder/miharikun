@@ -80,35 +80,19 @@ export function Nav() {
             ニュース
           </NavLink>
 
-          {user ? (
-            <>
-              <NavLink href="/dashboard" pathname={pathname}>
-                ダッシュボード
-              </NavLink>
-              <NavLink href="/fleet" pathname={pathname}>
-                フリート
-              </NavLink>
-              <NavLink href="/ships/new" pathname={pathname}>
-                船舶登録
-              </NavLink>
-              <NavLink href="/settings" pathname={pathname}>
-                設定
-              </NavLink>
-              <button
-                onClick={handleLogout}
-                className="text-zinc-500 hover:text-red-600 transition-colors"
-              >
-                ログアウト
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-lg bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 transition-colors"
-            >
-              ログイン
-            </Link>
-          )}
+          {/* 開発モード: 全メニュー常時表示 */}
+          <NavLink href="/dashboard" pathname={pathname}>
+            ダッシュボード
+          </NavLink>
+          <NavLink href="/fleet" pathname={pathname}>
+            フリート
+          </NavLink>
+          <NavLink href="/ships/new" pathname={pathname}>
+            船舶登録
+          </NavLink>
+          <NavLink href="/settings" pathname={pathname}>
+            設定
+          </NavLink>
           {mounted && (
             <button
               onClick={() => {
@@ -138,39 +122,19 @@ export function Nav() {
             ニュース
           </NavLink>
 
-          {user ? (
-            <>
-              <NavLink href="/dashboard" pathname={pathname} onClick={() => setMenuOpen(false)}>
-                ダッシュボード
-              </NavLink>
-              <NavLink href="/fleet" pathname={pathname} onClick={() => setMenuOpen(false)}>
-                フリート
-              </NavLink>
-              <NavLink href="/ships/new" pathname={pathname} onClick={() => setMenuOpen(false)}>
-                船舶登録
-              </NavLink>
-              <NavLink href="/settings" pathname={pathname} onClick={() => setMenuOpen(false)}>
-                設定
-              </NavLink>
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  handleLogout();
-                }}
-                className="text-left text-zinc-500 hover:text-red-600 transition-colors"
-              >
-                ログアウト
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-lg bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 text-center transition-colors"
-              onClick={() => setMenuOpen(false)}
-            >
-              ログイン
-            </Link>
-          )}
+          {/* 開発モード: 全メニュー常時表示 */}
+          <NavLink href="/dashboard" pathname={pathname} onClick={() => setMenuOpen(false)}>
+            ダッシュボード
+          </NavLink>
+          <NavLink href="/fleet" pathname={pathname} onClick={() => setMenuOpen(false)}>
+            フリート
+          </NavLink>
+          <NavLink href="/ships/new" pathname={pathname} onClick={() => setMenuOpen(false)}>
+            船舶登録
+          </NavLink>
+          <NavLink href="/settings" pathname={pathname} onClick={() => setMenuOpen(false)}>
+            設定
+          </NavLink>
           {mounted && (
             <button
               onClick={() => {

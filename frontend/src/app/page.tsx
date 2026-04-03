@@ -67,13 +67,13 @@ export default async function Home() {
             最新規制を見る
           </Link>
           <Link
-            href="/login"
+            href="/dashboard"
             className={cn(
               "rounded-lg bg-blue-600 px-8 py-3 text-sm font-medium text-white",
               "hover:scale-105 hover:bg-blue-700 transition-transform"
             )}
           >
-            無料で始める
+            ダッシュボードを見る
           </Link>
         </div>
       </section>
@@ -228,16 +228,16 @@ export default async function Home() {
       {/* ───────── 5. CTA Repeat ───────── */}
       <section className="px-4 py-20 text-center motion-preset-fade">
         <Link
-          href="/login"
+          href="/dashboard"
           className={cn(
             "inline-block rounded-lg bg-blue-600 px-8 py-3 text-sm font-medium text-white",
             "hover:scale-105 hover:bg-blue-700 transition-transform"
           )}
         >
-          今すぐ無料で始める
+          ダッシュボードを見る
         </Link>
         <p className="mt-3 text-sm text-zinc-400">
-          登録は30秒。クレジットカード不要。
+          開発中 — フィードバック歓迎です。
         </p>
       </section>
 
