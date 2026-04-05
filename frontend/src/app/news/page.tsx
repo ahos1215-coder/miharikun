@@ -26,6 +26,7 @@ const PAGE_SIZE = 10;
 
 // --- Category tab definitions ---
 
+type SectionKey = "regulations" | "publications";
 type TabKey = "all" | "safety" | "environment" | "crew" | "domestic";
 type SortKey = "newest";
 
@@ -193,6 +194,7 @@ export default async function NewsPage({
   }>;
 }) {
   const params = await searchParams;
+  const activeSection: SectionKey = params.tab === "publications" ? "publications" : "regulations";
   const sourceFilter = params.source?.toUpperCase();
   const searchQuery = params.q?.trim() || "";
   const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
@@ -254,6 +256,17 @@ export default async function NewsPage({
   const nkCount = nkResult.count;
   const mlitCount = mlitResult.count;
 
+  // --- Publications (書籍セクション選択時のみ取得) ---
+  type PubRow = { id: string; title: string; title_ja: string | null; category: string; publisher: string | null; current_edition: string | null; current_edition_date: string | null; legal_basis: string | null; update_cycle: string | null };
+  let publicationsList: PubRow[] = [];
+  if (activeSection === "publications") {
+    const { data: pubs } = await supabase
+      .from("publications")
+      .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
+      .order("current_edition_date", { ascending: false, nullsFirst: false });
+    publicationsList = (pubs ?? []) as PubRow[];
+  }
+
   // --- URL builders ---
 
   function buildUrl(overrides: {
@@ -307,6 +320,99 @@ export default async function NewsPage({
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-5 dark:text-zinc-100">最新規制ニュース</h1>
+
+      {/* Section tabs: 規制 / 書籍 */}
+      <div className="flex gap-2 mb-5">
+        <Link
+          href="/news"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+            activeSection === "regulations"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800",
+          )}
+        >
+          <Shield size={16} />
+          規制情報
+        </Link>
+        <Link
+          href="/news?tab=publications"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+            activeSection === "publications"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800",
+          )}
+        >
+          <BookOpen size={16} />
+          備付書籍
+        </Link>
+      </div>
+
+      {/* ===== Publications Section ===== */}
+      {activeSection === "publications" && (
+        <div className="space-y-3">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+            法定備付書籍 {publicationsList.length} 冊 — 最新出版順
+          </p>
+          {publicationsList.map((pub, i) => {
+            const catColors: Record<string, string> = {
+              A: "bg-cyan-100 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800",
+              B: "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800",
+              C: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800",
+              D: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+            };
+            const catLabels: Record<string, string> = { A: "条約", B: "航海用", C: "旗国/船級", D: "マニュアル" };
+            return (
+              <div
+                key={pub.id}
+                className={cn(
+                  "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950",
+                  i < 5 ? "motion-preset-fade" : "",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium", catColors[pub.category] ?? "")}>
+                        {catLabels[pub.category] ?? pub.category}
+                      </span>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">{pub.publisher}</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">
+                      {pub.title_ja ?? pub.title}
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{pub.title}</p>
+                    {pub.legal_basis && (
+                      <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
+                        根拠: {pub.legal_basis}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      {pub.current_edition ?? "—"}
+                    </p>
+                    {pub.current_edition_date && (
+                      <p className="text-[10px] text-zinc-500 tabular-nums mt-0.5">
+                        {pub.current_edition_date.slice(0, 7)}
+                      </p>
+                    )}
+                    {pub.update_cycle && (
+                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                        更新: {pub.update_cycle}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ===== Regulations Section ===== */}
+      {activeSection === "regulations" && (<>
 
       {/* Search bar */}
       <form method="GET" action="/news" className="flex gap-2 mb-5">
@@ -553,6 +659,8 @@ export default async function NewsPage({
           )}
         </>
       )}
+
+      </>)}
     </div>
   );
 }
