@@ -105,14 +105,40 @@ export default function ShipNewPage() {
 
   return (
     <div className="mx-auto max-w-lg p-4">
-      <h1 className="mb-6 text-xl font-bold">船舶登録</h1>
+      <h1 className="mb-2 text-xl font-bold">船舶登録</h1>
+      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
+        基本情報を入力するだけで、自船に該当する規制を自動表示できます
+      </p>
+
+      {/* ステップインジケーター */}
+      <div className="flex items-center gap-2 mb-6 text-xs">
+        <span className="flex items-center gap-1 text-blue-600 font-medium">
+          <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
+          基本情報
+        </span>
+        <span className="w-4 border-t border-zinc-300 dark:border-zinc-700" />
+        <span className="flex items-center gap-1 text-zinc-400">
+          <span className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[10px]">2</span>
+          認証・旗国
+        </span>
+        <span className="w-4 border-t border-zinc-300 dark:border-zinc-700" />
+        <span className="flex items-center gap-1 text-zinc-400">
+          <span className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[10px]">3</span>
+          航行区域
+        </span>
+        <span className="w-4 border-t border-zinc-300 dark:border-zinc-700" />
+        <span className="flex items-center gap-1 text-zinc-400">
+          <span className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[10px]">4</span>
+          無線設備
+        </span>
+      </div>
 
       <div className="motion-preset-fade rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* --- 基本情報 --- */}
           <fieldset className="space-y-4">
             <legend className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-              基本情報
+              Step 1: 基本情報
             </legend>
             <div className="border-t border-zinc-100 dark:border-zinc-800" />
 
@@ -224,7 +250,7 @@ export default function ShipNewPage() {
           {/* --- 認証・旗国 --- */}
           <fieldset className="space-y-4">
             <legend className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-              認証・旗国
+              Step 2: 認証・旗国
             </legend>
             <div className="border-t border-zinc-100 dark:border-zinc-800" />
 
@@ -272,7 +298,7 @@ export default function ShipNewPage() {
           {/* --- 航行区域 --- */}
           <fieldset className="space-y-4">
             <legend className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-              航行区域
+              Step 3: 航行区域
             </legend>
             <div className="border-t border-zinc-100 dark:border-zinc-800" />
 
@@ -317,7 +343,7 @@ export default function ShipNewPage() {
           {/* --- 無線設備 --- */}
           <fieldset className="space-y-4">
             <legend className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-              無線設備
+              Step 4: 無線設備
             </legend>
             <div className="border-t border-zinc-100 dark:border-zinc-800" />
             <div>

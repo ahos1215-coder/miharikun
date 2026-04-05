@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { Ship, Plus } from "lucide-react";
 import type {
   ShipProfile,
   UserMatch,
@@ -164,12 +165,14 @@ export default async function FleetPage() {
       </div>
 
       {shipList.length === 0 ? (
-        <div className="rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6 text-center">
-          <p className="text-zinc-500 mb-4">船舶が登録されていません</p>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 text-center">
+          <Ship size={48} className="mx-auto mb-4 text-blue-500/50" />
+          <p className="text-zinc-500 dark:text-zinc-400 mb-4">船舶が登録されていません</p>
           <Link
             href="/ships/new"
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
           >
+            <Plus size={16} />
             船舶を登録する
           </Link>
         </div>

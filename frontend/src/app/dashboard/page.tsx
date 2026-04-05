@@ -164,26 +164,48 @@ export default async function DashboardPage({
   });
 
   return (
-    <div className="min-h-screen bg-navy dark:bg-navy">
+    <div className="min-h-screen dark:bg-zinc-950">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Maritime Command Center
+          <h1 className="text-2xl font-bold dark:text-white mb-1">
+            ダッシュボード
           </h1>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
             自船に該当する規制をリアルタイムに監視
           </p>
         </div>
 
         {shipList.length === 0 ? (
-          /* Empty state */
-          <div className="glass rounded-2xl p-12 text-center glow-cyan">
-            <Ship size={48} className="mx-auto mb-4 text-cyan-500/50" />
-            <p className="text-zinc-400 mb-6">船舶が登録されていません</p>
+          /* Empty state — 3ステップガイド */
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 text-center">
+            <Ship size={48} className="mx-auto mb-4 text-blue-500/50" />
+            <h2 className="text-lg font-bold dark:text-white mb-2">はじめましょう</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
+              3ステップで自船に該当する規制を自動表示できます
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 mb-8 text-left max-w-md mx-auto">
+              <div className="flex-1 rounded-lg border border-blue-200 dark:border-blue-900 p-4">
+                <div className="text-blue-600 font-bold text-lg mb-1">1</div>
+                <p className="text-sm font-medium dark:text-zinc-200">船舶を登録</p>
+                <p className="text-xs text-zinc-500">船種・GT・旗国を入力</p>
+              </div>
+              <div className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                <div className="text-zinc-400 font-bold text-lg mb-1">2</div>
+                <p className="text-sm font-medium dark:text-zinc-200">AIが自動マッチング</p>
+                <p className="text-xs text-zinc-500">117件の規制を自動判定</p>
+              </div>
+              <div className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                <div className="text-zinc-400 font-bold text-lg mb-1">3</div>
+                <p className="text-sm font-medium dark:text-zinc-200">該当規制を表示</p>
+                <p className="text-xs text-zinc-500">ここに結果が表示されます</p>
+              </div>
+            </div>
+
             <Link
               href="/ships/new"
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-6 py-3 text-sm font-medium text-white hover:bg-cyan-500 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
             >
               <Plus size={16} />
               船舶を登録する

@@ -21,13 +21,12 @@ import {
 } from "lucide-react";
 import type { Regulation, Severity } from "@/lib/types";
 import { DeadlineBadge } from "@/components/deadline-badge";
-import type { Publication } from "@/lib/types";
 
 const PAGE_SIZE = 10;
 
 // --- Category tab definitions ---
 
-type TabKey = "all" | "main" | "review" | "safety" | "environment" | "crew" | "domestic" | "publications";
+type TabKey = "all" | "safety" | "environment" | "crew" | "domestic";
 type SortKey = "newest";
 
 interface TabDef {
@@ -40,8 +39,6 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: "all", label: "全て", param: "", icon: <List size={16} />, keywords: [] },
-  { key: "main", label: "主要 / My Ship", param: "main", icon: <Star size={16} />, keywords: [] },
-  { key: "review", label: "確認待ち", param: "review", icon: <HelpCircle size={16} />, keywords: [] },
   {
     key: "safety",
     label: "SOLAS / 安全",
@@ -69,13 +66,6 @@ const TABS: TabDef[] = [
     param: "domestic",
     icon: <Flag size={16} />,
     keywords: ["船舶安全法", "海防法", "船員法", "NK", "ClassNK", "旗国", "船級", "テクニカル"],
-  },
-  {
-    key: "publications",
-    label: "備付書籍",
-    param: "publications",
-    icon: <BookOpen size={16} />,
-    keywords: [],
   },
 ];
 
@@ -212,85 +202,9 @@ export default async function NewsPage({
 
   const supabase = await createClient();
 
-  // --- Auth check for main tab ---
-  let userId: string | null = null;
-  let matchedRegulationIds: string[] | null = null;
-  let authError = false;
-
-  // reviewRegulationIds: マッチ不明 (is_applicable=null) の規制ID
-  let reviewRegulationIds: string[] | null = null;
-
-  if (activeTab === "main" || activeTab === "review") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      userId = user.id;
-      const { data: ships } = await supabase
-        .from("ship_profiles")
-        .select("id")
-        .eq("user_id", user.id);
-
-      if (ships && ships.length > 0) {
-        const shipIds = ships.map((s: { id: string }) => s.id);
-
-        if (activeTab === "main") {
-          const { data: matches } = await supabase
-            .from("user_matches")
-            .select("regulation_id")
-            .in("ship_profile_id", shipIds)
-            .eq("is_applicable", true);
-
-          matchedRegulationIds = matches
-            ? matches.map((m: { regulation_id: string }) => m.regulation_id)
-            : [];
-        }
-
-        if (activeTab === "review") {
-          const { data: reviewMatches } = await supabase
-            .from("user_matches")
-            .select("regulation_id")
-            .in("ship_profile_id", shipIds)
-            .is("is_applicable", null);
-
-          reviewRegulationIds = reviewMatches
-            ? reviewMatches.map((m: { regulation_id: string }) => m.regulation_id)
-            : [];
-        }
-      } else {
-        matchedRegulationIds = [];
-        reviewRegulationIds = [];
-      }
-    } else {
-      authError = true;
-    }
-  }
-
-  // --- Also fetch matches for applicability badges (when user is logged in on any tab) ---
-  let allMatchedIds: Set<string> = new Set();
-  if (activeTab !== "main") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      userId = user.id;
-      const { data: ships } = await supabase
-        .from("ship_profiles")
-        .select("id")
-        .eq("user_id", user.id);
-
-      if (ships && ships.length > 0) {
-        const shipIds = ships.map((s: { id: string }) => s.id);
-        const { data: matches } = await supabase
-          .from("user_matches")
-          .select("regulation_id")
-          .in("ship_profile_id", shipIds)
-          .eq("is_applicable", true);
-
-        if (matches) {
-          allMatchedIds = new Set(matches.map((m: { regulation_id: string }) => m.regulation_id));
-        }
-      }
-    }
-  } else if (matchedRegulationIds) {
-    allMatchedIds = new Set(matchedRegulationIds);
-  }
+  // ニュースページは全規制の閲覧専用（My Ship/確認待ちはダッシュボードに集約）
+  const userId: string | null = null;
+  const allMatchedIds: Set<string> = new Set();
 
   // --- Build query ---
   const selectFields = "id,source,source_id,title,headline,category,severity,confidence,published_at,scraped_at,effective_date,summary_ja";
@@ -319,63 +233,26 @@ export default async function NewsPage({
   // Category tab filter
   const tabDef = TABS.find((t) => t.key === activeTab);
 
-  if (activeTab === "main") {
-    if (matchedRegulationIds && matchedRegulationIds.length > 0) {
-      query = query.in("id", matchedRegulationIds);
-      // My Ship: severity 優先ソート (critical > action_required > informational)
-      query = query
-        .order("severity", { ascending: true })
-        .order("published_at", { ascending: false, nullsFirst: false });
-    } else if (!authError) {
-      query = query.in("id", ["__no_match__"]);
-    }
-  } else if (activeTab === "review") {
-    if (reviewRegulationIds && reviewRegulationIds.length > 0) {
-      query = query.in("id", reviewRegulationIds);
-    } else if (!authError) {
-      query = query.in("id", ["__no_match__"]);
-    }
-  } else if (tabDef && tabDef.keywords.length > 0) {
+  if (tabDef && tabDef.keywords.length > 0) {
     query = query.or(buildKeywordFilter(tabDef.keywords));
   }
 
-  // Only execute data query if not showing auth error for main tab
-  let items: Regulation[] = [];
-  let totalFiltered = 0;
-
-  if (activeTab === "main" && authError) {
-    // Don't query -- show login message
-  } else {
-    const { data: regulations, count: filteredCount } = await query;
-    items = (regulations ?? []) as Regulation[];
-    totalFiltered = filteredCount ?? 0;
-  }
+  const { data: regulations, count: filteredCount } = await query;
+  let items: Regulation[] = (regulations ?? []) as Regulation[];
+  let totalFiltered = filteredCount ?? 0;
 
   const totalPages = Math.ceil(totalFiltered / PAGE_SIZE);
 
-  // --- Source counts + publications を並列取得 ---
-  const countQueries = [
+  // --- Source counts を並列取得 ---
+  const [totalResult, nkResult, mlitResult] = await Promise.all([
     supabase.from("regulations").select("*", { count: "exact", head: true }).neq("needs_review", true),
     supabase.from("regulations").select("*", { count: "exact", head: true }).ilike("source", "nk").neq("needs_review", true),
     supabase.from("regulations").select("*", { count: "exact", head: true }).ilike("source", "MLIT").neq("needs_review", true),
-  ] as const;
-
-  // publications は "publications" タブの時のみ取得（遅延取得）
-  const pubQuery = activeTab === "publications"
-    ? supabase.from("publications")
-        .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
-        .order("current_edition_date", { ascending: false, nullsFirst: false })
-    : null;
-
-  const [totalResult, nkResult, mlitResult, pubResult] = await Promise.all([
-    ...countQueries,
-    pubQuery ?? Promise.resolve({ data: null }),
   ]);
 
   const totalCount = totalResult.count;
   const nkCount = nkResult.count;
   const mlitCount = mlitResult.count;
-  const publications: Publication[] = (pubResult.data ?? []) as Publication[];
 
   // --- URL builders ---
 
@@ -546,152 +423,15 @@ export default async function NewsPage({
         </div>
       </div>
 
-      {/* Main tab -- auth error message */}
-      {/* Main tab -- match count header */}
-      {activeTab === "main" && !authError && items.length > 0 && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-900 dark:bg-emerald-950/30 mb-4 motion-preset-fade">
-          <p className="text-sm text-emerald-700 dark:text-emerald-300">
-            <Star size={14} className="inline mr-1.5 -mt-0.5" />
-            全 {totalCount ?? 0} 件中 <strong>{totalFiltered}</strong> 件が自船に該当
-          </p>
-        </div>
-      )}
-
-      {activeTab === "main" && authError && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center dark:border-blue-900 dark:bg-blue-950/30 motion-preset-fade">
-          <Star size={32} className="mx-auto mb-3 text-blue-400" />
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            ログインすると自船に該当する規制だけを表示できます
-          </p>
-          <Link
-            href="/login"
-            className="mt-3 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-          >
-            ログイン
-          </Link>
-        </div>
-      )}
-
-      {/* Main tab -- logged in but no matches */}
-      {activeTab === "main" && !authError && items.length === 0 && (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900 motion-preset-fade">
-          <Star size={32} className="mx-auto mb-3 text-zinc-400" />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            該当する規制はありません。船舶プロファイルを登録すると、マッチング結果がここに表示されます。
-          </p>
-          <Link
-            href="/ships"
-            className="mt-3 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-          >
-            船舶を登録
-          </Link>
-        </div>
-      )}
-
-      {/* Review tab -- header */}
-      {activeTab === "review" && !authError && items.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900 dark:bg-amber-950/30 mb-4 motion-preset-fade">
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            <HelpCircle size={14} className="inline mr-1.5 -mt-0.5" />
-            以下の <strong>{totalFiltered}</strong> 件は自動判定できませんでした。内容を確認して自船に関係あるか判断してください。
-          </p>
-        </div>
-      )}
-
-      {activeTab === "review" && authError && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center dark:border-blue-900 dark:bg-blue-950/30 motion-preset-fade">
-          <HelpCircle size={32} className="mx-auto mb-3 text-blue-400" />
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            ログインすると確認待ちの規制を表示できます
-          </p>
-          <Link
-            href="/login"
-            className="mt-3 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-          >
-            ログイン
-          </Link>
-        </div>
-      )}
-
-      {activeTab === "review" && !authError && items.length === 0 && (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900 motion-preset-fade">
-          <CheckCircle size={32} className="mx-auto mb-3 text-emerald-400" />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            確認待ちの規制はありません。全て自動判定済みです。
-          </p>
-        </div>
-      )}
-
-      {/* Publications tab — DB から取得 */}
-      {activeTab === "publications" && (
-        <div className="space-y-4">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            備付書籍マスター（{publications.length}冊） — 発行日の新しい順
-          </p>
-          <div className="flex flex-col gap-3">
-            {publications.map((pub, i) => {
-              const catColors: Record<string, string> = {
-                A: "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
-                B: "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
-                C: "bg-purple-500/15 text-purple-300 border-purple-500/20",
-                D: "bg-amber-500/15 text-amber-300 border-amber-500/20",
-              };
-              const catLabels: Record<string, string> = { A: "条約", B: "航海用", C: "旗国/船級", D: "マニュアル" };
-              const editionDate = pub.current_edition_date;
-              const editionYear = editionDate ? new Date(editionDate).getFullYear() : null;
-              const currentYear = new Date().getFullYear();
-              const isAnnual = pub.update_cycle?.includes("年") ?? false;
-              const isVerified = isAnnual && editionYear === currentYear;
-              return (
-                <div
-                  key={pub.id}
-                  className={cn(
-                    "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950",
-                    i < 5 ? "motion-preset-fade" : "",
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium", catColors[pub.category] ?? "")}>
-                      {catLabels[pub.category] ?? pub.category}
-                    </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{pub.publisher}</span>
-                    {isVerified && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-500 dark:text-emerald-400">
-                        <CheckCircle size={11} />
-                        {editionYear}年版確認済
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">
-                    {pub.title_ja ?? pub.title}
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{pub.title}</p>
-                  <div className="flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
-                    <span>最新版: <strong className="text-zinc-600 dark:text-zinc-300">{pub.current_edition ?? "不明"}</strong></span>
-                    {editionDate && <span>発行: <strong className="text-zinc-600 dark:text-zinc-300 tabular-nums">{editionDate}</strong></span>}
-                    {pub.update_cycle && <span>更新: {pub.update_cycle}</span>}
-                  </div>
-                  {pub.legal_basis && (
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
-                      根拠: {pub.legal_basis}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Regular empty state (non-main tabs) */}
-      {activeTab !== "main" && activeTab !== "publications" && items.length === 0 && (
+      {/* Empty state */}
+      {items.length === 0 && (
         <p className="text-zinc-500 dark:text-zinc-400 py-8 text-center">
           該当する規制情報はありません
         </p>
       )}
 
       {/* News cards */}
-      {activeTab !== "publications" && items.length > 0 && (
+      {items.length > 0 && (
         <>
           <ul className="flex flex-col gap-4">
             {items.map((reg, index) => {
