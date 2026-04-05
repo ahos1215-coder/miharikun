@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   BookOpen,
   ExternalLink,
@@ -147,16 +146,9 @@ export function GlassPublicationCard({
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.4,
-        delay: 0.1 + index * 0.06,
-        ease: [0.4, 0, 0.2, 1],
-      }}
+    <div
       className={cn(
-        "glass rounded-xl p-5 transition-all duration-300 glass-hover",
+        "glass rounded-xl p-5 transition-all duration-300 glass-hover motion-preset-slide-up motion-duration-300",
         statusConfig.glow,
       )}
     >
@@ -308,6 +300,6 @@ export function GlassPublicationCard({
           購入リンク
         </a>
       )}
-    </motion.div>
+    </div>
   );
 }

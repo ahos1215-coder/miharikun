@@ -70,7 +70,7 @@ export default async function FleetPage() {
   // if (!user) redirect("/login");
 
   // 全船舶を取得（開発モード: user_id チェック緩和）
-  let shipsQuery = supabase.from("ship_profiles").select("*");
+  let shipsQuery = supabase.from("ship_profiles").select("id,ship_name,ship_type,gross_tonnage,navigation_area,flag_state,classification_society,created_at");
   if (user) {
     shipsQuery = shipsQuery.eq("user_id", user.id);
   }
@@ -79,7 +79,6 @@ export default async function FleetPage() {
   const shipList = (ships ?? []) as ShipProfile[];
   const shipIds = shipList.map((s) => s.id);
 
-  // 各船舶のマッチ数・最終マッチ日を集計
   let matchStats: Record<
     string,
     { applicableCount: number; totalAssessed: number; lastMatchedAt: string | null }
@@ -88,39 +87,29 @@ export default async function FleetPage() {
   if (shipIds.length > 0) {
     const { data: matches } = await supabase
       .from("user_matches")
-      .select("*")
+      .select("id,regulation_id,ship_profile_id,is_applicable")
       .in("ship_profile_id", shipIds);
 
     const allMatches = (matches ?? []) as UserMatch[];
 
     for (const m of allMatches) {
       if (!matchStats[m.ship_profile_id]) {
-        matchStats[m.ship_profile_id] = {
-          applicableCount: 0,
-          totalAssessed: 0,
-          lastMatchedAt: null,
-        };
+        matchStats[m.ship_profile_id] = { applicableCount: 0, totalAssessed: 0, lastMatchedAt: null };
       }
       const stat = matchStats[m.ship_profile_id];
-      // is_applicable が null でないもの = 評価済み
-      if (m.is_applicable !== null) {
-        stat.totalAssessed++;
-      }
-      if (m.is_applicable === true) {
-        stat.applicableCount++;
-      }
+      if (m.is_applicable !== null) stat.totalAssessed++;
+      if (m.is_applicable === true) stat.applicableCount++;
     }
 
-    // 最終マッチ日は regulations テーブルから取得
     const regIds = [...new Set(allMatches.filter((m) => m.is_applicable === true).map((m) => m.regulation_id))];
     if (regIds.length > 0) {
       const { data: regs } = await supabase
         .from("regulations")
-        .select("*")
+        .select("id,published_at,created_at")
         .in("id", regIds);
 
-      const regsMap: Record<string, Regulation> = {};
-      for (const r of (regs ?? []) as Regulation[]) {
+      const regsMap: Record<string, { published_at: string | null; created_at: string }> = {};
+      for (const r of (regs ?? []) as { id: string; published_at: string | null; created_at: string }[]) {
         regsMap[r.id] = r;
       }
 

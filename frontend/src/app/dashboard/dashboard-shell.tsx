@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { Pencil, BookOpen } from "lucide-react";
 import { GlassRegulationCard } from "@/components/dashboard/glass-regulation-card";
@@ -44,12 +43,9 @@ export function DashboardShell({ shipData, showAll, activeTabKey }: DashboardShe
   return (
     <div className="flex flex-col gap-8">
       {shipData.map((sd, shipIndex) => (
-        <motion.div
+        <div
           key={sd.ship.id}
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: shipIndex * 0.15, ease: [0.4, 0, 0.2, 1] }}
-          className="space-y-5"
+          className="space-y-5 motion-preset-fade"
         >
           {/* Ship Info Card */}
           <div className="glass rounded-2xl p-5">
@@ -151,15 +147,11 @@ export function DashboardShell({ shipData, showAll, activeTabKey }: DashboardShe
 
           {/* Regulation cards */}
           {sd.filteredMatches.length === 0 ? (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-sm text-zinc-500 text-center py-8 glass rounded-xl"
-            >
+            <p className="text-sm text-zinc-500 text-center py-8 glass rounded-xl motion-preset-fade">
               {activeTabKey !== "all"
                 ? "このカテゴリに該当する規制はありません"
                 : "マッチした規制はまだありません"}
-            </motion.p>
+            </p>
           ) : (
             <ul className="flex flex-col gap-3">
               {sd.filteredMatches.map((m, i) => (
@@ -179,12 +171,7 @@ export function DashboardShell({ shipData, showAll, activeTabKey }: DashboardShe
 
           {/* Potential matches section */}
           {!showAll && sd.potentialMatches.length > 0 && activeTabKey === "all" && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              className="glass rounded-xl p-4 glow-amber"
-            >
+            <div className="glass rounded-xl p-4 glow-amber motion-preset-fade">
               <p className="text-xs font-medium text-amber-400 mb-3">
                 確認待ち ({sd.totalPotential}件)
               </p>
@@ -218,9 +205,9 @@ export function DashboardShell({ shipData, showAll, activeTabKey }: DashboardShe
                   他 {sd.totalPotential - sd.potentialMatches.length}件を表示
                 </Link>
               )}
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
       ))}
     </div>
   );

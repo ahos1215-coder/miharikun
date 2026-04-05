@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -139,11 +136,9 @@ export function GlassRegulationCard({
   const isPotential = isApplicable === null && matchMethod === "potential_match";
 
   return (
-    <motion.li
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.1 + index * 0.06, ease: [0.4, 0, 0.2, 1] }}
+    <li
       className={cn(
+        "motion-preset-slide-up motion-duration-300",
         "glass rounded-xl p-4 transition-all duration-300 glass-hover list-none",
         isApplicable === true && isHighConfidence && "glow-cyan-strong",
         isApplicable === true && !isHighConfidence && "glow-cyan",
@@ -262,6 +257,6 @@ export function GlassRegulationCard({
       {isPotential && (
         <PotentialMatchCard matchId={matchId} reason={reason} />
       )}
-    </motion.li>
+    </li>
   );
 }

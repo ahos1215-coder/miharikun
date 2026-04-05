@@ -1,8 +1,7 @@
 "use client";
 
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { BookOpen, CheckCircle, AlertTriangle, HelpCircle } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -15,34 +14,42 @@ interface StatCardProps {
 }
 
 function AnimatedNumber({ value }: { value: number }) {
-  const mv = useMotionValue(0);
-  const display = useTransform(mv, (v) => Math.round(v));
+  const [display, setDisplay] = useState(0);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const controls = animate(mv, value, {
-      duration: 1.2,
-      ease: [0.4, 0, 0.2, 1],
-    });
-    return controls.stop;
-  }, [mv, value]);
+    const start = performance.now();
+    const duration = 1200;
+    const from = 0;
 
-  return <motion.span>{display}</motion.span>;
+    function tick(now: number) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(from + (value - from) * eased));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [value]);
+
+  return <span>{display}</span>;
 }
 
 function StatCard({ icon, label, value, color, glowClass, index }: StatCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        duration: 0.5,
-        delay: 0.15 + index * 0.08,
-        ease: [0.4, 0, 0.2, 1],
-      }}
+    <div
       className={cn(
-        "glass rounded-xl p-4 flex flex-col items-center gap-2 glass-hover transition-all duration-300",
+        "glass rounded-xl p-4 flex flex-col items-center gap-2 glass-hover transition-all duration-300 motion-preset-slide-up motion-duration-500",
         glowClass,
       )}
+      style={{ animationDelay: `${150 + index * 80}ms` }}
     >
       <div className={cn("flex items-center gap-2", color)}>
         {icon}
@@ -51,7 +58,7 @@ function StatCard({ icon, label, value, color, glowClass, index }: StatCardProps
       <span className={cn("text-3xl font-bold tabular-nums", color)}>
         <AnimatedNumber value={value} />
       </span>
-    </motion.div>
+    </div>
   );
 }
 

@@ -1,3 +1,6 @@
+// ISR: トップページは1時間キャッシュ（規制件数は頻繁に変わらない）
+export const revalidate = 3600;
+
 import {
   Anchor,
   Ship,

@@ -11,6 +11,15 @@ function isPublic(pathname: string): boolean {
 }
 
 export async function updateSession(request: NextRequest) {
+  // ============================================================
+  // 開発モード: 認証チェック自体をスキップ（パフォーマンス最適化）
+  // 全リクエストで Supabase auth.getUser() を呼ばないことで -50〜150ms
+  // 本番復帰時にこのブロック全体を元に戻すこと。
+  // ============================================================
+  return NextResponse.next({ request });
+
+  // --- 本番用コード（開発モード終了時に復帰） ---
+  /*
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -38,21 +47,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ============================================================
-  // 開発モード: 認証リダイレクト一時停止
-  // 誰でも全ページ閲覧可能。本番復帰時にこのブロックを元に戻すこと。
-  // ============================================================
-  // if (!user && !isPublic(request.nextUrl.pathname)) {
-  //   const url = request.nextUrl.clone();
-  //   url.pathname = "/login";
-  //   url.searchParams.set("redirect", request.nextUrl.pathname);
-  //   return NextResponse.redirect(url);
-  // }
-  // if (user && request.nextUrl.pathname === "/login") {
-  //   const url = request.nextUrl.clone();
-  //   url.pathname = "/dashboard";
-  //   return NextResponse.redirect(url);
-  // }
+  if (!user && !isPublic(request.nextUrl.pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("redirect", request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+  }
+  if (user && request.nextUrl.pathname === "/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
+  */
 }

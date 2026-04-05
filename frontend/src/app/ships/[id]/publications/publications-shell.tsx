@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { BookOpen, Ship } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -46,12 +43,7 @@ export function PublicationsShell({
   return (
     <div className="space-y-5">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="glass rounded-2xl p-5"
-      >
+      <div className="glass rounded-2xl p-5 motion-preset-slide-up motion-duration-500">
         <div className="flex items-center gap-3">
           <Ship size={20} className="text-cyan-400" />
           <div>
@@ -61,7 +53,7 @@ export function PublicationsShell({
             </p>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Category tabs */}
       <nav className="flex gap-1.5 overflow-x-auto pb-1">
@@ -101,12 +93,9 @@ export function PublicationsShell({
           {publications.map((pub, i) => {
             const isSms = pub.legal_basis?.includes("SMS管理図書") ?? false;
             return (
-              <motion.div
+              <div
                 key={pub.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3) }}
-                className="glass rounded-xl p-4"
+                className="glass rounded-xl p-4 motion-preset-slide-up motion-duration-300"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -149,7 +138,7 @@ export function PublicationsShell({
                     根拠: {pub.legal_basis}
                   </p>
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>

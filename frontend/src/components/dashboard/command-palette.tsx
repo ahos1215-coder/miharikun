@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { Search, Ship, FileText, Settings, BarChart3, Home, Command, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -173,27 +172,18 @@ export function CommandPalette() {
       </button>
 
       {/* Modal */}
-      <AnimatePresence>
-        {open && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-            />
+      {open && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm motion-preset-fade motion-duration-150"
+            onClick={() => setOpen(false)}
+          />
 
-            {/* Palette */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: -10 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-              className="fixed left-1/2 top-[20%] z-50 w-[90vw] max-w-lg -translate-x-1/2 rounded-2xl border border-white/10 bg-navy-light/95 shadow-2xl backdrop-blur-xl"
-            >
+          {/* Palette */}
+          <div
+            className="fixed left-1/2 top-[20%] z-50 w-[90vw] max-w-lg -translate-x-1/2 rounded-2xl border border-white/10 bg-navy-light/95 shadow-2xl backdrop-blur-xl motion-preset-slide-down motion-duration-200"
+          >
               {/* Search input */}
               <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
                 <Search size={18} className="text-zinc-500 shrink-0" />
@@ -250,10 +240,9 @@ export function CommandPalette() {
                 <span>↵ 決定</span>
                 <span>ESC 閉じる</span>
               </div>
-            </motion.div>
+            </div>
           </>
         )}
-      </AnimatePresence>
     </>
   );
 }

@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Shield } from "lucide-react";
 
 interface ComplianceGaugeProps {
@@ -33,11 +30,8 @@ export function ComplianceGauge({
         : "#f43f5e"; // rose
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-      className="glass rounded-2xl p-6 glow-cyan"
+    <div
+      className="glass rounded-2xl p-6 glow-cyan motion-preset-slide-up motion-duration-500"
     >
       <div className="flex items-center gap-6">
         {/* SVG Gauge */}
@@ -53,7 +47,7 @@ export function ComplianceGauge({
               strokeWidth="8"
             />
             {/* Progress ring */}
-            <motion.circle
+            <circle
               cx="64"
               cy="64"
               r={radius}
@@ -62,24 +56,23 @@ export function ComplianceGauge({
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={circumference}
-              initial={{ strokeDashoffset: circumference }}
-              animate={{ strokeDashoffset: offset }}
-              transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1], delay: 0.3 }}
+              strokeDashoffset={offset}
               transform="rotate(-90 64 64)"
-              style={{ filter: `drop-shadow(0 0 8px ${gaugeColor}50)` }}
+              className="animate-gauge-fill"
+              style={{
+                filter: `drop-shadow(0 0 8px ${gaugeColor}50)`,
+                transition: "stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
             />
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span
-              className="text-2xl font-bold tabular-nums"
+            <span
+              className="text-2xl font-bold tabular-nums motion-preset-fade motion-duration-500"
               style={{ color: gaugeColor }}
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.8 }}
             >
               {rate}%
-            </motion.span>
+            </span>
             <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
               カバー率
             </span>
@@ -123,6 +116,6 @@ export function ComplianceGauge({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

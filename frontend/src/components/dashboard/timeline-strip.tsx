@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Clock, AlertTriangle, Calendar } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -35,11 +32,7 @@ export function TimelineStrip({ items }: TimelineStripProps) {
   if (items.length === 0) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-    >
+    <div className="motion-preset-slide-up motion-duration-500">
       <h3 className="text-sm font-medium text-zinc-400 dark:text-zinc-500 mb-3 flex items-center gap-2">
         <Clock size={14} className="text-accent-cyan" />
         適用スケジュール
@@ -48,11 +41,9 @@ export function TimelineStrip({ items }: TimelineStripProps) {
         {items.map((item, i) => {
           const style = getUrgencyStyle(item.daysUntil);
           return (
-            <motion.div
+            <div
               key={item.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 + i * 0.08 }}
+              className="motion-preset-slide-right motion-duration-300"
             >
               <Link
                 href={`/news/${item.regulationId}`}
@@ -79,10 +70,10 @@ export function TimelineStrip({ items }: TimelineStripProps) {
                   {new Date(item.effectiveDate).toLocaleDateString("ja-JP")}
                 </p>
               </Link>
-            </motion.div>
+            </div>
           );
         })}
       </div>
-    </motion.div>
+    </div>
   );
 }

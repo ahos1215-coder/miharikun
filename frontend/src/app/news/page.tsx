@@ -1,3 +1,6 @@
+// ISR: ニュースは5分キャッシュ（週次更新なので十分）
+export const revalidate = 300;
+
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -350,31 +353,29 @@ export default async function NewsPage({
 
   const totalPages = Math.ceil(totalFiltered / PAGE_SIZE);
 
-  // --- Source counts (hidden を除外) ---
-  const { count: totalCount } = await supabase
-    .from("regulations")
-    .select("*", { count: "exact", head: true })
-    .neq("needs_review", true);
+  // --- Source counts + publications を並列取得 ---
+  const countQueries = [
+    supabase.from("regulations").select("*", { count: "exact", head: true }).neq("needs_review", true),
+    supabase.from("regulations").select("*", { count: "exact", head: true }).ilike("source", "nk").neq("needs_review", true),
+    supabase.from("regulations").select("*", { count: "exact", head: true }).ilike("source", "MLIT").neq("needs_review", true),
+  ] as const;
 
-  const { count: nkCount } = await supabase
-    .from("regulations")
-    .select("*", { count: "exact", head: true })
-    .ilike("source", "nk")
-    .neq("needs_review", true);
+  // publications は "publications" タブの時のみ取得（遅延取得）
+  const pubQuery = activeTab === "publications"
+    ? supabase.from("publications")
+        .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
+        .order("current_edition_date", { ascending: false, nullsFirst: false })
+    : null;
 
-  const { count: mlitCount } = await supabase
-    .from("regulations")
-    .select("*", { count: "exact", head: true })
-    .ilike("source", "MLIT")
-    .neq("needs_review", true);
+  const [totalResult, nkResult, mlitResult, pubResult] = await Promise.all([
+    ...countQueries,
+    pubQuery ?? Promise.resolve({ data: null }),
+  ]);
 
-  // --- Publications from DB ---
-  const { data: dbPublications } = await supabase
-    .from("publications")
-    .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
-    .order("current_edition_date", { ascending: false, nullsFirst: false });
-
-  const publications: Publication[] = (dbPublications ?? []) as Publication[];
+  const totalCount = totalResult.count;
+  const nkCount = nkResult.count;
+  const mlitCount = mlitResult.count;
+  const publications: Publication[] = (pubResult.data ?? []) as Publication[];
 
   // --- URL builders ---
 

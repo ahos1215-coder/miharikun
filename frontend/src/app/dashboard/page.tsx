@@ -71,7 +71,7 @@ export default async function DashboardPage({
   // if (!user) redirect("/login");
 
   // 開発モード: user が null でも全船表示
-  let shipsQuery = supabase.from("ship_profiles").select("*");
+  let shipsQuery = supabase.from("ship_profiles").select("id,ship_name,ship_type,gross_tonnage,navigation_area,flag_state,classification_society,radio_equipment,created_at");
   if (user) {
     shipsQuery = shipsQuery.eq("user_id", user.id);
   }
@@ -81,22 +81,33 @@ export default async function DashboardPage({
   const shipIds = shipList.map((s) => s.id);
 
   let matchesByShip: Record<string, MatchWithReg[]> = {};
+  let allPublications: Publication[] = [];
 
   if (shipIds.length > 0) {
-    const { data: matches } = await supabase
-      .from("user_matches")
-      .select("*")
-      .in("ship_profile_id", shipIds)
-      .order("created_at", { ascending: false });
+    // 並列: matches + publications を同時取得
+    const [matchesResult, pubsResult] = await Promise.all([
+      supabase
+        .from("user_matches")
+        .select("id,regulation_id,ship_profile_id,is_applicable,match_method,confidence,reason,citations,notified,created_at")
+        .in("ship_profile_id", shipIds)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("publications")
+        .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
+        .order("category", { ascending: true })
+        .order("title_ja", { ascending: true }),
+    ]);
 
-    const allMatches = (matches ?? []) as UserMatch[];
+    allPublications = (pubsResult.data ?? []) as Publication[];
+
+    const allMatches = (matchesResult.data ?? []) as UserMatch[];
     const regIds = [...new Set(allMatches.map((m) => m.regulation_id))];
     let regsMap: Record<string, Regulation> = {};
 
     if (regIds.length > 0) {
       const { data: regs } = await supabase
         .from("regulations")
-        .select("*")
+        .select("id,source,source_id,title,headline,summary_ja,category,severity,confidence,published_at,effective_date,onboard_actions,shore_actions,sms_chapters")
         .in("id", regIds);
 
       for (const r of (regs ?? []) as Regulation[]) {
@@ -111,16 +122,14 @@ export default async function DashboardPage({
       }
       matchesByShip[m.ship_profile_id].push(entry);
     }
+  } else {
+    // 船がなくても publications は取得
+    const { data: dbPubs } = await supabase
+      .from("publications")
+      .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
+      .order("category", { ascending: true });
+    allPublications = (dbPubs ?? []) as Publication[];
   }
-
-  // Fetch publications from DB (法定書籍 — 船舶登録不要で全件表示)
-  const { data: dbPubs } = await supabase
-    .from("publications")
-    .select("id,title,title_ja,category,publisher,current_edition,current_edition_date,legal_basis,update_cycle")
-    .order("category", { ascending: true })
-    .order("title_ja", { ascending: true });
-
-  const allPublications = (dbPubs ?? []) as Publication[];
 
   /* ── Build serializable data for client shell ── */
 

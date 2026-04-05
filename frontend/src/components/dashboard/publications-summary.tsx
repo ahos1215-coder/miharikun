@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { BookOpen, CheckCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -114,11 +113,7 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
   }, [publications]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.25 }}
-    >
+    <div className="motion-preset-slide-up motion-duration-500">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
           <BookOpen size={14} className="text-accent-cyan" />
@@ -170,12 +165,10 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
               const status = getEditionStatus(pub);
               const editionYear = new Date(pub.editionDate).getFullYear();
               return (
-                <motion.tr
+                <tr
                   key={pub.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 + i * 0.04 }}
                   className={cn(
+                    "motion-preset-fade motion-duration-300",
                     "border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors",
                     status.rowClass
                   )}
@@ -210,7 +203,7 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
                       </span>
                     )}
                   </td>
-                </motion.tr>
+                </tr>
               );
             })}
           </tbody>
@@ -226,6 +219,6 @@ export function PublicationsSummary({ shipId, publications }: PublicationsSummar
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

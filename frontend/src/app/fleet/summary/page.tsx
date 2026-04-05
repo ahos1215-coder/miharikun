@@ -55,7 +55,7 @@ export default async function FleetSummaryPage() {
   // if (!user) redirect("/login");
 
   // 全船舶を取得（開発モード: user_id チェック緩和）
-  let shipsQuery = supabase.from("ship_profiles").select("*");
+  let shipsQuery = supabase.from("ship_profiles").select("id,ship_name,ship_type,gross_tonnage");
   if (user) {
     shipsQuery = shipsQuery.eq("user_id", user.id);
   }
@@ -74,7 +74,7 @@ export default async function FleetSummaryPage() {
   if (shipIds.length > 0) {
     const { data: matches } = await supabase
       .from("user_matches")
-      .select("*")
+      .select("id,regulation_id,ship_profile_id,is_applicable,confidence")
       .in("ship_profile_id", shipIds)
       .eq("is_applicable", true);
 
@@ -94,7 +94,7 @@ export default async function FleetSummaryPage() {
     if (regIds.length > 0) {
       const { data: regs } = await supabase
         .from("regulations")
-        .select("*")
+        .select("id,source,source_id,title,headline,category,severity,published_at,effective_date")
         .in("id", regIds);
 
       for (const reg of (regs ?? []) as Regulation[]) {
