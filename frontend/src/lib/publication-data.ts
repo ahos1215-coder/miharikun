@@ -534,33 +534,5 @@ export const PUBLICATIONS: PublicationRef[] = [
   },
 ];
 
-/**
- * 船舶スペックから必要な書籍を判定
- */
-export function getRequiredPublications(ship: {
-  ship_type: string;
-  gross_tonnage: number;
-  navigation_area: string[];
-  flag_state: string;
-  classification_society: string;
-  radio_equipment?: string[];
-}): PublicationRef[] {
-  return PUBLICATIONS.filter((pub) => {
-    const a = pub.appliesTo;
-    if (a.allShips) return true;
-    if (a.shipTypes && !a.shipTypes.includes(ship.ship_type)) return false;
-    if (a.gtMin && ship.gross_tonnage < a.gtMin) return false;
-    if (a.navigation && !a.navigation.some((n) => ship.navigation_area.includes(n))) return false;
-    if (a.flagState && ship.flag_state !== a.flagState) return false;
-    if (a.classSociety && ship.classification_society !== a.classSociety) return false;
-    if (a.radioEquipment && !(ship.radio_equipment ?? []).some(r => a.radioEquipment!.includes(r))) return false;
-    return true;
-  });
-}
-
-/**
- * 最新版の発行日でソート（新しい順）
- */
-export function getPublicationsByRecency(): PublicationRef[] {
-  return [...PUBLICATIONS].sort((a, b) => b.editionDate.localeCompare(a.editionDate));
-}
+// getRequiredPublications / getPublicationsByRecency は廃止済み
+// DB publications テーブルから直接取得する方式に移行 (2026-04-03)
